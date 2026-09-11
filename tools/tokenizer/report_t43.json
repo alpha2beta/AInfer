@@ -1,0 +1,78 @@
+{
+ "cases": 14,
+ "passed": 14,
+ "all_pass": true,
+ "results": [
+  {
+   "case": "encode:'Hello, world!'",
+   "pass": true,
+   "detail": "ours=[9419, 11, 1814, 0] ref=[9419, 11, 1814, 0]"
+  },
+  {
+   "case": "encode:'What is 84 * 3 / 2?'",
+   "pass": true,
+   "detail": "ours=[3710, 369, 220, 23, 19, 348, 220, 18] ref=[3710, 369, 220, 23, 19, 348, 220, 18]"
+  },
+  {
+   "case": "encode:'Explain quantum computin'",
+   "pass": true,
+   "detail": "ours=[814, 20139, 29144, 23470, 303, 4145, 3665, 13] ref=[814, 20139, 29144, 23470, 303, 4145, 3665, 13]"
+  },
+  {
+   "case": "encode:'Write a Python function '",
+   "pass": true,
+   "detail": "ours=[7734, 264, 12654, 709, 421, 16915, 287, 264] ref=[7734, 264, 12654, 709, 421, 16915, 287, 264]"
+  },
+  {
+   "case": "encode:'Unicode: caf\u00e9 \u4e2d\u6587 \ud83d\ude00'",
+   "pass": true,
+   "detail": "ours=[32798, 25, 50203, 220, 99986, 87209] ref=[32798, 25, 50203, 220, 99986, 87209]"
+  },
+  {
+   "case": "encode:''",
+   "pass": true,
+   "detail": "ours=[] ref=[]"
+  },
+  {
+   "case": "encode:chat-markup",
+   "pass": true,
+   "detail": "[248045, 846, 198, 12675, 248046, 198, 248045, 74455, 198]"
+  },
+  {
+   "case": "specials:count-33",
+   "pass": true,
+   "detail": "33"
+  },
+  {
+   "case": "specials:all-single-id",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "case": "decode:chat-markup",
+   "pass": true,
+   "detail": "'<|im_start|>user\\nHi<|im_end|>\\n<|im_start'"
+  },
+  {
+   "case": "chat-template:minimal",
+   "pass": true,
+   "detail": "ours='<|im_start|>user\\nHi<|im_end|>\\n<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n' ref='<|im_start|>user\\nHi<|im_end|>\\n<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n'"
+  },
+  {
+   "case": "chat-template:system",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "case": "chat-template:thinking",
+   "pass": true,
+   "detail": "ours='<|im_start|>system\\nReasoning effort is set to xhigh. Please '"
+  },
+  {
+   "case": "prompt_ids:e2e",
+   "pass": true,
+   "detail": "[248045, 846, 198, 12675, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271]"
+  }
+ ],
+ "note": "reference = transformers AutoTokenizer(Qwen2Tokenizer) on pinned dir"
+}

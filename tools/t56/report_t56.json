@@ -1,0 +1,53 @@
+{
+ "cases": [
+  "determinism_x3",
+  "long_gen_60",
+  "long_template_96",
+  "cpu_wait",
+  "wall_stability"
+ ],
+ "passed": 5,
+ "all_pass": true,
+ "results": {
+  "determinism_x3": {
+   "pass": true,
+   "generated": [
+    369,
+    248046
+   ]
+  },
+  "long_gen_60": {
+   "pass": true,
+   "tokens": 61,
+   "stopped_eos": false,
+   "top5_lines": 61,
+   "finite": true,
+   "spread": true,
+   "wall_s": 12.2
+  },
+  "long_template_96": {
+   "pass": true,
+   "tokens": 59,
+   "text_head": "We need answer user: \"What is 84 * 3 / 2? Reply with just the number.\" Need comp"
+  },
+  "cpu_wait": {
+   "pass": true,
+   "samples_pct": [
+    96.7
+   ],
+   "rc": 0,
+   "bg_tokens": 61,
+   "note": "AINFER_TOP5=0 steady-state path; samples = whole-generation process-CPU average via stdbuf-unbuffered step lines (block-buffered stdio hid the generation window); no user-space spin in loop (all waits UINT64_MAX blocking); <95% rules out hot spin; bg run must complete 61 tokens"
+  },
+  "wall_stability": {
+   "pass": true,
+   "walls": [
+    7.6,
+    7.0,
+    8.3,
+    12.2,
+    16.7
+   ]
+  }
+ }
+}

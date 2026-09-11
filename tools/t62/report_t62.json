@@ -1,0 +1,69 @@
+{
+ "device": "B60",
+ "backend": "raw-L0 recorded lists",
+ "points": 4,
+ "passed": 4,
+ "all_pass": true,
+ "rows": [
+  {
+   "point": "p001",
+   "prompt": 1,
+   "max_new": 8,
+   "pass": true,
+   "generated": 9,
+   "finite_top5": true,
+   "wall_s": 41.4,
+   "lin_ms": 1.032,
+   "attn_ms": 1.012,
+   "tail_ms": 2.304,
+   "steady_s_per_tok": 0.068,
+   "steady_tok_per_s": 14.7,
+   "prefill_tok_per_s": 15.21
+  },
+  {
+   "point": "p016",
+   "prompt": 16,
+   "max_new": 8,
+   "pass": true,
+   "generated": 9,
+   "finite_top5": true,
+   "wall_s": 42.2,
+   "lin_ms": 1.031,
+   "attn_ms": 1.143,
+   "tail_ms": 2.307,
+   "steady_s_per_tok": 0.0701,
+   "steady_tok_per_s": 14.27,
+   "prefill_tok_per_s": 14.75
+  },
+  {
+   "point": "p064",
+   "prompt": 64,
+   "max_new": 8,
+   "pass": true,
+   "generated": 9,
+   "finite_top5": true,
+   "wall_s": 46.2,
+   "lin_ms": 1.031,
+   "attn_ms": 1.559,
+   "tail_ms": 2.303,
+   "steady_s_per_tok": 0.0767,
+   "steady_tok_per_s": 13.03,
+   "prefill_tok_per_s": 13.44
+  },
+  {
+   "point": "p256",
+   "prompt": 256,
+   "max_new": 4,
+   "pass": true,
+   "generated": 3,
+   "finite_top5": true,
+   "wall_s": 66.6,
+   "lin_ms": 1.035,
+   "attn_ms": 3.173,
+   "tail_ms": 2.301,
+   "steady_s_per_tok": 0.1027,
+   "steady_tok_per_s": 9.73,
+   "prefill_tok_per_s": 9.96
+  }
+ ]
+}

@@ -1,0 +1,85 @@
+{
+ "prompts": [
+  "What animal is on the candy?",
+  "What is 84 * 3 / 2?",
+  "Tell me an interesting fact about the universe!",
+  "Explain quantum computing in simple terms.",
+  "Write a Python function that reverses a string.",
+  "Summarize the plot of a famous fairy tale in two sentences."
+ ],
+ "prompt_ids": [
+  [
+   3710,
+   9572,
+   369,
+   383,
+   279,
+   30517,
+   30
+  ],
+  [
+   3710,
+   369,
+   220,
+   23,
+   19,
+   348,
+   220,
+   18,
+   593,
+   220,
+   17,
+   30
+  ],
+  [
+   39113,
+   728,
+   449,
+   6821,
+   2029,
+   883,
+   279,
+   15039,
+   0
+  ],
+  [
+   814,
+   20139,
+   29144,
+   23470,
+   303,
+   4145,
+   3665,
+   13
+  ],
+  [
+   7734,
+   264,
+   12654,
+   709,
+   421,
+   16915,
+   287,
+   264,
+   886,
+   13
+  ],
+  [
+   8917,
+   5437,
+   537,
+   279,
+   6868,
+   314,
+   264,
+   10919,
+   43008,
+   22557,
+   303,
+   1330,
+   22157,
+   13
+  ]
+ ],
+ "status": "BLOCKED: short-prompt logits + greedy sequences need full-model forward"
+}

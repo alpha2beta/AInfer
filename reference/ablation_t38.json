@@ -1,0 +1,79 @@
+{
+ "date": "2026-09-08",
+ "ref": "reference/mlp_layer0.json (corrected 1+w)",
+ "conclusion": "keep symmetric g128; no cheap exception (error uniform, no outliers); asymmetric gain too small for decode cost; end-to-end quality (T1.5/T6.3) is the arbiter",
+ "variants": [
+  {
+   "variant": "bf16-control",
+   "max": 0.0,
+   "mean": 0.0,
+   "meanrel": 0.0
+  },
+  {
+   "variant": "q-gate-only",
+   "max": 1.4456,
+   "mean": 0.03717,
+   "meanrel": 0.0403
+  },
+  {
+   "variant": "q-up-only",
+   "max": 0.9407,
+   "mean": 0.03598,
+   "meanrel": 0.039
+  },
+  {
+   "variant": "q-down-only",
+   "max": 1.4149,
+   "mean": 0.03723,
+   "meanrel": 0.0403
+  },
+  {
+   "variant": "q-all-g128sym",
+   "max": 1.6314,
+   "mean": 0.06384,
+   "meanrel": 0.0692
+  },
+  {
+   "variant": "exc-gate",
+   "max": 0.5552,
+   "mean": 0.05165,
+   "meanrel": 0.056
+  },
+  {
+   "variant": "exc-up",
+   "max": 1.2484,
+   "mean": 0.05207,
+   "meanrel": 0.0564
+  },
+  {
+   "variant": "exc-down",
+   "max": 1.8175,
+   "mean": 0.0524,
+   "meanrel": 0.0568
+  },
+  {
+   "variant": "exc-gateup",
+   "max": 1.4149,
+   "mean": 0.03723,
+   "meanrel": 0.0403
+  },
+  {
+   "variant": "q-all-g64sym",
+   "max": 1.9539,
+   "mean": 0.05779,
+   "meanrel": 0.0626
+  },
+  {
+   "variant": "q-all-g32sym",
+   "max": 0.6218,
+   "mean": 0.051,
+   "meanrel": 0.0553
+  },
+  {
+   "variant": "q-all-g128asym",
+   "max": 1.6157,
+   "mean": 0.05359,
+   "meanrel": 0.0581
+  }
+ ]
+}

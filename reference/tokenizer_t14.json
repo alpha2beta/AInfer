@@ -1,0 +1,69 @@
+{
+ "vocab_size": 248077,
+ "tests": [
+  {
+   "text": "Hello, world!",
+   "ids": [
+    9419,
+    11,
+    1814,
+    0
+   ],
+   "len": 4,
+   "roundtrip": true
+  },
+  {
+   "text": "What is 84 * 3 / 2?",
+   "ids": [
+    3710,
+    369,
+    220,
+    23,
+    19,
+    348,
+    220,
+    18,
+    593,
+    220,
+    17,
+    30
+   ],
+   "len": 12,
+   "roundtrip": true
+  },
+  {
+   "text": "Explain quantum computing in simple terms.",
+   "ids": [
+    814,
+    20139,
+    29144,
+    23470,
+    303,
+    4145,
+    3665,
+    13
+   ],
+   "len": 8,
+   "roundtrip": true
+  },
+  {
+   "text": "<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n",
+   "ids": [
+    248045,
+    846,
+    198,
+    12675,
+    248046,
+    198,
+    248045,
+    74455,
+    198
+   ],
+   "len": 9,
+   "roundtrip": false
+  }
+ ],
+ "all_roundtrip": false,
+ "special_tokens_note": "chat markup (<|im_start|> etc.) does NOT round-trip with tokenizer.json standalone: added special tokens live in tokenizer_config.json/chat_template and decode() skips them by default. T4.3 must register added tokens before any comparisons.",
+ "plain_text_roundtrip": "all True"
+}

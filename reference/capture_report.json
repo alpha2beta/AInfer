@@ -1,0 +1,10 @@
+{
+ "date": "2026-09-07",
+ "parts": {
+  "A_tokenizer": "ok",
+  "B_operators": "ok",
+  "C_weight_stats": "ok",
+  "D_mlp_layer0": "ok",
+  "E_corpus": "ok"
+ }
+}

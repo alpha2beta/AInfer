@@ -1,0 +1,105 @@
+Here is an engineering implementation plan to build a lightweight, specialized, "NInfer-style" inference engine for **Qwen 3.8 27B** on the **Intel Arc Pro B60 (24GB, Xe2 Battlemage architecture)** under Ubuntu.
+
+---
+
+### Phase 1: Architecture & Technical Foundations
+
+The core philosophy mirrors NInfer: **zero framework bloat, static memory pre-allocation, hardware-specific kernel tuning, and direct driver dispatch.**
+
+| Dimension | Standard Framework (vLLM / llama.cpp) | Custom NInfer-Style Xe2 Engine |
+| --- | --- | --- |
+| **Driver & Dispatch** | OpenCL / PyTorch / SYCL generic runtime | Direct **oneAPI Level Zero (L0)** C API |
+| **Kernel Implementation** | Generic cross-platform SYCL / OpenCL | **ESIMD (Explicit SIMD)** & native Xe2 **XMX** intrinsics |
+| **Scheduling** | Dynamic queue submissions, runtime graphs | **Reusable Level Zero Command Lists** (pre-recorded token loop) |
+| **Model Weight Format** | `.gguf` / SafeTensors + dynamic dequant | Custom single-binary `.binfer` (pre-swizzled for Xe2 cache lines) |
+| **Quantization Format** | GGUF Q4_K / AWQ | Packed **INT4 / FP8** aligned to 64-byte/128-byte cache transactions |
+
+---
+
+### Phase 2: Memory Budgeting (24GB VRAM Allocation)
+
+To ensure zero dynamic allocation (`malloc` / `zeMemAllocDevice`) during inference, lock the address space at initialization:
+
+* **Static Weights (INT4 Quantized Qwen 27B)**: ~15.2 GB
+* **Fixed KV Cache (FP8 or INT8, 4K context window)**: ~2.4 GB
+* **Scratchpad & Activation Buffers (QKV, SwiGLU, RMSNorm)**: ~1.2 GB
+* **Level Zero Context & System Margin**: ~1.5 GB
+* **Total Static Footprint**: **~20.3 GB / 24 GB** (leaves ~3.7 GB safety margin).
+
+---
+
+### Phase 3: Core Kernel Development (ESIMD & XMX)
+
+1. **INT4-FP16 GEMV Decode Kernel (The Primary Workhorse)**
+* Target the decode phase (batch = 1, `M=1, K=hidden_dim, N=intermediate_dim`).
+* Write kernels in **DPC++ ESIMD** to manage GRF (General Register File) allocation manually.
+* Swizzle INT4 weights offline during model export so that 2D block reads match Xe2 Subslice cache line layouts directly into XMX systolic registers.
+
+
+2. **Fused RMSNorm + Rotary Position Embedding (RoPE)**
+* Fuse layer normalization and RoPE into a single dispatch pass to prevent redundant round-trips to the 456 GB/s GDDR6 memory.
+
+
+3. **Padded Static Attention Kernel**
+* Avoid generic PagedAttention. Use a contiguous pre-allocated circular ring buffer for the KV Cache per sequence, computing attention using direct vectorized dot-products across Xe Vector Engines (XVE).
+
+
+4. **MTP (Multi-Token Prediction) Verification Kernel**
+* If Qwen 3.8 exposes speculative MTP heads, write a small verification kernel that checks candidate tokens in parallel, amortizing the 27B backbone memory fetch.
+
+
+
+---
+
+### Phase 4: Driver-Level Scheduling (Level Zero Pipeline)
+
+* **Pre-Recorded Command Lists**:
+* Avoid `zeCommandQueueExecuteCommandLists` overhead on every layer.
+* Record all 60+ transformer block dispatches, memory barriers, and kernel arguments into a single reusable **Immediate / Synchronized Command List**.
+
+
+* **Zero-Copy Host Interaction**:
+* Pin input/output buffers via `zeMemAllocHost`.
+* The host only writes the next single Token ID to the input buffer, signals a lightweight L0 event, and polls the output logits buffer.
+
+
+
+---
+
+### Phase 5: Implementation Roadmap
+
+```
+Step 1: Offline Quantizer & Exporter (Python / C++)
+ ├── Load Qwen 3.8 27B SafeTensors
+ ├── Quantize linear weights to INT4 with group-size 128
+ └── Swizzle and pack tensor bytes into a contiguous `.binfer` binary
+
+Step 2: Microbenchmarking & Baseline Kernels
+ ├── Set up Ubuntu Intel compute runtime (compute-runtime, level-zero, dpcpp)
+ ├── Validate raw memory bandwidth on Arc Pro B60 using ESIMD block reads
+ └── Implement and profile a standalone INT4-GEMV kernel against 456 GB/s peak
+
+Step 3: Graph Assembly & Layer Fusions
+ ├── Stitch Attention, MLP (SwiGLU), and RMSNorm in Level Zero
+ ├── Pre-record the full forward pass execution chain
+ └── Verify numerical parity with Hugging Face baseline
+
+Step 4: End-to-End Runtime & Server Loop
+ ├── Implement CLI streaming output (C++ std::cout)
+ ├── Integrate embedded tokenizer (BPE C++ port)
+ └── (Optional) Lightweight HTTP daemon matching OpenAI `/v1/completions`
+
+```
+
+---
+
+### Expected Performance Milestones
+
+* **Theoretical Bandwidth Ceiling**:
+
+$$\frac{456\text{ GB/s}}{15.2\text{ GB per token}} \approx 30.0\text{ tokens/s (Standard Auto-regressive)}$$
+
+
+* **Target Real-World Performance**:
+* **Pure Decode (INT4)**: **25 – 28 tokens/s** (achieving >85% of physical memory bandwidth).
+* **With Speculative MTP Head**: **35 – 48 tokens/s** (depending on token acceptance rate).

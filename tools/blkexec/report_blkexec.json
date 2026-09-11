@@ -1,0 +1,1 @@
+{"device":"B60","results":[{"tensor":"model.language_model.layers.3.self_attn.q_proj.weight","ms":0.146,"gbs":221.9,"maxrel":2.76e-07,"PASS":true},{"tensor":"model.language_model.layers.0.mlp.gate_proj.weight","ms":0.254,"gbs":181.2,"maxrel":2.00e-07,"PASS":true}]}

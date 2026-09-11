@@ -1,0 +1,1 @@
+{"device":"B60","esimd":{"sg16":true,"sg32":true},"xmx":{"int8_8x16x32":true,"fp16_8x16x16":true,"bf16_8x16x16":true,"int4_native":false},"timestamps":{"sycl_submit_ns":13424879546918,"sycl_end_ns":13424887059062,"l0_ok":true,"l0_host":13393547803492,"l0_dev":257757832180}}

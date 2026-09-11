@@ -1,0 +1,127 @@
+{
+ "cases": 6,
+ "passed": 6,
+ "all_pass": true,
+ "results": [
+  {
+   "case": "matched-template-completion",
+   "pass": true,
+   "prompt_tokens": 70,
+   "generated": [
+    1596,
+    1144,
+    4087,
+    1156,
+    25,
+    328,
+    3710,
+    369,
+    220,
+    23,
+    19,
+    348,
+    220,
+    18,
+    593,
+    220,
+    17,
+    30,
+    17308,
+    440,
+    1066,
+    279,
+    1324,
+    1149,
+    14235,
+    12204,
+    13,
+    220,
+    23,
+    19,
+    9,
+    18,
+    28,
+    17,
+    20,
+    17,
+    11,
+    593,
+    17,
+    28,
+    16,
+    17,
+    21,
+    13,
+    12650,
+    1066,
+    1324,
+    13,
+    28320,
+    874,
+    4799,
+    13,
+    198,
+    248069,
+    271,
+    16,
+    17,
+    21,
+    248046
+   ],
+   "device_text": "We need answer user: \"What is 84 * 3 / 2? Reply with just the number.\" Need compute. 84*3=252, /2=126. Final just number",
+   "llama_text": "126"
+  },
+  {
+   "case": "one-token-prompt",
+   "pass": true,
+   "generated": [
+    369,
+    279,
+    7193,
+    314,
+    279,
+    1510,
+    312,
+    2083,
+    12
+   ]
+  },
+  {
+   "case": "determinism-repeat",
+   "pass": true,
+   "gen1": [
+    369,
+    279,
+    248046
+   ],
+   "gen2": [
+    369,
+    279,
+    248046
+   ]
+  },
+  {
+   "case": "max-length-64",
+   "pass": true,
+   "generated": [
+    198,
+    248045,
+    248068,
+    198,
+    760
+   ]
+  },
+  {
+   "case": "negative-truncated",
+   "pass": true,
+   "rc": 2,
+   "stderr": "payload span out of range: lm_head.weight"
+  },
+  {
+   "case": "negative-garbage",
+   "pass": true,
+   "rc": 2,
+   "stderr": "bad magic (not a .binfer file)"
+  }
+ ]
+}

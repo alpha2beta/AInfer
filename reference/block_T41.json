@@ -1,0 +1,16 @@
+{
+ "date": "2026-09-08",
+ "note": "manual low-level wiring vs HF Qwen3_5DecoderLayer, real weights, 4-token prefill",
+ "results": {
+  "L3-full_attention": {
+   "max": 0.0,
+   "mean": 0.0,
+   "refmax": 31.630210876464844
+  },
+  "L0-linear_attention": {
+   "max": 0.0,
+   "mean": 0.0,
+   "refmax": 84.37805938720703
+  }
+ }
+}

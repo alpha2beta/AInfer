@@ -1,0 +1,1 @@
+{"device":"B60","results":[{"name":"rope-neox64","ms":0.0298,"maxdiff":2.38e-07,"meandiff":1.18e-09},{"name":"attn-weights-h0","ms":0.1243,"maxdiff":2.84e-08,"meandiff":2.84e-08},{"name":"oproj+e2e","ms":0.8280,"maxdiff":1.28e-06,"meandiff":8.21e-08},{"name":"silu-mul-2pass","ms":0.0057},{"name":"silu-mul-fused","ms":0.0014}]}

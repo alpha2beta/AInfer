@@ -1,0 +1,19 @@
+{
+ "seed": 0,
+ "float": "float64",
+ "rope_note": "half-rotation dim-64 theta-1e7; mrope section split TBD vs HF",
+ "keys": [
+  "attn_k",
+  "attn_out",
+  "attn_q",
+  "attn_v",
+  "g",
+  "rmsnorm_in",
+  "rmsnorm_out",
+  "rmsnorm_w",
+  "rope_in",
+  "rope_out",
+  "silu_gate_out",
+  "u"
+ ]
+}

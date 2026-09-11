@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/mnt/usb/AInfer/tools/l0probe/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

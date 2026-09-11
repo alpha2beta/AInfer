@@ -1,0 +1,29 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "b60",
+      "displayName": "AInfer on B60 (icpx, Release)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-b60",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "/opt/intel/oneapi/compiler/2026.1/bin/icpx"
+      }
+    },
+    {
+      "name": "host",
+      "displayName": "Host compiler fallback (Release)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-host",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "b60", "configurePreset": "b60" },
+    { "name": "host", "configurePreset": "host" }
+  ],
+  "testPresets": [
+    { "name": "b60", "configurePreset": "b60", "output": { "outputOnFailure": true } }
+  ]
+}

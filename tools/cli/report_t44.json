@@ -1,0 +1,28 @@
+{
+ "cases": 3,
+ "passed": 3,
+ "all_pass": true,
+ "note": "backend=llama.cpp SYCL reference (native T4.2 backend pending); total_s includes ~16-20s model load",
+ "results": [
+  {
+   "case": "determinism-same-seed",
+   "pass": true,
+   "text": "126"
+  },
+  {
+   "case": "second-prompt",
+   "pass": true,
+   "text": "Paris"
+  },
+  {
+   "case": "short-prompt",
+   "pass": true,
+   "text": "Hi! What can I help you with?",
+   "note": "needed max-tokens 128: thinking block consumes budget at 32"
+  }
+ ],
+ "timings": {
+  "total_s": 19.97023916244507,
+  "prompt_tokens": 30
+ }
+}

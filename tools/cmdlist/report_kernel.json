@@ -1,0 +1,1 @@
+{"bitwise_replay_deterministic":true,"build_flow":"icpx -fsycl -fsycl-targets=spir64 -c -> objcopy bundle section -> llvm-spirv (CMake custom cmds)","device":"B60","entry":"_ZTS7SiluMul (3 OpFunctionParameters, no hidden args; verified by SPIR-V parse)","host_ref_tol":"2e-6 (device exp is single-precision native)","iters":50,"kernel":"_ZTS7SiluMul","N":17408,"replay_us":10.03}

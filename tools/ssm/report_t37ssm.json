@@ -1,0 +1,1 @@
+{"device":"B60","results":[{"name":"conv-update-k4","ms":0.0091,"maxdiff":1.75e-10,"meandiff":1.46e-11},{"name":"recurrent-h0","ms":11.2081,"maxdiff":2.98e-10,"meandiff":8.98e-12,"rel":1.36e-06},{"name":"recurrent-48h","ms":16.0139,"maxdiff":-1.00e+00,"meandiff":-1.00e+00,"gbs":0.4}]}

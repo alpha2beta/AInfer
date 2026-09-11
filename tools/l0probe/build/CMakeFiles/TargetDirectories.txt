@@ -1,0 +1,3 @@
+/mnt/usb/AInfer/tools/l0probe/build/CMakeFiles/l0probe.dir
+/mnt/usb/AInfer/tools/l0probe/build/CMakeFiles/edit_cache.dir
+/mnt/usb/AInfer/tools/l0probe/build/CMakeFiles/rebuild_cache.dir

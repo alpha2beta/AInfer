@@ -1,0 +1,80 @@
+{
+ "stages": {
+  "S0": {
+   "L0-linear_attention": {
+    "max": 1.52587890625e-05,
+    "mean": 6.96202704375537e-08
+   },
+   "L1-linear_attention": {
+    "max": 1.9073486328125e-06,
+    "mean": 8.96232421609966e-08
+   },
+   "L2-linear_attention": {
+    "max": 3.814697265625e-06,
+    "mean": 1.1182864767533829e-07
+   },
+   "L3-full_attention": {
+    "max": 0.0,
+    "mean": 0.0
+   }
+  },
+  "S1": {
+   "seconds": 145.5,
+   "top5": [
+    369,
+    513,
+    248046,
+    1503,
+    635
+   ],
+   "top5_logit": [
+    17.558,
+    16.872,
+    16.519,
+    15.49,
+    14.683
+   ],
+   "logit_std": 2.0095,
+   "logits_sha": null,
+   "note": "logits saved to fwd_T42_bf16_logits.pt"
+  },
+  "S2": {
+   "seconds": 414.4,
+   "top1_agree": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "top1_q": [
+    8678,
+    198,
+    2523,
+    369
+   ],
+   "top1_bf16": [
+    8678,
+    198,
+    2523,
+    369
+   ]
+  },
+  "S3": {
+   "prompt_tokens": 24,
+   "seconds": 202.2,
+   "ours_top5": [
+    1206,
+    8160,
+    760,
+    23,
+    13682
+   ],
+   "ours_top1_text": "To",
+   "llama_first80": "126",
+   "first_token_agree": false,
+   "verdict": "MISMATCH EXPLAINED, comparison invalid as configured",
+   "analysis": "ours used thinking-DISABLED template (empty <think> block, last pos predicts thinking-style To); llama-cli applied its own default template WITH thinking and answered 126. Different prompts -> different first tokens. Proper check needs matched templates + greedy-to-completion on both sides (decode loop with KV/SSM caches = T4.2-device/T4.4-native work)."
+  }
+ },
+ "seconds_total": 574.8
+}

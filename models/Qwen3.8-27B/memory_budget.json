@@ -1,0 +1,99 @@
+{
+ "budget_version": "1.0",
+ "generated_at": "2026-09-07",
+ "context_cap": 4096,
+ "int4_group_size": 128,
+ "symmetric_scales": "BF16/group",
+ "weight_categories_bf16_gib": {
+  "keep_high_precision": 0.005,
+  "int4_candidate": 50.884,
+  "visual_excluded_v1": 0.858
+ },
+ "weight_categories_tensors": {
+  "keep_high_precision": 360,
+  "int4_candidate": 506,
+  "visual_excluded_v1": 333
+ },
+ "scenarios": {
+  "A_embed_bf16_lm_int4": {
+   "weights_bytes": 15978432512,
+   "weights_gib": 14.88
+  },
+  "B_embed_bf16_lm_bf16": {
+   "weights_bytes": 17865664512,
+   "weights_gib": 16.64
+  }
+ },
+ "kv_cache_bf16_bytes": 268435456,
+ "kv_cache_bf16_mib": 256.0,
+ "kv_cache_fp8_mib": 128.0,
+ "ssm_state_estimate": {
+  "bytes": 150994944,
+  "mib": 144.0,
+  "note": "estimate: 48 layers x 48 heads x 128 x 128 FP32; verify vs reference (T1.4)"
+ },
+ "conv_state_bytes": 5898240,
+ "conv_state_mib": 5.6,
+ "logits_bytes": 993280,
+ "activations_envelope_gib": 0.5,
+ "runtime_envelope_gib": 1.5,
+ "visual_excluded_v1_gib": 0.858,
+ "device_gib": 24.0,
+ "total_A_kv_bf16_bytes": 18552238080,
+ "total_A_kv_bf16_gib": 17.28,
+ "margin_A_kv_bf16_gib": 6.72,
+ "total_A_kv_fp8_bytes": 18418020352,
+ "total_A_kv_fp8_gib": 17.15,
+ "margin_A_kv_fp8_gib": 6.85,
+ "context_scaling_scenario_A": {
+  "ctx_4096_bf16": {
+   "kv_gib": 0.25,
+   "total_gib": 17.28,
+   "total_gb_decimal": 18.55,
+   "margin_gb_decimal_vs_24gb": 5.45
+  },
+  "ctx_4096_fp8": {
+   "kv_gib": 0.125,
+   "total_gib": 17.15,
+   "total_gb_decimal": 18.42,
+   "margin_gb_decimal_vs_24gb": 5.58
+  },
+  "ctx_8192_bf16": {
+   "kv_gib": 0.5,
+   "total_gib": 17.53,
+   "total_gb_decimal": 18.82,
+   "margin_gb_decimal_vs_24gb": 5.18
+  },
+  "ctx_8192_fp8": {
+   "kv_gib": 0.25,
+   "total_gib": 17.28,
+   "total_gb_decimal": 18.55,
+   "margin_gb_decimal_vs_24gb": 5.45
+  },
+  "ctx_16384_bf16": {
+   "kv_gib": 1.0,
+   "total_gib": 18.03,
+   "total_gb_decimal": 19.36,
+   "margin_gb_decimal_vs_24gb": 4.64
+  },
+  "ctx_16384_fp8": {
+   "kv_gib": 0.5,
+   "total_gib": 17.53,
+   "total_gb_decimal": 18.82,
+   "margin_gb_decimal_vs_24gb": 5.18
+  },
+  "ctx_32768_bf16": {
+   "kv_gib": 2.0,
+   "total_gib": 19.03,
+   "total_gb_decimal": 20.43,
+   "margin_gb_decimal_vs_24gb": 3.57
+  },
+  "ctx_32768_fp8": {
+   "kv_gib": 1.0,
+   "total_gib": 18.03,
+   "total_gb_decimal": 19.36,
+   "margin_gb_decimal_vs_24gb": 4.64
+  }
+ },
+ "device_note": "24 GB decimal = 22.35 GiB; margins below are vs 24.0 GB decimal. Activation envelope assumes chunked prefill (<=4K chunks)."
+}
