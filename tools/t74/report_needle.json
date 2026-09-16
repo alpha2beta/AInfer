@@ -1,0 +1,21 @@
+{
+  "device": "B60",
+  "task": "T7.4-64K-needle-eval",
+  "date": "2026-09-15",
+  "method": "needle_corpus variant (65024-token haystack) -> host BF16 embed -> chunk64mc stream M=256 (254 chunks, resident weights, decode-layout state) -> CHUNK_DUMP_CACHES (4.4 GB) -> decode_l0 --import-caches= + --ids-file= (context + 19-token question) -> greedy gen (max 64)",
+  "variants": [
+    {"variant": 0, "depth": 0.0, "code": "739521", "result": "HIT (8 tokens)"},
+    {"variant": 1, "depth": 0.25, "code": "184963", "result": "HIT (8 tokens)"},
+    {"variant": 2, "depth": 0.5, "code": "502817", "result": "HIT (8 tokens)"},
+    {"variant": 3, "depth": 0.75, "code": "926438", "result": "HIT (8 tokens)"},
+    {"variant": 4, "depth": 1.0, "code": "317654", "result": "HIT (8 tokens)"}
+  ],
+  "score": "5/5 exact-match retrieval at all depths",
+  "notes": [
+    "Each variant: ~80 min stream prefill (11.9->26.8 s/chunk O(W) growth) + ~2 min import-decode.",
+    "All answers: exact 6-digit code + EOS in 8 tokens (no rambling).",
+    "Chain v1 postmortem (tmpfs-full dump death, SIGKILL, silent skip-through) fixed in hardened chain v2 (dumps to /mnt/usb, fail-fast guards).",
+    "One transient device loss during v3 first attempt (fence-sync failure cascade); CHECK hardened to exit(1); rerun clean with zero L0 errors."
+  ],
+  "verdict": "T7.4 64K QUALITY GATE PASSED 5/5: chunked-prefill + file-handoff + decode retrieves exact codes from 0/25/50/75/100% depth of 65K-token contexts."
+}

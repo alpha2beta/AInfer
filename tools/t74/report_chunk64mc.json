@@ -1,0 +1,13 @@
+{
+ "device": "B60",
+ "chunk64mc": "64-layer two-chunk prefill vs T=64 float chain + slot check",
+ "M": 32,
+ "chunks": "A:0..31 B:32..63",
+ "worst_rel": 0.01711149699985981,
+ "mean_rel": 0.0001463568623876199,
+ "ref_tol": 0.02,
+ "refmax": 515.279296875,
+ "slot_placement_bitwise": true,
+ "seconds": 370.9,
+ "chunk64mc_ok": true
+}

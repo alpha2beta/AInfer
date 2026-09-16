@@ -1,0 +1,2106 @@
+{
+ "version": 1,
+ "seed": 20260916,
+ "cases": [
+  {
+   "id": "fact-000",
+   "category": "factual",
+   "prompt": "What is the capital of France? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Paris"
+   }
+  },
+  {
+   "id": "fact-001",
+   "category": "factual",
+   "prompt": "What is the capital of Japan? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Tokyo"
+   }
+  },
+  {
+   "id": "fact-002",
+   "category": "factual",
+   "prompt": "What is the capital of Brazil? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Brasília"
+   }
+  },
+  {
+   "id": "fact-003",
+   "category": "factual",
+   "prompt": "What is the capital of Canada? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Ottawa"
+   }
+  },
+  {
+   "id": "fact-004",
+   "category": "factual",
+   "prompt": "What is the capital of Australia? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Canberra"
+   }
+  },
+  {
+   "id": "fact-005",
+   "category": "factual",
+   "prompt": "What is the capital of Egypt? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Cairo"
+   }
+  },
+  {
+   "id": "fact-006",
+   "category": "factual",
+   "prompt": "What is the capital of India? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "New Delhi"
+   }
+  },
+  {
+   "id": "fact-007",
+   "category": "factual",
+   "prompt": "What is the capital of Germany? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Berlin"
+   }
+  },
+  {
+   "id": "fact-008",
+   "category": "factual",
+   "prompt": "What is the capital of Italy? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Rome"
+   }
+  },
+  {
+   "id": "fact-009",
+   "category": "factual",
+   "prompt": "What is the capital of Spain? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Madrid"
+   }
+  },
+  {
+   "id": "fact-010",
+   "category": "factual",
+   "prompt": "What is the capital of Mexico? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Mexico City"
+   }
+  },
+  {
+   "id": "fact-011",
+   "category": "factual",
+   "prompt": "What is the capital of Argentina? Reply with only the city name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Buenos Aires"
+   }
+  },
+  {
+   "id": "fact-012",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol H? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Hydrogen"
+   }
+  },
+  {
+   "id": "fact-013",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol He? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Helium"
+   }
+  },
+  {
+   "id": "fact-014",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol C? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Carbon"
+   }
+  },
+  {
+   "id": "fact-015",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol N? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Nitrogen"
+   }
+  },
+  {
+   "id": "fact-016",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol O? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Oxygen"
+   }
+  },
+  {
+   "id": "fact-017",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol Na? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Sodium"
+   }
+  },
+  {
+   "id": "fact-018",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol Fe? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Iron"
+   }
+  },
+  {
+   "id": "fact-019",
+   "category": "factual",
+   "prompt": "Which chemical element has the symbol Au? Reply with only the element name.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "Gold"
+   }
+  },
+  {
+   "id": "fact-020",
+   "category": "factual",
+   "prompt": "In which year did the first moon landing occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1969"
+   }
+  },
+  {
+   "id": "fact-021",
+   "category": "factual",
+   "prompt": "In which year did the fall of the Berlin Wall occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1989"
+   }
+  },
+  {
+   "id": "fact-022",
+   "category": "factual",
+   "prompt": "In which year did the first modern Olympic Games occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1896"
+   }
+  },
+  {
+   "id": "fact-023",
+   "category": "factual",
+   "prompt": "In which year did the signing of the US Declaration of Independence occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1776"
+   }
+  },
+  {
+   "id": "fact-024",
+   "category": "factual",
+   "prompt": "In which year did the first flight by the Wright brothers occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1903"
+   }
+  },
+  {
+   "id": "fact-025",
+   "category": "factual",
+   "prompt": "In which year did the end of World War II occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1945"
+   }
+  },
+  {
+   "id": "fact-026",
+   "category": "factual",
+   "prompt": "In which year did the launch of Sputnik 1 occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1957"
+   }
+  },
+  {
+   "id": "fact-027",
+   "category": "factual",
+   "prompt": "In which year did the invention of the telephone by Bell occur? Reply with only the year.",
+   "max_new": 16,
+   "check": {
+    "type": "exact",
+    "expected": "1876"
+   }
+  },
+  {
+   "id": "fact-028",
+   "category": "factual",
+   "prompt": "Convert 32 kilometers to miles. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 19.88,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-029",
+   "category": "factual",
+   "prompt": "Convert 100 kilometers to miles. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 62.14,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-030",
+   "category": "factual",
+   "prompt": "Convert 5 kilograms to pounds. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 11.02,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-031",
+   "category": "factual",
+   "prompt": "Convert 20 kilograms to pounds. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 44.09,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-032",
+   "category": "factual",
+   "prompt": "Convert 2 liters to fluid ounces. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 67.63,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-033",
+   "category": "factual",
+   "prompt": "Convert 500 milliliters to fluid ounces. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 16.91,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-034",
+   "category": "factual",
+   "prompt": "Convert 25 degrees Celsius to Fahrenheit. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 77.0,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-035",
+   "category": "factual",
+   "prompt": "Convert 0 degrees Celsius to Fahrenheit. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 32.0,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-036",
+   "category": "factual",
+   "prompt": "Convert 10 meters to feet. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 32.81,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-037",
+   "category": "factual",
+   "prompt": "Convert 3 meters to feet. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 9.84,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-038",
+   "category": "factual",
+   "prompt": "Convert 7 hectares to acres. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 17.3,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "fact-039",
+   "category": "factual",
+   "prompt": "Convert 2 hectares to acres. Reply with only the number, rounded to two decimals.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 4.94,
+    "tol": 0.05
+   }
+  },
+  {
+   "id": "arit-000",
+   "category": "arithmetic",
+   "prompt": "What is 778 + 143? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 921,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-001",
+   "category": "arithmetic",
+   "prompt": "What is 798 + 491? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1289,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-002",
+   "category": "arithmetic",
+   "prompt": "What is 262 + 991? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1253,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-003",
+   "category": "arithmetic",
+   "prompt": "What is 759 + 211? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 970,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-004",
+   "category": "arithmetic",
+   "prompt": "What is 478 + 616? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1094,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-005",
+   "category": "arithmetic",
+   "prompt": "What is 347 + 987? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1334,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-006",
+   "category": "arithmetic",
+   "prompt": "What is 8175 - 777? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 7398,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-007",
+   "category": "arithmetic",
+   "prompt": "What is 9207 - 852? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 8355,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-008",
+   "category": "arithmetic",
+   "prompt": "What is 9763 - 348? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 9415,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-009",
+   "category": "arithmetic",
+   "prompt": "What is 5072 - 277? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 4795,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-010",
+   "category": "arithmetic",
+   "prompt": "What is 67 * 46? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 3082,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-011",
+   "category": "arithmetic",
+   "prompt": "What is 81 * 93? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 7533,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-012",
+   "category": "arithmetic",
+   "prompt": "What is 70 * 64? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 4480,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-013",
+   "category": "arithmetic",
+   "prompt": "What is 93 * 65? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 6045,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-014",
+   "category": "arithmetic",
+   "prompt": "What is 2728 / 44? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 62,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-015",
+   "category": "arithmetic",
+   "prompt": "What is 1387 / 19? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 73,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-016",
+   "category": "arithmetic",
+   "prompt": "What is (15 + 33) * 9? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 432,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-017",
+   "category": "arithmetic",
+   "prompt": "What is (86 + 48) * 12? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1608,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-018",
+   "category": "arithmetic",
+   "prompt": "What is (77 + 71) * 5? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 740,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-019",
+   "category": "arithmetic",
+   "prompt": "What is (13 + 19) * 2? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 64,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-020",
+   "category": "arithmetic",
+   "prompt": "What is (56 + 13) * 7? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 483,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-021",
+   "category": "arithmetic",
+   "prompt": "What is (71 + 43) * 8? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 912,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-022",
+   "category": "arithmetic",
+   "prompt": "What is (87 + 16) * 9? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 927,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-023",
+   "category": "arithmetic",
+   "prompt": "What is (78 + 85) * 6? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 978,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-024",
+   "category": "arithmetic",
+   "prompt": "A shop sells 28 apples per day. How many apples does it sell in 5 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 140,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-025",
+   "category": "arithmetic",
+   "prompt": "A shop sells 25 apples per day. How many apples does it sell in 5 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 125,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-026",
+   "category": "arithmetic",
+   "prompt": "A shop sells 7 apples per day. How many apples does it sell in 25 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 175,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-027",
+   "category": "arithmetic",
+   "prompt": "A shop sells 25 apples per day. How many apples does it sell in 10 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 250,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-028",
+   "category": "arithmetic",
+   "prompt": "A shop sells 14 apples per day. How many apples does it sell in 25 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 350,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-029",
+   "category": "arithmetic",
+   "prompt": "A shop sells 21 apples per day. How many apples does it sell in 10 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 210,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-030",
+   "category": "arithmetic",
+   "prompt": "A shop sells 6 apples per day. How many apples does it sell in 25 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 150,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-031",
+   "category": "arithmetic",
+   "prompt": "A shop sells 9 apples per day. How many apples does it sell in 5 days? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 45,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-032",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 224 divided by 21? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 14,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-033",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 393 divided by 14? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 1,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-034",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 388 divided by 17? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 14,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-035",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 295 divided by 17? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 6,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-036",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 485 divided by 7? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 2,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-037",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 79 divided by 29? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 21,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-038",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 243 divided by 31? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 26,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "arit-039",
+   "category": "arithmetic",
+   "prompt": "What is the remainder of 239 divided by 41? Reply with only the number.",
+   "max_new": 16,
+   "check": {
+    "type": "final_number",
+    "expected": 34,
+    "tol": 0.0
+   }
+  },
+  {
+   "id": "codi-000",
+   "category": "coding",
+   "prompt": "Write a Python function add(a, b) that returns their sum. Reply with only the function code, no explanation.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert add(2, 3) == 5\nassert add(-1, 1) == 0\nassert add(0, 0) == 0"
+   }
+  },
+  {
+   "id": "codi-001",
+   "category": "coding",
+   "prompt": "Write a Python function mul(a, b) that returns their product. Reply with only the function code, no explanation.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert mul(3, 4) == 12\nassert mul(-2, 5) == -10"
+   }
+  },
+  {
+   "id": "codi-002",
+   "category": "coding",
+   "prompt": "Write a Python function is_even(n) that returns True if n is even else False. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert is_even(4) is True\nassert is_even(7) is False\nassert is_even(0) is True"
+   }
+  },
+  {
+   "id": "codi-003",
+   "category": "coding",
+   "prompt": "Write a Python function factorial(n) that returns n! for n >= 0. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert factorial(0) == 1\nassert factorial(5) == 120\nassert factorial(7) == 5040"
+   }
+  },
+  {
+   "id": "codi-004",
+   "category": "coding",
+   "prompt": "Write a Python function fib(n) that returns the n-th Fibonacci number with fib(0)=0, fib(1)=1. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert fib(0) == 0\nassert fib(1) == 1\nassert fib(10) == 55"
+   }
+  },
+  {
+   "id": "codi-005",
+   "category": "coding",
+   "prompt": "Write a Python function reverse_string(s) that returns s reversed. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert reverse_string('abc') == 'cba'\nassert reverse_string('') == ''"
+   }
+  },
+  {
+   "id": "codi-006",
+   "category": "coding",
+   "prompt": "Write a Python function is_palindrome(s) that returns True if s reads the same forwards and backwards. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert is_palindrome('racecar') is True\nassert is_palindrome('hello') is False"
+   }
+  },
+  {
+   "id": "codi-007",
+   "category": "coding",
+   "prompt": "Write a Python function count_vowels(s) that returns the number of vowels (aeiou, case-insensitive) in s. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert count_vowels('hello') == 2\nassert count_vowels('AEIOU') == 5\nassert count_vowels('xyz') == 0"
+   }
+  },
+  {
+   "id": "codi-008",
+   "category": "coding",
+   "prompt": "Write a Python function sum_list(xs) that returns the sum of a list of numbers. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert sum_list([1, 2, 3]) == 6\nassert sum_list([]) == 0"
+   }
+  },
+  {
+   "id": "codi-009",
+   "category": "coding",
+   "prompt": "Write a Python function list_max(xs) that returns the largest element of a non-empty list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert list_max([3, 1, 4, 1, 5]) == 5\nassert list_max([-2, -8]) == -2"
+   }
+  },
+  {
+   "id": "codi-010",
+   "category": "coding",
+   "prompt": "Write a Python function second_largest(xs) that returns the second largest distinct value in a list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert second_largest([3, 1, 4, 1, 5]) == 4\nassert second_largest([10, 10, 5]) == 5"
+   }
+  },
+  {
+   "id": "codi-011",
+   "category": "coding",
+   "prompt": "Write a Python function dedup(xs) that returns a list with duplicates removed, preserving order. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert dedup([1, 2, 2, 3, 1]) == [1, 2, 3]\nassert dedup([]) == []"
+   }
+  },
+  {
+   "id": "codi-012",
+   "category": "coding",
+   "prompt": "Write a Python function flatten(xss) that flattens a list of lists into one list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert flatten([[1, 2], [3], []]) == [1, 2, 3]"
+   }
+  },
+  {
+   "id": "codi-013",
+   "category": "coding",
+   "prompt": "Write a Python function dot(a, b) that returns the dot product of two equal-length vectors. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert dot([1, 2, 3], [4, 5, 6]) == 32"
+   }
+  },
+  {
+   "id": "codi-014",
+   "category": "coding",
+   "prompt": "Write a Python function mat2x2_mul(A, B) that multiplies two 2x2 matrices given as nested lists. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert mat2x2_mul([[1, 2], [3, 4]], [[5, 6], [7, 8]]) == [[19, 22], [43, 50]]"
+   }
+  },
+  {
+   "id": "codi-015",
+   "category": "coding",
+   "prompt": "Write a Python function gcd(a, b) that returns the greatest common divisor. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert gcd(12, 18) == 6\nassert gcd(7, 13) == 1\nassert gcd(100, 25) == 25"
+   }
+  },
+  {
+   "id": "codi-016",
+   "category": "coding",
+   "prompt": "Write a Python function is_prime(n) that returns True if n is prime. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert is_prime(2) is True\nassert is_prime(15) is False\nassert is_prime(29) is True"
+   }
+  },
+  {
+   "id": "codi-017",
+   "category": "coding",
+   "prompt": "Write a Python function primes_upto(n) that returns all primes <= n in order. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert primes_upto(10) == [2, 3, 5, 7]\nassert primes_upto(2) == [2]"
+   }
+  },
+  {
+   "id": "codi-018",
+   "category": "coding",
+   "prompt": "Write a Python function binary_search(xs, x) that returns the index of x in sorted xs or -1. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert binary_search([1, 3, 5, 7], 5) == 2\nassert binary_search([1, 3, 5], 4) == -1"
+   }
+  },
+  {
+   "id": "codi-019",
+   "category": "coding",
+   "prompt": "Write a Python function bubble_pass(xs) that performs one bubble-sort pass over the list in place and returns it. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert bubble_pass([3, 2, 1]) == [2, 1, 3]"
+   }
+  },
+  {
+   "id": "codi-020",
+   "category": "coding",
+   "prompt": "Write a Python function merge_sorted(a, b) that merges two sorted lists into one sorted list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert merge_sorted([1, 3], [2, 4]) == [1, 2, 3, 4]\nassert merge_sorted([], [1]) == [1]"
+   }
+  },
+  {
+   "id": "codi-021",
+   "category": "coding",
+   "prompt": "Write a Python function word_count(s) that returns a dict mapping each word to its count (split on spaces). Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert word_count('a b a') == {'a': 2, 'b': 1}"
+   }
+  },
+  {
+   "id": "codi-022",
+   "category": "coding",
+   "prompt": "Write a Python function most_common(xs) that returns the most frequent element. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert most_common([1, 2, 2, 3]) == 2"
+   }
+  },
+  {
+   "id": "codi-023",
+   "category": "coding",
+   "prompt": "Write a Python function group_by_first(words) that groups words by their first letter into a dict. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert group_by_first(['apple', 'ape', 'boat']) == {'a': ['apple', 'ape'], 'b': ['boat']}"
+   }
+  },
+  {
+   "id": "codi-024",
+   "category": "coding",
+   "prompt": "Write a Python function fizzbuzz(n) that returns a list of strings for 1..n with Fizz/Buzz/FizzBuzz rules. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert fizzbuzz(5) == ['1', '2', 'Fizz', '4', 'Buzz']\nassert fizzbuzz(15)[-1] == 'FizzBuzz'"
+   }
+  },
+  {
+   "id": "codi-025",
+   "category": "coding",
+   "prompt": "Write a Python function running_total(xs) that returns the running totals of a list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert running_total([1, 2, 3]) == [1, 3, 6]\nassert running_total([]) == []"
+   }
+  },
+  {
+   "id": "codi-026",
+   "category": "coding",
+   "prompt": "Write a Python function clamp(x, lo, hi) that restricts x to the range [lo, hi]. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert clamp(5, 0, 10) == 5\nassert clamp(-3, 0, 10) == 0\nassert clamp(99, 0, 10) == 10"
+   }
+  },
+  {
+   "id": "codi-027",
+   "category": "coding",
+   "prompt": "Write a Python function celsius_to_fahrenheit(c) that converts Celsius to Fahrenheit. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert abs(celsius_to_fahrenheit(0) - 32.0) < 1e-9\nassert abs(celsius_to_fahrenheit(100) - 212.0) < 1e-9"
+   }
+  },
+  {
+   "id": "codi-028",
+   "category": "coding",
+   "prompt": "Write a Python function char_freq(s) that returns a dict of character frequencies. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert char_freq('aab') == {'a': 2, 'b': 1}"
+   }
+  },
+  {
+   "id": "codi-029",
+   "category": "coding",
+   "prompt": "Write a Python function transpose(matrix) that transposes a rectangular nested list. Reply with only the function code.",
+   "max_new": 256,
+   "check": {
+    "type": "unit_test",
+    "tests": "assert transpose([[1, 2, 3], [4, 5, 6]]) == [[1, 4], [2, 5], [3, 6]]"
+   }
+  },
+  {
+   "id": "summ-000",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nThe harbor seal rested on the warm rocks while gulls circled overhead. Fishermen mended their nets nearby, and the tide slowly pulled the boats away from the dock. By evening the water was calm again.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-001",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nThe harbor seal rested on the warm rocks while gulls circled overhead. Fishermen mended their nets nearby, and the tide slowly pulled the boats away from the dock. By evening the water was calm again.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-002",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nPhotosynthesis allows green plants to convert sunlight, water, and carbon dioxide into glucose and oxygen. Chlorophyll captures light energy, which powers chemical reactions in the leaves. This process underpins most life on Earth.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-003",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nPhotosynthesis allows green plants to convert sunlight, water, and carbon dioxide into glucose and oxygen. Chlorophyll captures light energy, which powers chemical reactions in the leaves. This process underpins most life on Earth.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-004",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nThe old library on Baker Street holds over forty thousand volumes. Its reading room has tall oak shelves, brass lamps, and a marble staircase. Scholars travel from far away to consult its rare manuscript collection.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-005",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nThe old library on Baker Street holds over forty thousand volumes. Its reading room has tall oak shelves, brass lamps, and a marble staircase. Scholars travel from far away to consult its rare manuscript collection.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-006",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nA thunderstorm rolled over the valley just after midnight. Lightning split a tall pine on the ridge, and rain hammered the tin roof of the cabin. By dawn only wet leaves and a fresh smell of pine remained.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-007",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nA thunderstorm rolled over the valley just after midnight. Lightning split a tall pine on the ridge, and rain hammered the tin roof of the cabin. By dawn only wet leaves and a fresh smell of pine remained.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-008",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nThe bridge spans the river in three steel arches. Engineers spent four years driving piles into the riverbed before the first girder was lifted. Today thousands of cars cross it every hour.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-009",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nThe bridge spans the river in three steel arches. Engineers spent four years driving piles into the riverbed before the first girder was lifted. Today thousands of cars cross it every hour.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-010",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nBees communicate the location of flowers through a waggle dance. The angle of the dance relative to the sun indicates direction, while its duration signals distance. Other workers watch and then fly straight to the source.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-011",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nBees communicate the location of flowers through a waggle dance. The angle of the dance relative to the sun indicates direction, while its duration signals distance. Other workers watch and then fly straight to the source.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-012",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nThe museum's new wing displays pottery from five ancient cultures. Each vessel is labeled with its origin, estimated age, and firing technique. Interactive screens let visitors rotate fragile pieces virtually.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-013",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nThe museum's new wing displays pottery from five ancient cultures. Each vessel is labeled with its origin, estimated age, and firing technique. Interactive screens let visitors rotate fragile pieces virtually.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-014",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nWinter wheat is planted in autumn and harvested in early summer. The young plants survive frost under a blanket of snow, then grow rapidly when temperatures rise. Farmers watch rainfall closely in April and May.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-015",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nWinter wheat is planted in autumn and harvested in early summer. The young plants survive frost under a blanket of snow, then grow rapidly when temperatures rise. Farmers watch rainfall closely in April and May.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-016",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nThe lighthouse keeper climbed one hundred twelve steps each evening. He polished the lens, lit the lamp, and logged passing ships. On foggy nights he also sounded the horn every two minutes.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-017",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nThe lighthouse keeper climbed one hundred twelve steps each evening. He polished the lens, lit the lamp, and logged passing ships. On foggy nights he also sounded the horn every two minutes.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "summ-018",
+   "category": "summarization",
+   "prompt": "Summarize the following paragraph in one sentence:\n\nCoral reefs grow where warm, shallow, sunlit water meets a rocky shelf. Tiny polyps build limestone skeletons over centuries, creating habitats for thousands of species. Rising temperatures bleach and weaken them.",
+   "max_new": 96,
+   "check": {
+    "type": "format",
+    "max_sentences": 2,
+    "min_chars": 20
+   }
+  },
+  {
+   "id": "summ-019",
+   "category": "summarization",
+   "prompt": "Rewrite the following paragraph in a formal style, keeping all facts:\n\nCoral reefs grow where warm, shallow, sunlit water meets a rocky shelf. Tiny polyps build limestone skeletons over centuries, creating habitats for thousands of species. Rising temperatures bleach and weaken them.",
+   "max_new": 128,
+   "check": {
+    "type": "format",
+    "min_chars": 60
+   }
+  },
+  {
+   "id": "bili-000",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nThe cat sat on the mat.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The cat sat on the mat."
+   }
+  },
+  {
+   "id": "bili-001",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nWater boils at 100 degrees Celsius.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Water boils at 100 degrees Celsius."
+   }
+  },
+  {
+   "id": "bili-002",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nShe sells seashells by the seashore.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "She sells seashells by the seashore."
+   }
+  },
+  {
+   "id": "bili-003",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nThe quick brown fox jumps over the lazy dog.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The quick brown fox jumps over the lazy dog."
+   }
+  },
+  {
+   "id": "bili-004",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nbreaking news: markets rally on strong earnings.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "breaking news: markets rally on strong earnings."
+   }
+  },
+  {
+   "id": "bili-005",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nAn apple a day keeps the doctor away.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "An apple a day keeps the doctor away."
+   }
+  },
+  {
+   "id": "bili-006",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nTo be or not to be, that is the question.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "To be or not to be, that is the question."
+   }
+  },
+  {
+   "id": "bili-007",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nThe early bird catches the worm.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The early bird catches the worm."
+   }
+  },
+  {
+   "id": "bili-008",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nA journey of a thousand miles begins with a single step.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "A journey of a thousand miles begins with a single step."
+   }
+  },
+  {
+   "id": "bili-009",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nHonesty is the best policy.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Honesty is the best policy."
+   }
+  },
+  {
+   "id": "bili-010",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nTime flies like an arrow.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Time flies like an arrow."
+   }
+  },
+  {
+   "id": "bili-011",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nThe pen is mightier than the sword.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The pen is mightier than the sword."
+   }
+  },
+  {
+   "id": "bili-012",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nWhen in Rome, do as the Romans do.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "When in Rome, do as the Romans do."
+   }
+  },
+  {
+   "id": "bili-013",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nNo pain, no gain.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "No pain, no gain."
+   }
+  },
+  {
+   "id": "bili-014",
+   "category": "bilingual",
+   "prompt": "Repeat the following sentence exactly:\n\nKnowledge is power.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Knowledge is power."
+   }
+  },
+  {
+   "id": "bili-015",
+   "category": "bilingual",
+   "prompt": "把下面的中文翻译成英文，只回复译文：猫坐在垫子上。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The cat is sitting on the mat."
+   }
+  },
+  {
+   "id": "bili-016",
+   "category": "bilingual",
+   "prompt": "把下面的中文翻译成英文，只回复译文：水在100摄氏度沸腾。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Water boils at 100 degrees Celsius."
+   }
+  },
+  {
+   "id": "bili-017",
+   "category": "bilingual",
+   "prompt": "把下面的中文翻译成英文，只回复译文：今天天气很好。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "The weather is very nice today."
+   }
+  },
+  {
+   "id": "bili-018",
+   "category": "bilingual",
+   "prompt": "把下面的中文翻译成英文，只回复译文：我爱读书。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "I love reading."
+   }
+  },
+  {
+   "id": "bili-019",
+   "category": "bilingual",
+   "prompt": "把下面的中文翻译成英文，只回复译文：北京是中国的首都。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "Beijing is the capital of China."
+   }
+  },
+  {
+   "id": "bili-020",
+   "category": "bilingual",
+   "prompt": "Translate the following English into Chinese, reply with only the translation: Good morning.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "早上好。"
+   }
+  },
+  {
+   "id": "bili-021",
+   "category": "bilingual",
+   "prompt": "Translate the following English into Chinese, reply with only the translation: Thank you very much.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "非常感谢。"
+   }
+  },
+  {
+   "id": "bili-022",
+   "category": "bilingual",
+   "prompt": "Translate the following English into Chinese, reply with only the translation: See you tomorrow.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "明天见。"
+   }
+  },
+  {
+   "id": "bili-023",
+   "category": "bilingual",
+   "prompt": "Translate the following English into Chinese, reply with only the translation: The book is on the table.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "书在桌子上。"
+   }
+  },
+  {
+   "id": "bili-024",
+   "category": "bilingual",
+   "prompt": "Translate the following English into Chinese, reply with only the translation: I have two apples.",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "我有两个苹果。"
+   }
+  },
+  {
+   "id": "bili-025",
+   "category": "bilingual",
+   "prompt": "下面这句话有多少个汉字？只回复数字：人工智能正在改变世界",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "10"
+   }
+  },
+  {
+   "id": "bili-026",
+   "category": "bilingual",
+   "prompt": "下面这句话有多少个汉字？只回复数字：春眠不觉晓",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "5"
+   }
+  },
+  {
+   "id": "bili-027",
+   "category": "bilingual",
+   "prompt": "把下面的句子改成疑问句，只回复改写后的句子：他喜欢喝茶。",
+   "max_new": 48,
+   "check": {
+    "type": "exact",
+    "expected": "他喜欢喝茶吗？"
+   }
+  },
+  {
+   "id": "bili-028",
+   "category": "bilingual",
+   "prompt": "用“因为……所以……”造一个句子。",
+   "max_new": 64,
+   "check": {
+    "type": "record"
+   }
+  },
+  {
+   "id": "bili-029",
+   "category": "bilingual",
+   "prompt": "请用三个词语形容大海。",
+   "max_new": 64,
+   "check": {
+    "type": "record"
+   }
+  },
+  {
+   "id": "long-000",
+   "category": "longgen",
+   "prompt": "Write a short story about a lighthouse keeper who discovers a hidden room.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-001",
+   "category": "longgen",
+   "prompt": "Explain how rain forms, step by step, for a curious ten-year-old.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-002",
+   "category": "longgen",
+   "prompt": "Describe a journey through a desert at night in vivid detail.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-003",
+   "category": "longgen",
+   "prompt": "Write a dialogue between a robot and its inventor about freedom.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-004",
+   "category": "longgen",
+   "prompt": "Tell the history of writing systems from cuneiform to the alphabet.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-005",
+   "category": "longgen",
+   "prompt": "Describe how to bake sourdough bread from starter to finished loaf.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-006",
+   "category": "longgen",
+   "prompt": "Write a story about two friends who build a treehouse over one summer.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-007",
+   "category": "longgen",
+   "prompt": "Explain the water cycle and why it matters for farmers.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-008",
+   "category": "longgen",
+   "prompt": "Imagine a city floating on the ocean and describe daily life there.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-009",
+   "category": "longgen",
+   "prompt": "Write about a musician who hears a melody that nobody else can hear.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-010",
+   "category": "longgen",
+   "prompt": "Describe the seasons in a mountain valley across one full year.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-011",
+   "category": "longgen",
+   "prompt": "Explain how bridges stay up, with examples of three bridge types.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-012",
+   "category": "longgen",
+   "prompt": "Write a mystery story set on an overnight train.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-013",
+   "category": "longgen",
+   "prompt": "Describe the process of making paper from trees to notebook.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-014",
+   "category": "longgen",
+   "prompt": "Tell a fable about a fox and a crow with a clear moral.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-015",
+   "category": "longgen",
+   "prompt": "Write about the first humans landing on Mars and their first week.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-016",
+   "category": "longgen",
+   "prompt": "Explain electricity to someone who has never seen a light bulb.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-017",
+   "category": "longgen",
+   "prompt": "Describe a coral reef and the creatures that live there.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-018",
+   "category": "longgen",
+   "prompt": "Write a story about a library where books rewrite themselves.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "long-019",
+   "category": "longgen",
+   "prompt": "Explain photosynthesis and why forests are called the lungs of Earth.",
+   "max_new": 300,
+   "check": {
+    "type": "stability"
+   }
+  },
+  {
+   "id": "retr-000",
+   "category": "retrieval",
+   "prompt": "LEGACY-64K-NEEDLE variant 0 (see tools/t74/report_needle.json)",
+   "max_new": 16,
+   "check": {
+    "type": "record",
+    "legacy_variant": 0
+   }
+  },
+  {
+   "id": "retr-001",
+   "category": "retrieval",
+   "prompt": "LEGACY-64K-NEEDLE variant 1 (see tools/t74/report_needle.json)",
+   "max_new": 16,
+   "check": {
+    "type": "record",
+    "legacy_variant": 1
+   }
+  },
+  {
+   "id": "retr-002",
+   "category": "retrieval",
+   "prompt": "LEGACY-64K-NEEDLE variant 2 (see tools/t74/report_needle.json)",
+   "max_new": 16,
+   "check": {
+    "type": "record",
+    "legacy_variant": 2
+   }
+  },
+  {
+   "id": "retr-003",
+   "category": "retrieval",
+   "prompt": "LEGACY-64K-NEEDLE variant 3 (see tools/t74/report_needle.json)",
+   "max_new": 16,
+   "check": {
+    "type": "record",
+    "legacy_variant": 3
+   }
+  },
+  {
+   "id": "retr-004",
+   "category": "retrieval",
+   "prompt": "LEGACY-64K-NEEDLE variant 4 (see tools/t74/report_needle.json)",
+   "max_new": 16,
+   "check": {
+    "type": "record",
+    "legacy_variant": 4
+   }
+  },
+  {
+   "id": "retr-005",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 4K ctx=4096 depth=0.1",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "4K",
+     "ctx": 4096,
+     "depth": 0.1
+    }
+   }
+  },
+  {
+   "id": "retr-006",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 4K ctx=4096 depth=0.9",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "4K",
+     "ctx": 4096,
+     "depth": 0.9
+    }
+   }
+  },
+  {
+   "id": "retr-007",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 8K ctx=8192 depth=0.1",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "8K",
+     "ctx": 8192,
+     "depth": 0.1
+    }
+   }
+  },
+  {
+   "id": "retr-008",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 8K ctx=8192 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "8K",
+     "ctx": 8192,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-009",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 8K ctx=8192 depth=0.9",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "8K",
+     "ctx": 8192,
+     "depth": 0.9
+    }
+   }
+  },
+  {
+   "id": "retr-010",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 16K ctx=16384 depth=0.1",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "16K",
+     "ctx": 16384,
+     "depth": 0.1
+    }
+   }
+  },
+  {
+   "id": "retr-011",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 16K ctx=16384 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "16K",
+     "ctx": 16384,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-012",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 16K ctx=16384 depth=0.9",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "16K",
+     "ctx": 16384,
+     "depth": 0.9
+    }
+   }
+  },
+  {
+   "id": "retr-013",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 32K ctx=32768 depth=0.25",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "32K",
+     "ctx": 32768,
+     "depth": 0.25
+    }
+   }
+  },
+  {
+   "id": "retr-014",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 32K ctx=32768 depth=0.75",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "32K",
+     "ctx": 32768,
+     "depth": 0.75
+    }
+   }
+  },
+  {
+   "id": "retr-015",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 8K-multi ctx=8192 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "8K-multi",
+     "ctx": 8192,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-016",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 16K-multi ctx=16384 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "16K-multi",
+     "ctx": 16384,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-017",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 4K-distract ctx=4096 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "4K-distract",
+     "ctx": 4096,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-018",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 16K-distract ctx=16384 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "16K-distract",
+     "ctx": 16384,
+     "depth": 0.5
+    }
+   }
+  },
+  {
+   "id": "retr-019",
+   "category": "retrieval",
+   "prompt": "RETRIEVAL-GEN 32K-distract ctx=32768 depth=0.5",
+   "max_new": 24,
+   "check": {
+    "type": "record",
+    "gen": {
+     "tag": "32K-distract",
+     "ctx": 32768,
+     "depth": 0.5
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+  "task": "T7.4-chunk-prefill-GEMM-attention",
+  "date": "2026-09-13",
+  "harness": "tools/cmdlist/chunkqkwv_replay.cpp (ctest, synthetic)",
+  "composition": "ChunkQkGemm (causal mask, one M*4*nBc launch) + ChunkSoftmaxRow (M*24 rows) + CvtF32F16 (element-generic, reused) + ChunkWvGemm (one M*64 launch); M=32 chunk, P=64 prefix, W=96",
+  "harness_result": {
+    "device": "B60",
+    "us": {"qk": 385.8, "sm": 50.6, "cv": 96.5, "wv": 107.3, "total": 640.2},
+    "worst_rel": 2.43e-04,
+    "ref_tol": 0.001,
+    "causal_mask_direct": "S[0][W-1] == -FLT_MAX, last-row score finite",
+    "chunkqkwv_ok": true
+  },
+  "verdict": "CHUNKQKWV-OK: worst-rel 2.43e-04 (same half-input envelope as decode-hybrid 2.19e-04), mask verified directly + end-to-end. GEMM-form chunk attention proven at small geometry.",
+  "debug": "arg-strip trap (third dead-strip instance): unreferenced functor member M silently dropped from the signature (9 vs 10 args), INVALID_ARGUMENT far from cause; caught by numKernelArgs probe; fixed with bounds+liveness guard. Rule added to docs/toolchain.md. Companion harness bug (decode-WV arg indices on the 8-arg chunk WV) fixed same session.",
+  "next": [
+    "real-weight chunk-GEMM layer (chunkattnreal composition with scan ChunkAttn swapped for QK/SM/CV/WV stages)",
+    "M=256 scaling + 64-layer orchestration + prefill-to-decode handoff"
+  ]
+}

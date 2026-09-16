@@ -55,11 +55,12 @@ def render_chat(messages, add_generation_prompt=True, enable_thinking=False):
     deterministic prompt. Callers needing parity with HF defaults must pass
     the same kwargs to both renderers (see validation report).
     """
-    from jinja2 import Environment, BaseLoader, StrictUndefined
+    from jinja2 import Environment, BaseLoader
     with open(os.path.join(MODEL_DIR, "chat_template.jinja")) as f:
         src = f.read()
-    env = Environment(loader=BaseLoader(), undefined=StrictUndefined,
-                      keep_trailing_newline=True)
+    # Default (lenient) Undefined, matching HF apply_chat_template: assistant
+    # messages without tool_calls render instead of raising (T8.4).
+    env = Environment(loader=BaseLoader(), keep_trailing_newline=True)
     # The template calls raise_exception(); provide it like HF does.
     def _raise(msg):
         raise ValueError(msg)

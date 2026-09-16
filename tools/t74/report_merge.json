@@ -1,0 +1,19 @@
+{
+  "device": "B60",
+  "task": "T7.4-single-binary-prefill-decode",
+  "date": "2026-09-15",
+  "design": "decode_l0 --prefill-chunks N (M via CHUNK_M, inputs via CHUNK64MC_HOST_IN): 8 new chunk modules appended (existing enum indices untouched), per-chunk 64-layer record against SHARED payArena/scArena (weights loaded once) + decode-layout KV/SSM + preloaded norms, stream record+exec+destroy, D2D last row to dX, impP set -> existing loop seam (tail-only start, question, generate). Score buffer aliased S==Sm (row-wise read-before-write, bitwise-safe; saves 1.5 GiB; budget ~21.4 vs 22.71 GiB heap). All changes additive and flagged; default path untouched.",
+  "validation": {
+    "default_path": "70-token e2e post-merge: 58 tokens, has126=True, trajectory identical to Stamp 12 pattern",
+    "bitwise_gate": "M=32/N=2 arb inputs: merged final hidden vs chunk64mc out_b maxabs-diff 0.000e+00 BITWISE-IDENTICAL (AINFER_PREFILL_DUMP)",
+    "handoff_parity": "merged first-5 tokens [198, 248045, 248068, 198, 1596] == file-import trajectory",
+    "needle_64k_one_process": "variant 2 (code 502817): 254x256 chunks, prefill_ms 4793617.1 (~80 min, same as file path), generated [271, 20, 15, 17, 23, 16, 22, 248044] = '502817' + EOS — identical to file-handoff result. Zero weight re-uploads, zero disk traffic."
+  },
+  "bugs_caught": [
+    "report JSON malformed (prefill_ms inserted inside top5 array) — fixed (close-array-then-field), validated parse + field on small run",
+    "space-separated --prefill-chunks rejected (same trap as --import-caches) — dual-form parsing",
+    "legacy arb_in_a/b naming not found by numeric reader — a/b fallback for ch<2"
+  ],
+  "verdict": "MERGE-OK: single binary prefills 64K and decodes in one process with zero redundant traffic, bitwise-identical prefill to the harness path, default loop path provably untouched. Kills the 16 GB duplicate weight load + 4.4 GB disk round-trip per 64K run. Recommended production path going forward.",
+  "next": "linear-list sharing across chunks (48 position-independent lists recorded once); full ctest re-run not needed for this change (no ctest covers decode_l0; targeted gates above are stronger)"
+}

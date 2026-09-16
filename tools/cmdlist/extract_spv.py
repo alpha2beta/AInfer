@@ -57,6 +57,19 @@ WANTED = {
     "_ZTS12ChunkSsmConv": "chunkssmconv.spv",
     "_ZTS13ChunkSsmRecur": "chunkssmrecur.spv",
     "_ZTS9CvtF32F16": "cvtf32f16.spv",
+    "_ZTS7Concat2": "concat.spv",
+    "_ZTS10KvAppendI8": "kvappendi8.spv",
+    "_ZTS10AttnCoreI8": "attni8.spv",
+    "_ZTS9TiledAttn": "tiledattn.spv",
+    "_ZTS6QkGemm": "qkgemm.spv",
+    "_ZTS6WvGemm": "wvgemm.spv",
+    "_ZTS10SoftmaxRow": "softmaxrow.spv",
+    "_ZTS7GateMul": "gatemul.spv",
+    "_ZTS13ChunkKvAppend": "chunkkvappend.spv",
+    "_ZTS9ChunkRope": "chunkrope.spv",
+    "_ZTS11ChunkQkGemm": "chunkqkgemm.spv",
+    "_ZTS11ChunkWvGemm": "chunkwvgemm.spv",
+    "_ZTS15ChunkSoftmaxRow": "chunksoftmaxrow.spv",
 }
 SPV_MAGIC = b"\x03\x02\x23\x07"
 # Flag set captured from the icpx spir64 driver link (2026.1.1); the two

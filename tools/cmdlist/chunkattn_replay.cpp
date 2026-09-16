@@ -39,6 +39,20 @@ static double med(std::vector<double> v) {
   std::sort(v.begin(), v.end());
   return v[v.size() / 2];
 }
+// BF16 caches (production alignment with decode): device stores RNE, so the
+// host reference sees exactly the quantized values (attn_replay pattern).
+static uint16_t f32_to_bf16(float x) {
+  uint32_t u;
+  std::memcpy(&u, &x, 4);
+  return (uint16_t)((u + 0x7FFFu + ((u >> 16) & 1u)) >> 16);
+}
+static float bf16_to_f32(uint16_t b) {
+  uint32_t u = (uint32_t)b << 16;
+  float x;
+  std::memcpy(&x, &u, 4);
+  return x;
+}
+static inline float qb(float v) { return bf16_to_f32(f32_to_bf16(v)); }
 
 int main(int argc, char **argv) {
   if (argc < 2) {
@@ -93,9 +107,9 @@ int main(int argc, char **argv) {
   CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)M * 6144 * 4, 4096, dev, &dQ));
   CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)M * 6144 * 4, 4096, dev, &dG));
   CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)M * 6144 * 4, 4096, dev, &dAtt));
-  CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)NKV * TC * D * 4, 4096, dev,
+  CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)NKV * TC * D * 2, 4096, dev,
                          &dKc));
-  CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)NKV * TC * D * 4, 4096, dev,
+  CHECK(zeMemAllocDevice(ctx, &mdesc, (size_t)NKV * TC * D * 2, 4096, dev,
                          &dVc));
   CHECK(zeMemAllocDevice(ctx, &mdesc, sizeof(DecodeControl), 4096, dev,
                          &dCtrl));
@@ -165,9 +179,18 @@ int main(int argc, char **argv) {
     v = rnd() * 0.5f;
   for (auto &v : hVc)
     v = rnd() * 0.5f;
-  CHECK(zeCommandListAppendMemoryCopy(up, dKc, hKc.data(), hKc.size() * 4,
+  for (auto &v : hKc)
+    v = qb(v); // reference sees exactly what the BF16 cache stores
+  for (auto &v : hVc)
+    v = qb(v);
+  std::vector<uint16_t> hKcB(hKc.size()), hVcB(hVc.size());
+  for (size_t i = 0; i < hKc.size(); ++i)
+    hKcB[i] = f32_to_bf16(hKc[i]);
+  for (size_t i = 0; i < hVc.size(); ++i)
+    hVcB[i] = f32_to_bf16(hVc[i]);
+  CHECK(zeCommandListAppendMemoryCopy(up, dKc, hKcB.data(), hKcB.size() * 2,
                                       nullptr, 0, nullptr));
-  CHECK(zeCommandListAppendMemoryCopy(up, dVc, hVc.data(), hVc.size() * 4,
+  CHECK(zeCommandListAppendMemoryCopy(up, dVc, hVcB.data(), hVcB.size() * 2,
                                       nullptr, 0, nullptr));
   DecodeControl c{0, P0, P0 + 1, -1};
   CHECK(zeCommandListAppendMemoryCopy(up, dCtrl, &c, sizeof(c), nullptr, 0,

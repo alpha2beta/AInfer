@@ -1,0 +1,28 @@
+{
+  "device": "B60",
+  "task": "T7.4-64-layer-orchestration",
+  "date": "2026-09-13",
+  "harness": "tools/cmdlist/chunk64real_replay.cpp (ctest, M=32/P=0, 64 recorded lists, streamed weights, per-layer SSM/KV state)",
+  "device_result": {
+    "ms_all_layers": 1583.2,
+    "out_sum": 16443.192,
+    "out_maxabs": 478.993,
+    "finite": true,
+    "reset_deterministic": true,
+    "cross_run": "3/3 identical sums"
+  },
+  "ref": "tools/forward/ref_chunk64.py (float INT4-dequant 64-block chain, same input, rope 0..31, causal mask)",
+  "accuracy": {
+    "worst_rel": 0.0138,
+    "mean_rel": 1.52e-04,
+    "frac_gt_1e-3": 0.0041,
+    "frac_gt_5e-3": 4.0e-05,
+    "ref_tol": 0.02,
+    "top_error_anatomy": "top-10 errors sit on LARGE-magnitude elements (|ref| 65-407, spread across rows 6-28, not position-concentrated) with ~1-2% local-relative error — multiplicative noise signature, not structural divergence",
+    "accumulation_fit": "64 x single-layer envelope 1.68e-04 = 1.08e-02 vs measured 1.38e-02 — linear fp16-convert noise accumulation through 64 layers (each layer re-quantizes GEMM inputs to fp16; host ref stays float32)"
+  },
+  "verdict": "CHUNK64-OK (tol 2e-2, accumulation-documented): 99.6% of elements <= 1e-3, outliers are large-element multiplicative noise consistent with the proven single-layer envelope x64. Prefill-quality arbitration moves to 64K quality runs (the gated next step); convert-fusion is noted production hardening, not a blocker.",
+  "debug": "shared-buffer address-capture trap (upload per layer before exec), in_proj_z V6-rows mis-binning (device overrun segfault), NULL fill-pattern driver segfault — all in docs/toolchain.md",
+  "next": "multi-chunk continuity at 64-layer scale + prefill-to-decode handoff, then 64K quality",
+  "chunk64_ok": true
+}

@@ -89,6 +89,47 @@ pid = ours.prompt_ids(otok, msgs)
 check("prompt_ids:e2e",
       pid == ours.encode(otok, ours.render_chat(msgs)), str(pid))
 
+# T8.4: decode with and without skipped special tokens must match HF.
+chat_ids = ref.encode(chat)
+for skip in (True, False):
+    a = ours.decode(otok, chat_ids, skip_special_tokens=skip)
+    b = ref.decode(chat_ids, skip_special_tokens=skip)
+    check(f"decode:chat-markup-skip={skip}", a == b, repr(a[:48]))
+
+# T8.4: whitespace edge cases (leading/trailing/tabs/repeat spaces).
+ws_cases = ["  indented", "trailing space ", "\ttab\nnewline",
+            "multiple   spaces", " \n "]
+for t in ws_cases:
+    a, b = ours.encode(otok, t), ref.encode(t)
+    rt = ours.decode(otok, a) == ref.decode(b) == t or True
+    check(f"encode:ws:{t!r}", a == b and ours.decode(otok, a) == t,
+          f"ours={a} ref={b}")
+
+# T8.4: malformed markup must behave exactly like HF (plain-text fallback).
+bad_markup = ["<|im_start|>user\nHi", "<|foo|>bar", "<|im_end|>",
+              "<|im_start|>"]
+for t in bad_markup:
+    a, b = ours.encode(otok, t), ref.encode(t)
+    check(f"encode:malformed:{t!r}", a == b, f"ours={a} ref={b}")
+
+# T8.4: multi-turn + empty-content template parity (thinking on and off).
+msgs3 = [{"role": "system", "content": "Be brief."},
+         {"role": "user", "content": "Hi"},
+         {"role": "assistant", "content": "Hello."},
+         {"role": "user", "content": ""}]
+for thinking in (False, True):
+    try:
+        r1 = ours.render_chat(msgs3, add_generation_prompt=True,
+                              enable_thinking=thinking)
+        r2 = ref.apply_chat_template(msgs3, tokenize=False,
+                                     add_generation_prompt=True,
+                                     enable_thinking=thinking)
+        check(f"chat-template:multiturn-think={thinking}", r1 == r2,
+              f"ours={r1[:60]!r}")
+    except Exception as e:
+        check(f"chat-template:multiturn-think={thinking}", False,
+              f"{type(e).__name__}: {e}")
+
 npass = sum(1 for r in results if r["pass"])
 report = {"cases": len(results), "passed": npass, "all_pass": npass == len(results),
           "results": results,

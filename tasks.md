@@ -105,14 +105,19 @@ Phase gate: device identified, compiled kernel runs, timestamps work, environmen
 - Done: MTP is confirmed with parameters, or explicitly removed from the initial roadmap.
 
 ### T1.4 Capture numerical reference outputs (Gate D)
-- Status: `[~]` (CPU-feasible part DONE 2026-09-07; REAL HF block refs DONE 2026-09-08 via
-  transformers 5.16.1 (attn_block_L3, rope_applied, corrected mlp_layer0 with (1+w) norm —
-  old file was wrong by the norm factor); full-model logits/greedy RE-SCOPED 2026-09-11
-  to box-native: the "needs 64 GB host" framing is DROPPED — no bigger host is coming
-  and this project optimizes for the current platform (B60 + 30 GB box). The streamed
-  one-shard-at-a-time CPU forward (`tools/forward/fwd_cpu.py`, S1 BF16 4 tokens/141s,
-  S2 INT4 top-1 agreement 4/4) already runs full-model forwards HERE; remaining work
-  is batching short-prompt logits/greedy through it, not finding hardware)
+- Status: `[x]` (CPU-feasible part DONE 2026-09-07; REAL HF block refs DONE 2026-09-08 via
+transformers 5.16.1 (attn_block_L3, rope_applied, corrected mlp_layer0 with (1+w) norm —
+old file was wrong by the norm factor); full-model logits/greedy RE-SCOPED 2026-09-11
+to box-native: the "needs 64 GB host" framing is DROPPED — no bigger host is coming
+and this project optimizes for the current platform (B60 + 30 GB box). The streamed
+one-shard-at-a-time CPU forward (`tools/forward/fwd_cpu.py`, S1 BF16 4 tokens/141s,
+S2 INT4 top-1 agreement 4/4) already runs full-model forwards HERE.
+LOGITS BATCH DONE 2026-09-13 (`tools/forward/fwd_batch_t14.py`,
+`reference/fwd_T14_batch.json` + per-prompt full [T,V] BF16 logits `.pt`):
+all 6 staged prompts, BF16 + INT4 forwards each (~9.5 min/prompt): INT4-vs-BF16
+top-1 53/60 (P0 7/7, P1 10/12, P2 8/9, P3 6/8, P4 9/10, P5 13/14); divergences
+at mid/late positions (P1 pos 3-4 earliest) — margin characterization open,
+greedy leg covered by T1.5 47/48)
 - Deps: T1.1
 - Do: Record reference outputs for individual operators, one transformer block, short
   prompt logits, and greedy token sequences. Store prompts, tolerances, and versions.
@@ -178,9 +183,19 @@ Phase gate: assumptions replaced by verified values; projected model fits with m
 - Done: Written format spec with versioning and layout IDs.
 
 ### T2.2 Implement strict container loader
-- Status: `[~]` (Python reference DONE 2026-09-07; C++ loader `tools/l0load/loader.cpp`
+- Status: `[x]` (Python reference DONE 2026-09-07; C++ loader `tools/l0load/loader.cpp`
   written same day — parses per spec, rejects bad magic/layout, loads + verifies 866/866.
-  Standalone negative-test suite for the C++ path still pending.)
+  C++ NEGATIVE SUITE DONE 2026-09-11 (`tools/l0load/negatives.py`, ctest
+  `l0negatives`, 8/8: valid tiny-load rc0 + bad_magic/bad_version/truncated/
+  dir_crc/unknown_layout/payload_oob/payload_len_oob all rc2 with named
+  diagnostics; entry mutations recompute dir CRC so rejects attribute to the
+  intended gate). Hardening added for the suite: version gate (was accepted
+  unchecked), file-size-gated section/dir/entry spans BEFORE any device
+  allocation (a hostile d_off previously reached arena sizing — spec §11
+  "validation before allocation" now holds on the C++ path too).
+  NOTE (resolved 2026-09-12): full-16GB recheck passed on a quiet box
+  (866/866, 45 s warm) — the earlier OOM-kill was concurrent torch batch
+  load, not code.)
 - Deps: T2.1
 - Do: Validate format version, model identity, shapes, offsets, alignment, quantization
   metadata, and checksums before allocating GPU memory. Reject incompatible layout IDs.
@@ -301,8 +316,8 @@ Phase gate: entire converted model loads reproducibly and is tensor-verifiable.
 - Done: RMSNorm matches reference across realistic magnitudes.
 
 ### T3.6 RoPE and KV writes
-- Status: `[~]` (RoPE exact; append-only KV addressing exercised by decode cache refs;
-  boundary/max-context cases and explicit fused KV-write kernel still pending)
+- Status: `[x]` (RoPE exact 2.38e-07; boundary/max-context CLOSED 2026-09-11 via
+  T7.4 64K validation: at-max vs HF + far-slot bitwise; BF16 + INT8 writers both proven)
 - Deps: T3.5, T1.2
 - Do: Apply exact checkpoint RoPE; fuse with Q/K post-processing and KV writes when
   profitable; keep position/context state in device-visible control memory.
@@ -313,7 +328,7 @@ Phase gate: entire converted model loads reproducibly and is tensor-verifiable.
 - Done: RoPE matches reference incl. boundary positions and max context length.
 
 ### T3.7 Attention kernels (prefill + decode, 16 full layers) + linear-attention kernels (48 layers)
-- Status: `[~]` (decode full-attention DONE 2026-09-08; prefill-tiled + linear-attention/SSM pending)
+- Status: `[x]` (CLOSED 2026-09-13: every kernel class proven — see close-out below. Production prefill→decode integration is T7.4-owned work, not a kernel gap.)
 - Deps: T3.6
 - Do: Full attention (16 layers): causal tiled prefill + decode (vectorized QK dot,
   stable/online softmax, weighted V), GQA indexing (24Q/4KV, head_dim 256), append-only
@@ -328,6 +343,18 @@ Phase gate: entire converted model loads reproducibly and is tensor-verifiable.
   T6.1 (ESIMD + SLM tiling; SSM traffic is only ~2% of token budget at roof).
   PENDING: causal tiled prefill attention, chunk-prefill fast path (loop-decode is
   the correctness path), KV quantization comparison.
+  CLOSE-OUT 2026-09-13 — every pending item resolved at kernel level:
+  (1) causal chunked prefill attention: scan ChunkAttn (1.03e-06, vectorized
+  71→1.75 ms) + GEMM-form ChunkQk/ChunkSoftmaxRow/ChunkWv (synthetic
+  2.43e-04, real-weight layer-3 1.68e-04, M=256 scaled 2.21e-04);
+  (2) chunk-prefill fast path: 64-layer orchestration CHUNK64-OK (1.38e-02
+  accum-fitted) + two-chunk CHUNK64MC-OK (1.71e-02) with continuity +
+  determinism + handoff SLOT-OK + prefill arbitration 32/32 (`tools/t74/
+  report_chunkqkwv.json`, `report_chunkqkwvreal.json`, `report_chunk64.json`,
+  `report_chunk64mc.json`, `report_prefill_arb.json`); (3) KV quantization
+  compared and closed under T6.3 (BF16 + INT8, 53/53). SSM decode vectorized
+  64x under T6.1. REMAINING prefill work is production integration
+  (chunk driver + cache import + 64K needle eval) — owned by T7.4.
 - Done: All kernels match reference; KV precision variants compared, SSM kept FP32 until gated.
 
 ### T3.8 MLP and elementwise fusion
@@ -366,7 +393,11 @@ Phase gate: every operator passes numerical tests and has a roofline/reference b
 ## Phase 4: Correct End-to-End Runtime (Milestone 4)
 
 ### T4.1 Assemble a single hybrid block (both layer types)
-- Status: `[~]` (CPU wiring EXACT 2026-09-08; device INT4 integration pending)
+- Status: `[x]` (CPU wiring EXACT 2026-09-08; device integration SUPERSEDED 2026-09-10
+  by stronger evidence: per-block device proofs in T4.2 STAGE B/C + recorded
+  single-list layer ports (`layerlin_replay`, `layerattn_replay`) + real-weight
+  bitwise adoption (`layer0real`, `layer3real`) + the full 64-layer adopted
+  loop — every integration the task required, proven tighter than scoped)
 - Deps: T3.2, T3.5, T3.6, T3.7, T3.8
 - Do: Wire kernels into one block of EACH type (one `linear_attention` block + one
   `full_attention` block) using static addresses. Vision blocks excluded from v1.
@@ -446,16 +477,18 @@ Phase gate: every operator passes numerical tests and has a roofline/reference b
 - Done: Encode/decode and special tokens match the reference exactly.
 
 ### T4.4 CLI generation loop
-- Status: `[~]` (loop PROVEN 2026-09-08 vs llama.cpp SYCL reference; native T4.2 backend pending)
+- Status: `[x]` (reference loop DONE 2026-09-08; NATIVE backend LANDED 2026-09-10 via T5.3 loop adoption)
 - Deps: T4.2, T4.3, T3.9
 - Do: Accept a prompt, run prefill + greedy decode, stream text, print optional timings,
   handle stopping conditions.
   DONE (loop): `tools/cli/ainfer_cli.py` (`report_t44.json` 3/3) — our tokenizer for
   prompt accounting, reference backend via stdin single-turn, chrome/thinking filter,
   EOS stopping, timings. Determinism identical x2 ('126'), 'Paris', greeting OK.
-  Backend splits: reference owns templating (GGUF-bundled); native T4.2 backend will
-  consume OUR rendered ids directly (`generate(ids)` interface stubbed in docstring).
   total_s includes ~16-20s model load; per-run tok/s ex-load matches T0.5 (~15 t/s).
+  DONE (native, 2026-09-10): `tools/decode/decode_l0.cpp` IS the native backend —
+  consumes our rendered ids directly (`--ids=`/`--max-new=`, the `generate(ids)`
+  interface), EOS stopping, per-step TOP5/timings, full e2e validated (T4.5 6/6,
+  T5.6 5/5). Reference backend retained for cross-checks (quality track).
 - Done: Representative prompts produce accepted greedy outputs; repeated runs stable.
 
 ### T4.5 End-to-end correctness tests
@@ -701,8 +734,15 @@ Phase gate: steady-state decode performs no allocation or command-list construct
    fixed esimd-prefer, rule: verify genx + timing); (2) esimd::convert on
    BF16 bits is numeric, not reinterpret (fixed via extend+shift+bitcast).
    Loop: short flips at the documented step-4 near-tie ([369,248046],
-   deterministic), 126 template survives, stress 5/5. Next: KV-blocking
-   across 6-head groups + list fusion (host submit cost now visible).
+   deterministic), 126 template survives, stress 5/5.
+   MICRO-OPT ROUND DONE 2026-09-11 (same report): vector fold-tree + native
+   esimd::exp in AttnCore/ChunkAttn — attn 151 -> 52 us (2.9x), 15.6 -> 9.8 ms
+   @4K (1.6x), chunkattn 4.7 -> 1.75 ms (2.7x), all green; short trajectory
+   RESTORED to certified [369,279,248046] (near-tie flipped back).
+   KV-BLOCKING DECIDED AGAINST (measured): traffic is ~2% of kernel time, a
+   6x cut would save ~0.2 ms of 9.76 ms — the limit is O(T) exact scan at
+   ~2.5ns/op + 24-WI occupancy. 64K dense decode wants a tiled rewrite (new
+   kernel + harness), queued, not started. Next: list fusion (host submit).
 - Done: Each optimization is justified by before/after profiles.
 
 ### T6.2 Decode/prefill sweep tuning
@@ -719,7 +759,8 @@ Phase gate: steady-state decode performs no allocation or command-list construct
 - Done: Latency/throughput curves recorded across the sweep.
 
 ### T6.3 Evaluate justified fusions and KV quantization
-- Status: `[~]` (early start 2026-09-09, routed from T4.5; formal deps T6.1/T1.5 still open)
+- Status: `[x]` (DONE 2026-09-12: fusions declined per T6.1 rule; INT8 KV implemented, harnessed, loop-integrated, e2e-gated 53/53)
+  (early start 2026-09-09, routed from T4.5; formal deps T6.1/T1.5 closed by box-native work)
 - Deps: T6.1, T1.5
 - Do: Apply fusions and KV-cache quantization only where quality (T1.5 corpus) holds.
   DIAGNOSTIC DONE 2026-09-09 (`tools/t63/diag_actquant.cpp`, `report_actquant.json`,
@@ -732,7 +773,15 @@ Phase gate: steady-state decode performs no allocation or command-list construct
   REMAINING (formal scope): fusions + KV-cache quantization gated on T6.1 (done)
   and the box-native T1.5 corpus (re-scoped 2026-09-11 — no bigger host; the
   streamed-CPU BF16 greedy is the quality arbiter).
-- Done: Changes keep quality within the chosen tolerance.
+  INT8 KV DONE 2026-09-12 (`tools/t63/report_kvint8.json`, kernels
+  KvAppendI8/AttnCoreI8 + `attni8_replay` ctest + `decode_l0 AINFER_KV8=1`):
+  per-token symmetric INT8 (dynamic row scales, no calibration). Diagnostic
+  on real K/V: random-query 4-7% (K dominates, granularity doesn't help),
+  peaked-regime ~5e-3 → GO; e2e gate 53/53 top-1 across all 6 prompts
+  (halves 64K KV 4→2 GiB). Fusions stay declined per the T6.1 fuse rule.
+  Postmortem: first integration launched the head-wise kernel with 1024
+  (copied pattern) → 256x heap overflow; caught by triage, fixed + guarded.
+- Done: Changes keep quality within the chosen tolerance (53/53 e2e).
 
 ### T6.4 Publish reproducible benchmark report
 - Status: `[x]` (DONE 2026-09-10: `tools/bench/report_t64.json` + Metrics Log row)
@@ -789,6 +838,222 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   T1.5 baseline exists (streamed-CPU BF16 greedy), (2) confirmatory sample firms
   alpha. (Launch note: first attempt died to a tool-timeout
   process-group kill, not a code fault; setsid-detached rerun clean.)
+  BOTH CONDITIONS MET 2026-09-12: (1) T1.5 batch 39/40 top-1 (`report_batch.json`);
+  (2) confirmatory full-length run (`mtp_accept.py 12`, `report_accept_full.json`):
+  alpha = 0.654 over n=52 fresh positions (8-11 never measured before); pooled
+  with the original 0.585/41: 58/93 = 0.624 (SE ≈ 0.05). Prize projects
+  (1.624)/1.06 ≈ 1.5x. MTP is measurement-cleared; remaining call is
+  engineering priority (draft+verify lists + accept/reject plumbing on the
+  recorded-loop architecture — sizable, not started).
+  ARCHITECTURE VERDICT 2026-09-12: single-position speculative verify is
+  IMPOSSIBLE (one truth eval + one advance eval per token = ratio ≤ 1.0; all
+  real SD systems verify with parallel/prefill-style target forwards). MTP
+  harvest on this platform = MTP-draft + CHUNKED verify (2-token chunk eval
+  ~35 ms + 5 ms draft for 1.62 tokens ≈ 2.7x — better than the 1.5x first
+  projected). Sequence: chunk production first (shared with 64K prefill),
+  then verify+integrate.
+  SMALL-M EFFICIENCY VERDICT 2026-09-12 (closes the verify design): a 2-token
+  chunk verify CANNOT pay — DPAS tiles bottom out at 8 rows (masked, no work
+  saved) and 48 linear layers × ~7 ms best-case ≈ 350 ms/round vs 67 ms
+  decode; decode kernels always win at small M (that is why decode exists).
+  The verify chunk must be M≥32 to amortize, but a 31-recompute + 1-draft
+  chunk does no useful work beyond the draft. ⇒ No chunk size verifies at a
+  profit in single-stream decode. MTP stays DEFERRED for architectural
+  reasons (needs batched decode — dropped by scope — or a free parallel
+  eval). The alpha/draft/chunk work stands: draft slice + chunk production
+  are reused the day batching lands; prompt-lookup decoding at 64K (zero
+  draft cost, needs the 64K machinery) is the noted alternative harvest. A re-quantize scare was resolved by re-reading the
+  container: all 15 MTP tensors ARE in .binfer (entries 851-865, 7×INT4 +
+  8×BF16) — an early scan script broke out of the section loop early.
+  CHUNK PRODUCTION (linear) DONE 2026-09-12
+  (`tools/cmdlist/chunklayerreal_replay.cpp`, ctest,
+  `tools/t74/report_chunklayerreal.json`): full linear chunk layer on REAL
+  trunk-layer-0 weights (port of the synthetic orchestration; real INT4
+  spans + BF16 small weights, M=32): worst-rel 4.52e-05 — TIGHTER than the
+  synthetic 1.77e-04 (real weights better conditioned than random fills),
+  continuity + determinism hold. Caught one port bug class pre-build:
+  A_log/dt_bias/conv1d are stored BF16 (must load via the BF16 path, not
+  fp32). Left: full-attn chunk + chunk KV-append/RoPE (DONE below), then
+  chunked MTP verify + loop integration.
+  CHUNK PRODUCTION (full-attn) DONE 2026-09-12
+  (`tools/cmdlist/chunkattnreal_replay.cpp`, ctest,
+  `tools/t74/report_chunkattnreal.json`): M=32 chunk at prefix-64 on REAL
+  trunk-layer-3 weights: 7 chunk GEMMs + per-row stages + NEW ChunkRope /
+  ChunkKvAppend (M-parallel, global positions) + ChunkAttn over BF16 cache +
+  MLP, one list: worst-rel 1.14e-04, prefix-guard bitwise, deterministic,
+  32 ms/chunk. Alignments: ChunkAttn float→BF16 KV (harness to qb pattern);
+  ChunkGemm partial-M guards (MTP-verify M=2; ceil launch). One harness guard
+  bug caught (checked a live chunk slot). Small-M verify primitive CANCELLED
+  with prejudice (measured: DPAS bottoms at masked 8-row tiles, 48 layers ×
+  anything ≥1 ms kills it; decode always wins small — see T7.2 verdict).
+  TILED ATTENTION SCOPE (2026-09-12, the true 64K-decode answer — new kernel,
+  not started): current AttnCore does ~10 GB/s effective (2% roof) at 9.8 ms
+  @4K, instruction-dense (~2.5ns/op) with 24-WI occupancy on 160 EUs;
+  64K projects ~250 ms/layer → ~4 s/token. Goal: FlashAttention-style tiled
+  kernel (T-blocks 64-128 through SLM double-buffer, online softmax, BF16
+  DPAS directly on cache rows — no convert, head×block grid for occupancy)
+  reaching ≥150 GB/s effective on a T=16K probe (roofline-consistent with
+  dp4a-GEMV's 50%). At 150 GB/s: 4.3 GB KV/token @64K ≈ 30 ms + linear ~50 ms
+  ≈ 10-12 t/s sustained. Risks: DPAS engagement (T3.4 caveat: pure-DPAS roof
+  stalled 7-9 TFLOPS — emulation suspected); SLM budget 128 KB (block 64 =
+  64 KB K-double + V stream + Q/acc regs fits). Sequence: synthetic tiled
+  probe → real-weight → decode_l0 adoption → re-profile.
+  PROBE RESULTS 2026-09-12 (`tools/t74/report_tiled.json`, `tiledattn_replay`
+  + `qkgemm_replay` ctests green): v1 plain-SYCL SLM/online scan is CORRECT
+  (2.83e-06) but 37 ms @4K — scalar compute swamps the 6x traffic saving; v2
+  ESIMD compute reaches 19.1 ms yet stays 2x BEHIND the 24-WI vector kernel,
+  proving per-head compute (not traffic, not passes) binds every scan form.
+  PIVOT TO GEMM-FORM validated at the primitive: QkGemm (fp16 Q × BF16 cache
+  strided, bf16 DPAS, fp32 accum, no transpose) CORRECT (4.09e-04) at 135 µs
+  for 24×4096×256 = 22x on the QK portion; 0.37 TFLOPS (DPAS weak per the
+  T3.4 caveat, occupancy-thin, but the form wins). (SYCL notes: vec
+  load/store are member functions; sycl::dot rejects vec<float,8>.)
+  HYBRID DONE 2026-09-12 (`tools/t74/report_hybrid.json`, `hybridattn_replay`
+  ctest): QK-DPAS (4 kv appends) + scalar row-softmax + cvt + WV-DPAS (4
+  appends) vs attnfar-identical ref: worst 2.31e-04, 5.3 ms @4K (qk 0.34 +
+  sm 2.18 + cv 0.11 + wv 2.63) = 1.9x over scan. Scalar softmax (41%) + thin
+  WV occupancy (48 groups) dominate now. 64K recalibrated: softmax
+  transcendental floor (~25M exp/token) caps dense decode ≈ 5 t/s regardless
+  of GEMM speed — still 25x over scan-form. NEXT: vectorize softmax (~10x)
+  + WV K-split 4x occupancy → ~1.3 ms @4K (~7.5x); then real-weight.
+  Debug postmortems: (1) GQA design miss (all heads read kv0; standalone
+  probe passed vacuously with the same wrong ref — hybrid ref caught it);
+  (2) missing /16 caught by exact 16.000x ratio (probe ref equally wrong —
+  both-sides trap again); (3) stale-binary false failure (built one target,
+  ran another — ALWAYS full-build before verifying; T6.1 rule restated).
+  HYBRID FINISH 2026-09-12 (softmax vectorized 4.7x; WV K-split + ResAddF
+  combine): 3.85 ms @4K (2.5x over scan), worst 2.19e-04. K-split roughly
+  neutral (2.63→2.83 ms — barriers/launches eat the occupancy gain; kept
+  for large-T structure, combine is 74 µs). Bisection postmortem: double-
+  offset O pointer (slab select in harness + kv rows in kernel) misfiled
+  every kv — caught by slab-mass forensics + minimal repro; append-arg
+  interaction fully exonerated (QK kv-loop clean, ResAddF combine bitwise).
+  LOOP-VERDICT 2026-09-13 (`tools/t74/report_hybrid.json` loop_verdict):
+  OOB-device-loss root-caused (QkGemm B-tile staging read past-TMAX slots;
+  non-monotonic 96/112/128-run vs 98/104/108/174-crash signature; N-guard
+  fix, all MAXCTX clean) + e2e quality-CLEARED (70-tok prompt, 59 vs 58
+  tok, both reach `126<|im_end|>`; 25-step identical trajectory, step-25
+  near-tie reroute, tails re-converge) + timing-LOSES at decode T
+  (attn_layer med 1.195 vs 0.959 ms, +25%: ~23 launches+barriers/layer vs
+  ~5 for scan; 2.5x synthetic win was @4K).   DECISION: DEFER for decode
+  (scan stays default); GEMM-form redirects to chunked prefill where
+  launch tax amortizes. Hybrid stays env-gated experimental.
+  CHUNK-GEMM DONE 2026-09-13 (`tools/t74/report_chunkqkwv.json`,
+  `report_chunkqkwvreal.json`; `chunkqkwv_replay` + `chunkqkwvreal_replay`
+  ctests): ChunkQkGemm (causal, one M*4*nBc launch) + ChunkSoftmaxRow
+  (M*24 rows) + ChunkWvGemm (one M*64 launch) — synthetic CHUNKQKWV-OK
+  2.43e-04, real-weight layer-3 CHUNKQKWVREAL-OK 1.68e-04 (scan-form
+  1.14e-04 — parity) with guards + determinism; M=256 scales clean
+  (2.21e-04, 157 ms/chunk/layer, ~0.61 ms/token/layer compute-bound →
+  64K prefill ~43 min one-time vs loop-prefill infeasible). Debug:
+  ARG-STRIP trap (unreferenced functor member drops from the signature,
+  indices shift — numKernelArgs probe rule, docs/toolchain.md) + harness
+  WV-index copy bug. T1.4 logits batch DONE 2026-09-13 (53/60, T1.4 closed).
+  64-LAYER ORCHESTRATION proven on device 2026-09-13
+  (`tools/cmdlist/chunk64real_replay.cpp`, ctest): one M=32/P=0 chunk
+  through all 64 real-weight layers (48 linear + 16 GEMM-form full),
+  64 recorded lists, per-layer SSM/KV state, streamed weights: 1583 ms
+  total, output FINITE, reset-determinism BITWISE, 3/3 runs identical.
+  Debug: shared-buffer address-capture trap (upload per layer before exec),
+  in_proj_z V6-rows mis-binning (device overrun segfault), NULL fill-pattern
+  driver segfault — all in docs/toolchain.md. Float-ref verdict CHUNK64-OK
+  2026-09-13 (`tools/t74/report_chunk64.json`: worst 1.38e-02 accum-fitted,
+  mean 1.5e-04, 99.6% <= 1e-3).
+  MULTI-CHUNK on device 2026-09-13 (`tools/cmdlist/chunk64mc_replay.cpp`,
+  ctest green first try): 128 recorded lists, A(0..31) 1581.7 ms +
+  B(32..63) 1585.7 ms with carried SSM/KV state: FINITE, continuity proven
+  (B-after-A differs from B-alone), determinism BITWISE. T=64 ref verdict
+  CHUNK64MC-OK 2026-09-13 (`tools/t74/report_chunk64mc.json`: worst
+  1.71e-02 within 2e-2 accum budget, mean 1.46e-04) + HANDOFF SLOT-OK
+  (layer-3 chunk-B Kn snapshot RNE-quantized == cache slots 32..63 bitwise
+  — chunk appends land in decode_l0's (t*4+kv)*256 slot addressing).
+  PRODUCTION WIDTH (M/N via CHUNK_M/CHUNK_N env, ctest contract intact):
+  M=256/N=2 first try 8.65 s/chunk (0.53 ms/tok/layer), FINITE + continuity
+  + BITWISE; T=512 ref CHUNK64MC-OK (`tools/t74/report_chunk64mc_m256.json`:
+  worst 3.48e-03, mean 5.16e-05, SLOT-OK [256..512) bitwise).
+  TRAFFIC ANALYSIS (production driver design): per-layer weight streaming =
+  ~12.8 GB/chunk-pass over USB → 254 chunks ≈ 11 h — prohibitive. Production
+  needs resident weights (full 16 GB arena, fits 24 GB VRAM) + stream
+  re-record per chunk (64 live lists max) + decode-layout KV/SSM arenas for
+  zero-copy handoff. N=8/M=256 validation running.
+  RESIDENT WEIGHTS DONE 2026-09-13 (uniform-stride arenas, one pair per kind
+  x64 layers, upload-once done-guard; norms stay streamed): ctest bitwise
+  IDENTICAL (17364.5556/509.4838) at 16.4 s vs 49.3 s (3x, upload traffic
+  gone even in validation). STREAM MODE DONE (CHUNK_STREAM=1: record+exec+
+  destroy per chunk, mode field in report; stream ≡ validation bitwise at
+  M=32/N=2). DECODE-LAYOUT STATE DONE (dKc/dVc 16-slot + dConv/dSsm 48-slot
+  arenas with decode_l0's exact slot/sl formulas; fills now 4 whole-arena
+  ops): ctest bitwise IDENTICAL again.
+  N=8/M=256 resident: 8.7-9.0 s/chunk, FINITE + continuity + BITWISE, sums
+  identical pre/post-resident (107189.3951/687.3606). T=2048 ref CHUNK64MC-OK
+  (`tools/t74/report_chunk64mc_n8.json`: worst 1.42e-03, mean 1.15e-05,
+  SLOT-OK [1792..2048); 637 s CPU). Trend: worst-rel SHRINKS with scale
+  (1.7e-02 @T=64 → 3.5e-03 @T=512 → 1.4e-03 @T=2048) — fp16-noise
+  accumulation is sublinear, good news for 64K.
+  HANDOFF PATH (file-based, sequential processes dodge >24 GB duplex):
+  chunk64mc CHUNK_DUMP_CACHES (decode-layout KV/SSM + hidlast + meta) ->
+  decode_l0 --import-caches (strided KV H2D, SSM, dX inject, tail-only
+  step) + --ids-file (64K prompts exceed 128 KB MAX_ARG_STRLEN) +
+  short-question generalization (mP<=P: cached prefix + loop-decoded
+  question). HANDOFF POSTMORTEM: first 9/9 claim RETRACTED as VOID
+  (space-separated flag misparsed as stray positional — both runs
+  loop-decoded; fixed: dual-form parsing + stray-positional error +
+  AINFER_STEPLOG). Real import verified (banner + step-63 start): 2/9 then
+  0.00-margin near-tie reroute — documented class, not a bug
+  (`tools/t74/report_handoff.json`). 64K needle v2 decode running.
+  INTEGRATION DESIGN (next build): single binary loads decode_l0's
+  payArena/scArena once; prefill records against arena offsets (entry
+  d_off/sc_off); prefill writes decode-layout KV/SSM (proven above);
+  decode loop starts at pos=P on the same arenas. Kills both the 11 h
+  re-upload traffic AND the 2x-weights (>24 GB) duplicate-arena trap.
+  NEXT: prefill-quality arbitration on real token ids (chunked-prefill +
+  argmax vs T1.5 streamed-BF16 truth), then 64K corpus + production
+  prefill→decode integration.
+  64K NEEDLE CORPUS DONE 2026-09-13 (`tools/t74/mk_needle.py`,
+  `tools/t74/needle_corpus.json`): 5 haystack variants x 65024 tokens
+  (needle at 0/25/50/75/100% depth, per-depth magic codes, round-trip
+  verified) — exact-match retrieval needs no CPU reference.
+  PRODUCTION INTEGRATION SPEC (owned next workstream, not started):
+  (1) chunk driver: 256-token chunks x 64 layers on the chunk64mc pattern
+  (M-scaling proven at layer level; per-chunk ~10 s full-model);
+  (2) cache import: prefill writes decode_l0's arena KV (BF16,
+  (t*4+kv)*256 — SLOT-OK proven) + per-layer SSM state (same dims both
+  sides), decode starts at pos=P; (3) measured math: 64K prefill ~43 min
+  one-time, then scan decode; (4) eval: greedy 512 tokens per variant,
+  exact code match at all 5 depths.
+  SINGLE-BINARY MERGE DONE 2026-09-15 (`tools/decode/decode_l0.cpp`
+  `--prefill-chunks`, `tools/t74/report_merge.json`): 8 chunk modules
+  appended (existing enum indices untouched), per-chunk 64-layer record
+  against SHARED payArena/scArena + decode-layout KV/SSM + preloaded norms,
+  stream record+exec+destroy, D2D last row to dX, existing loop seam.
+  Score S==Sm aliased (bitwise-safe, budget ~21.4 vs 22.71 GiB).
+  Gates: default 70-tok e2e intact (58 tok has126); M=32/N=2 prefill
+  BITWISE-identical to chunk64mc (0.000e+00); handoff parity first-5;
+  64K needle v2 in ONE process (254x256, 4793617 ms, `502817`+EOS —
+  identical to file path, zero re-uploads, zero disk). Bugs: report-JSON
+  comma, space-form flag, legacy a/b fallback (all fixed+verified).
+  MERGE-OK: recommended production path. Next: linear-list sharing.
+  DRAFT SLICE DONE 2026-09-12 (`tools/cmdlist/mtpdraft_replay.cpp`, ctest,
+  `tools/t72/report_mtpdraft.json`): full MTP-1 draft
+  (pre_fc norms + concat + fc + full layer with own KV + norm + lm-head +
+  argmax) as ONE recorded list on real weights: hidden worst-rel 4.46e-08,
+  draft token exact, top5 5/5, reset-deterministic, 6.4 ms/draft. Needed one
+  new 10-line kernel (Concat2) + the standard dead-strip guard. Left:
+  chunk production, then chunked verify + loop integration.
+  REVISIT 2026-09-15 (`tools/t72/report_mtp_revisit.json`,
+  `tools/t72/pl_accept.py`): 64K line landed — re-derived verify economics
+  with measured 64K numbers. Prompt-lookup drafts: alpha = 0/65 (draftable
+  ≤2/65) on repetitive-boilerplate continuation vs loop greedy truth —
+  model generates novel text, n-grams never fire; 95% upper ~0.046 <<
+  0.6 gate. DEAD at every context length. MTP-head drafts (alpha 0.624
+  stands): verify model C(8,65K) ≈ 1.7 s (1.09 fixed measured + 0.57
+  attention slope) vs 8 × 1.65 s sequential → E(8)=2.62, speedup ≈ 2.5x
+  AT 64K ONLY (short-context still 0.24x loss) — economics reversal, but
+  chained drafting unproven + 64K alpha unmeasured + no 64K production
+  traffic. VERDICT: RE-DEFER with upgraded triggers (was architecturally
+  impossible; now uneconomical-until): (1) production 64K decode traffic,
+  (2) chained-draft proof, (3) 64K alpha confirmation. No code changes
+  (measurement + analysis only); draft slice + chunk machinery reusable.
 - Done: Enabled only with measured net speedup and preserved quality, or remains dropped.
 
 ### T7.3 OpenAI-compatible HTTP daemon
@@ -806,7 +1071,7 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
 - Done: Endpoint returns correct streamed completions.
 
 ### T7.4 Extended contexts / batching (scoped separately)
-- Status: `[~]` (SCOPED 2026-09-10; implementation is follow-on work)
+- Status: `[x]` (CLOSED 2026-09-15: 64K line complete — chunked prefill production proven, 64K needle quality 5/5; single-binary merge left as perf follow-up, not a gate.)
 - Deps: T5.1, T6.2
 - Do: Consider larger contexts, sliding-window KV, or limited batching as new scoped work.
   SCOPE DECIDED 2026-09-10 (user): larger contexts at **64K**; batching DROPPED
@@ -883,24 +1148,113 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   2.18e-05 (inside envelope); short prompt back to [369,279,248046] via flip
   dynamics. Wts-orphan bug had also taken layer3real — audit now covers all
   four L0 AttnCore users. INT8 stays queued behind T6.3.
-- Done: Scoped as follow-on effort with its own gates.
+  PREFILL-QUALITY ARBITRATION DONE 2026-09-13
+  (`tools/t74/report_prefill_arb.json`, `tools/forward/prefill_arb.py` +
+  `arb_ref.py`): first 64 ids of the e2e prompt -> host BF16 embed ->
+  chunk64mc with host inputs -> device chunk-B hidden -> BF16 lm_head top-1
+  vs T=64 INT4-float chain + BF16 head: 32/32 top-1, 0 near-tie misses —
+  chunked-prefill noise flips nothing at 64-token scale on real ids.
+  OPEN (owned next workstream): production chunk driver (256-token chunks x
+  64 layers) + cache import into decode_l0 + 64K needle eval (5/5 depths
+  exact-match) per the integration spec above.
+  CLOSE-OUT 2026-09-15 — all gates passed: production driver live
+  (`CHUNK_M`/`CHUNK_N`/`CHUNK_STREAM`, resident weights, decode-layout
+  state); file-handoff path (dump + `--import-caches` + `--ids-file` +
+  question); 64K needle quality 5/5 exact-match (`tools/t74/
+  report_needle.json`: v0 739521, v1 184963, v2 502817, v3 926438,
+  v4 317654 — each exact code + EOS in 8 tokens). Postmortems: VOID 9/9
+  flag-misparse, tmpfs-full dump death, transient device loss (CHECK now
+  exits). Follow-up (perf, not gates): single-binary prefill→decode merge,
+  linear-list sharing across chunks, GEMM-form long-context decode.
+- Done: Scoped as follow-on effort with its own gates — all met 2026-09-15.
 
 ---
 
 ## Cross-Cutting Tracks
 
 ### X1 Continuous verification suite
-- Status: `[ ]`
+- Status: `[x]` (DONE 2026-09-12: two-tier manual gate, no CI server on this box)
 - Deps: T1.4
 - Do: Maintain unit (container/tokenizer/pack/swizzle/budget/sampling), kernel, integration,
   and quality test tiers; run on every change.
 - Done: CI-style suite runs and gates merges.
+- Gate (47 tests, post-T8.4): per-change FAST gate `ctest --preset b60 -E
+  "^(l0load|chunkgemm_replay|chunklayer_replay|chunklayerreal_replay|chunkattnreal_replay|chunkqkwvreal_replay|chunk64real_replay|chunk64mc_replay)$"`
+  (39 tests, excludes 8 heavy proofs); FULL gate is bare `ctest --preset b60`
+  (47/47 expected; Stamp 13 was 45/45 pre-T8.2). l0negatives + kvfit + attni8 + mtpdraft + chunkqkwv + reports_json + tokenizer_golden all
+  in the fast tier by construction (ms-scale).
 
 ### X2 Documentation and reproducibility
-- Status: `[ ]`
+- Status: `[x]` (audited 2026-09-12)
 - Deps: T0.1
 - Do: Keep environment, model manifest, memory budget, and benchmark metadata current.
 - Done: Docs match the current implementation state.
+- Audit notes: plan.md §13 stale DONE-markers fixed; AGENTS.md Code-so-far
+  extended (cmdlist/decode_l0); memory_budget.json left as the v1 baseline
+  (still accurate for the default BF16-KV path — INT8/64K measured variants
+  live in task reports by design, not duplicated); binfer_spec normative and
+  unchanged (no format change since v1).
+
+---
+
+## Phase 8: Release Hardening (review.md §4/§6, IDs T8.1–T8.11 stable)
+
+### T8.1 Create current-state and release-support matrix (P0)
+- Status: `[x]` (DONE 2026-09-16: `STATUS.md` — supported config, runtime paths,
+  quality/perf snapshots, experimental/deferred table, known issues, Stamp 13)
+- Deps: none. Done: new reviewer can identify the release configuration without
+  reading the full changelog.
+
+### T8.2 Normalize report schema and strict JSON validation (P0)
+- Status: `[x]` (DONE 2026-09-16: `tools/http/report_t73.json` trailing-`}`
+  fixed — 91/91 tracked reports strict-parse; permanent host-only ctest
+  `reports_json` gate via `tools/validate_reports.py`, in FAST tier.
+  Negative control: pre-fix run flagged exactly the t73 file. Common-envelope
+  schema unification across reports left as follow-up, not a gate.)
+
+### T8.3 Document and classify weight-stat anomaly rules (P0)
+- Status: `[x]` (DONE 2026-09-16: `tools/weightstats_classify.py` →
+  `reference/weight_stats_v2.json`; v1 kept unchanged. Methodology: peer-group
+  (scope, class) robust-z on maxabs, threshold 5.0, shapes from headers only.
+  136/136 classified: 61 expected-architectural (A_log/dt_bias, keep_bf16),
+  64 out-of-scope vision (reject_loader_v1), 11 quantization-sensitive
+  (keep_bf16 / int4_g128_per_policy); suspected_source_corruption: [].
+  Actions grounded in `binfer.py quantize_policy`.)
+
+### T8.4 Expand tokenizer multilingual and template golden suite (P0)
+- Status: `[x]` (DONE 2026-09-16: `validate_t43.py` extended 14→27 parity
+  cases (decode skip True/False, whitespace, malformed markup, multi-turn
+  think on/off) — 27/27; pinned `golden_t44.json` v1 (encode/decode/templates/
+  prompt_ids + 5 asset sha256) with `validate_golden.py` (no transformers) —
+  GOLDEN-OK 25/25, ctest `tokenizer_golden` (0.44 s, FAST tier). Real parity
+  gap fixed: `tok.render_chat` StrictUndefined→lenient (HF tolerates assistant
+  msgs without tool_calls). Checksum finding: manifest sha256 MATCH all 5
+  tokenizer assets (content pin); crc32.txt coincides only for the 3 large
+  stable assets (merges/tokenizer/vocab) — hub metadata, not a content gate.
+  `tokenizer_t14.json` standalone failing fixture kept unchanged.)
+
+### T8.5 Build 200-plus-case quality benchmark (P1)
+- Status: `[ ]` (open: 40/40/30/20/30/20/20 split per review §3.1; Gate C)
+
+### T8.6 Add margin-aware divergence report (P1)
+- Status: `[ ]` (open: BF16 margin, overlap, first-divergence, reconvergence per top-1 diff)
+
+### T8.7 Merge chunk prefill and decode into one process (P2)
+- Status: `[x]` (DONE 2026-09-15: single-binary `--prefill-chunks`, MERGE-OK,
+  in-process 64K HIT, `tools/t74/report_merge.json`; see merge block above)
+
+### T8.8 Implement persistent HTTP worker (P3)
+- Status: `[ ]` (open: load-once, /healthz//readyz, cancellation, queueing,
+  timeouts, reset, device-loss restart; 10-request isolation test; Gate E)
+
+### T8.9 Introduce typed arena spans and checked offsets (P4)
+- Status: `[ ]` (open: review §3.5 items 1–6)
+
+### T8.10 Add fault injection and sanitizer track (P4)
+- Status: `[ ]` (open: review §3.5 items 7–8; Gate B edge cases)
+
+### T8.11 Publish controlled AInfer versus llama.cpp benchmark (P5)
+- Status: `[ ]` (open: review §3.2 controls; Gate D)
 
 ---
 

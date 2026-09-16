@@ -68,6 +68,8 @@ int main(int argc, char **argv) {
   int opt_max_new = -1;
   SampleParams samp; // T7.1 defaults = certified greedy (temp 0)
   const char *spvdir = nullptr;
+  const char *impdir = nullptr; // T7.4 cache import: prefill state dir
+  int preChunks = 0;            // T7.4 in-process prefill: N 256-tok chunks
   std::vector<const char *> pos;
   for (int i = 1; i < argc; ++i) {
     if (std::strncmp(argv[i], "--ids=", 6) == 0) {
@@ -93,6 +95,33 @@ int main(int argc, char **argv) {
       samp.rep_penalty = (float)atof(argv[i] + 14);
     } else if (std::strncmp(argv[i], "--spvdir=", 9) == 0) {
       spvdir = argv[i] + 9;
+    } else if (std::strncmp(argv[i], "--import-caches=", 16) == 0) {
+      impdir = argv[i] + 16;
+    } else if (std::strcmp(argv[i], "--import-caches") == 0 && i + 1 < argc) {
+      impdir = argv[++i]; // space-separated form (equals form also works)
+    } else if (std::strncmp(argv[i], "--prefill-chunks=", 17) == 0) {
+      preChunks = atoi(argv[i] + 17);
+    } else if (std::strcmp(argv[i], "--prefill-chunks") == 0 && i + 1 < argc) {
+      preChunks = atoi(argv[++i]); // space-separated form also works
+    } else if (std::strncmp(argv[i], "--ids-file=", 11) == 0) {
+      FILE *ff = std::fopen(argv[i] + 11, "r");
+      if (!ff) {
+        std::fprintf(stderr, "no ids file %s\n", argv[i] + 11);
+        return 2;
+      }
+      char *line = nullptr;
+      size_t cap = 0;
+      if (getline(&line, &cap, ff) > 0) {
+        for (const char *q = line; *q;) {
+          opt_ids.push_back(atoi(q));
+          while (*q && *q != ',')
+            ++q;
+          if (*q == ',')
+            ++q;
+        }
+      }
+      free(line);
+      std::fclose(ff);
     } else {
       pos.push_back(argv[i]);
     }
@@ -103,7 +132,14 @@ int main(int argc, char **argv) {
     spvdir = pos[3];
   if (pos.size() < 4 || !spvdir) {
     std::fprintf(stderr, "usage: decode_l0 <model> <P> <G> <spvdir> [report] "
-                         "[--ids=..] [--max-new=..]\n");
+                         "[--ids=..] [--ids-file=..] [--max-new=..] "
+                         "[--import-caches=..] [--prefill-chunks=N]\n");
+    return 2;
+  }
+  if (pos.size() > 5) {
+    // Stray positionals are almost always misparsed flags (this once
+    // silently voided an import run: --import-caches <dir> without '=').
+    std::fprintf(stderr, "unexpected positional arg %s\n", pos[5]);
     return 2;
   }
   const char *path = pos[0];
@@ -276,6 +312,22 @@ int main(int argc, char **argv) {
        *dKn = alloc(KVW * 4);
   void *dQn = alloc(QN * 4), *dGate = alloc(QN * 4);
   void *dWts = alloc((size_t)24 * MAXCTX * 4);
+  // T7.4 hybrid-attention experiment (AINFER_ATTN=hybrid): GEMM-form decode
+  // attention (QK-DPAS + softmax + WV-DPAS) replacing AttnCore per full
+  // layer. Buffers sized by MAXCTX (full-width baked N/K; garbage cols
+  // beyond active T are unread or zero-weighted by construction).
+  const char *hybe = std::getenv("AINFER_ATTN");
+  const bool hyb = hybe && std::strcmp(hybe, "hybrid") == 0;
+  void *dQnh = alloc(QN * 2), *dS8 = alloc((size_t)24 * MAXCTX * 4),
+       *dW8 = alloc((size_t)24 * MAXCTX * 4),
+       *dWh8 = alloc((size_t)24 * MAXCTX * 2),
+       // WV partial slabs are 24x256: WvGemm writes O rows with hardcoded
+       // stride 256 (like the harness), NOT KMAX stride. A 24xMAXCTX slab
+       // here once misfiled every kv row and overflowed the slabs.
+       *dWVO = alloc((size_t)4 * 24 * 256 * 4),
+       *dWTmp = alloc((size_t)24 * 256 * 4);
+  if (hyb)
+    std::fprintf(stderr, "[l0] attention: hybrid GEMM-form (experimental)\n");
   void *dG17 = alloc(I * 4), *dU17 = alloc(I * 4), *dQ8 = alloc(I),
        *dSq = alloc(136 * 4);
   void *dB = alloc(NH * 4), *dA = alloc(NH * 4), *dBt = alloc(NH * 4),
@@ -283,8 +335,23 @@ int main(int argc, char **argv) {
   void *dLogits = alloc((size_t)V * 4);
   void *dPV = alloc(64 * 4), *dPI = alloc(64 * 4), *dOutT = alloc(4);
   void *dCtrl = alloc(sizeof(DecodeControl));
-  void *dKc = alloc((size_t)16 * MAXCTX * 4 * 256 * 2),
-       *dVc = alloc((size_t)16 * MAXCTX * 4 * 256 * 2);
+  // T6.3 INT8 KV (AINFER_KV8=1): per-token symmetric INT8 caches + fp32
+  // row scales (halves 64K KV 4.0 -> 2.0 GiB + scales). Only the active
+  // precision is allocated; per-layer pointers branch once below.
+  const char *kv8e = std::getenv("AINFER_KV8");
+  const bool kv8 = kv8e && kv8e[0] == '1';
+  void *dKc = nullptr, *dVc = nullptr;
+  void *dKc8 = nullptr, *dVc8 = nullptr, *dKscl = nullptr, *dVscl = nullptr;
+  if (kv8) {
+    dKc8 = alloc((size_t)16 * MAXCTX * 4 * 256);
+    dVc8 = alloc((size_t)16 * MAXCTX * 4 * 256);
+    dKscl = alloc((size_t)16 * MAXCTX * 4 * 4);
+    dVscl = alloc((size_t)16 * MAXCTX * 4 * 4);
+    std::fprintf(stderr, "[l0] KV precision: INT8 per-token\n");
+  } else {
+    dKc = alloc((size_t)16 * MAXCTX * 4 * 256 * 2),
+    dVc = alloc((size_t)16 * MAXCTX * 4 * 256 * 2);
+  }
   void *dConv = alloc((size_t)48 * C * 3 * 4),
        *dS = alloc((size_t)48 * NH * D * D * 4);
   void *dInN = alloc((size_t)64 * H * 4), *dPostN = alloc((size_t)64 * H * 4),
@@ -352,22 +419,129 @@ int main(int argc, char **argv) {
     CHECK(zeCommandListAppendMemoryCopy(up, dSin, sn.data(), sn.size() * 4,
                                         nullptr, 0, nullptr));
   }
-  { // zeroed persistent caches (BF16 zeros are zero bytes)
+  { // zeroed persistent caches (BF16/int8 zeros are zero bytes)
     // T7.4: device-side fill — at 64K the KV zero set is 4 GiB and must never
     // cross PCIe as host uploads. Synchronous immediate list: inline completion.
     const uint8_t z = 0;
-    CHECK(zeCommandListAppendMemoryFill(
-        up, dKc, &z, 1, (size_t)16 * MAXCTX * 4 * 256 * 2, nullptr, 0,
-        nullptr));
-    CHECK(zeCommandListAppendMemoryFill(
-        up, dVc, &z, 1, (size_t)16 * MAXCTX * 4 * 256 * 2, nullptr, 0,
-        nullptr));
+    if (kv8) {
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dKc8, &z, 1, (size_t)16 * MAXCTX * 4 * 256, nullptr, 0,
+          nullptr));
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dVc8, &z, 1, (size_t)16 * MAXCTX * 4 * 256, nullptr, 0,
+          nullptr));
+      // Zero scales are safe: dequant yields exact 0 for untouched slots,
+      // and every appended row overwrites its scales.
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dKscl, &z, 1, (size_t)16 * MAXCTX * 4 * 4, nullptr, 0,
+          nullptr));
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dVscl, &z, 1, (size_t)16 * MAXCTX * 4 * 4, nullptr, 0,
+          nullptr));
+    } else {
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dKc, &z, 1, (size_t)16 * MAXCTX * 4 * 256 * 2, nullptr, 0,
+          nullptr));
+      CHECK(zeCommandListAppendMemoryFill(
+          up, dVc, &z, 1, (size_t)16 * MAXCTX * 4 * 256 * 2, nullptr, 0,
+          nullptr));
+    }
     CHECK(zeCommandListAppendMemoryFill(up, dConv, &z, 1,
                                         (size_t)48 * C * 3 * 4, nullptr, 0,
                                         nullptr));
     CHECK(zeCommandListAppendMemoryFill(up, dS, &z, 1,
                                         (size_t)48 * NH * D * D * 4, nullptr,
                                         0, nullptr));
+  }
+  // T7.4 cache import (file handoff from chunk prefill): overwrites the
+  // zeroed arenas with prefilled KV (BF16) + SSM state + final hidden.
+  // Dump layout = decode layout at stride P (16 slots back-to-back);
+  // import re-strides KV per layer into MAXCTX arenas. INT8-KV import is
+  // future work (prefill writes BF16); KV8 + import is rejected.
+  int impP = 0;
+  if (impdir) {
+    if (kv8) {
+      std::fprintf(stderr, "import-caches needs BF16 KV (no --kv8)\n");
+      return 2;
+    }
+    char mp[512];
+    std::snprintf(mp, sizeof mp, "%s/meta.txt", impdir);
+    FILE *mf = std::fopen(mp, "r");
+    int mP = 0, mM = 0, mN = 0, mTC = 0;
+    if (!mf ||
+        std::fscanf(mf, "P=%d M=%d NCH=%d TC=%d", &mP, &mM, &mN, &mTC) != 4) {
+      std::fprintf(stderr, "import-caches: bad meta %s\n", mp);
+      return 2;
+    }
+    std::fclose(mf);
+    if (mP > P) {
+      std::fprintf(stderr, "import-caches: dump P=%d > prompt P=%d\n", mP, P);
+      return 2;
+    }
+    // mP <= P: first mP ids are cached (skipped); ids[mP..P-1] loop-decode
+    // as the question; tail runs at P-1 as usual.
+    if (mP > MAXCTX) {
+      std::fprintf(stderr, "import-caches: P=%d > MAXCTX=%d\n", mP, MAXCTX);
+      return 2;
+    }
+    auto impRaw = [&](const char *nm, std::vector<uint8_t> &hb) {
+      std::snprintf(mp, sizeof mp, "%s/%s", impdir, nm);
+      FILE *fi = std::fopen(mp, "rb");
+      if (!fi) {
+        std::fprintf(stderr, "import-caches: no %s\n", mp);
+        std::exit(2);
+      }
+      std::fseek(fi, 0, SEEK_END);
+      long nb = std::ftell(fi);
+      std::fseek(fi, 0, SEEK_SET);
+      hb.assign(nb > 0 ? (size_t)nb : 0, 0);
+      size_t nr = hb.empty() ? 0 : std::fread(hb.data(), 1, hb.size(), fi);
+      std::fclose(fi);
+      if (nr != hb.size()) {
+        std::fprintf(stderr, "import-caches: short %s\n", mp);
+        std::exit(2);
+      }
+    };
+    std::vector<uint8_t> hkc, hvc;
+    impRaw("kc.bin", hkc);
+    impRaw("vc.bin", hvc);
+    size_t lay = (size_t)mP * 4 * 256 * 2;
+    if (hkc.size() != lay * 16 || hvc.size() != lay * 16) {
+      std::fprintf(stderr, "import-caches: KV size %zu want %zu\n",
+                   hkc.size(), lay * 16);
+      return 2;
+    }
+    for (int l = 0; l < 16; ++l) {
+      CHECK(zeCommandListAppendMemoryCopy(
+          up, (char *)dKc + (size_t)l * MAXCTX * 4 * 256 * 2,
+          hkc.data() + (size_t)l * lay, lay, nullptr, 0, nullptr));
+      CHECK(zeCommandListAppendMemoryCopy(
+          up, (char *)dVc + (size_t)l * MAXCTX * 4 * 256 * 2,
+          hvc.data() + (size_t)l * lay, lay, nullptr, 0, nullptr));
+    }
+    std::vector<uint8_t> hcv, hss;
+    impRaw("conv.bin", hcv);
+    impRaw("ssm.bin", hss);
+    if (hcv.size() != (size_t)48 * C * 3 * 4 ||
+        hss.size() != (size_t)48 * NH * D * D * 4) {
+      std::fprintf(stderr, "import-caches: SSM size\n");
+      return 2;
+    }
+    CHECK(zeCommandListAppendMemoryCopy(up, dConv, hcv.data(), hcv.size(),
+                                        nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryCopy(up, dS, hss.data(), hss.size(),
+                                        nullptr, 0, nullptr));
+    std::vector<uint8_t> hhid;
+    impRaw("hidlast.bin", hhid);
+    if (hhid.size() != (size_t)H * 4) {
+      std::fprintf(stderr, "import-caches: hidden size\n");
+      return 2;
+    }
+    CHECK(zeCommandListAppendMemoryCopy(up, dX, hhid.data(), hhid.size(),
+                                        nullptr, 0, nullptr));
+    impP = mP;
+    std::fprintf(stderr, "[l0] imported prefill caches P=%d from %s\n", impP,
+                 impdir);
   }
   const Entry *Eemb = find("model.language_model.embed_tokens.weight");
   const void *embP = (const char *)payArena + (Eemb->d_off - pay_lo);
@@ -388,6 +562,19 @@ int main(int argc, char **argv) {
       {"rmsinv.spv", "_ZTS6RmsInv"},     {"normgated.spv", "_ZTS9NormGated"},
       {"embed.spv", "_ZTS5Embed"},       {"argmax1.spv", "_ZTS8ArgmaxS1"},
       {"argmax2.spv", "_ZTS8ArgmaxS2"},
+      {"kvappendi8.spv", "_ZTS10KvAppendI8"},
+      {"attni8.spv", "_ZTS10AttnCoreI8"},
+      {"qkgemm.spv", "_ZTS6QkGemm"},     {"softmaxrow.spv", "_ZTS10SoftmaxRow"},
+      {"cvtf32f16.spv", "_ZTS9CvtF32F16"}, {"wvgemm.spv", "_ZTS6WvGemm"},
+      {"gatemul.spv", "_ZTS7GateMul"}, // resaddf already loaded as RES
+      {"chunkgemm.spv", "_ZTS9ChunkGemm"},
+      {"chunkssmconv.spv", "_ZTS12ChunkSsmConv"},
+      {"chunkssmrecur.spv", "_ZTS13ChunkSsmRecur"},
+      {"chunkrope.spv", "_ZTS9ChunkRope"},
+      {"chunkkvappend.spv", "_ZTS13ChunkKvAppend"},
+      {"chunkqkgemm.spv", "_ZTS11ChunkQkGemm"},
+      {"chunksoftmaxrow.spv", "_ZTS15ChunkSoftmaxRow"},
+      {"chunkwvgemm.spv", "_ZTS11ChunkWvGemm"},
   };
   enum K {
     NORM,
@@ -411,6 +598,21 @@ int main(int argc, char **argv) {
     EMBED,
     ARG1,
     ARG2,
+    KV8,
+    ATTN8,
+    QKG,
+    SMR,
+    CVT2,
+    WVG,
+    GMUL,
+    CGEMM,
+    CCONV,
+    CRECUR,
+    CROPE,
+    CKV,
+    CQK,
+    CSM,
+    CWV,
     NK
   };
   ze_kernel_handle_t kh[NK] = {nullptr};
@@ -451,6 +653,11 @@ int main(int argc, char **argv) {
     if (i != ARG1 && i != ARG2)
       CHECK(zeKernelSetGroupSize(kh[i], 1, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[NORM], 256, 1, 1)); // T6.1 parallel norm
+  CHECK(zeKernelSetGroupSize(kh[QKG], 16, 1, 1)); // DPAS kernels: SG16 groups
+  CHECK(zeKernelSetGroupSize(kh[WVG], 16, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[CGEMM], 16, 1, 1)); // chunk prefill: same
+  CHECK(zeKernelSetGroupSize(kh[CQK], 16, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[CWV], 16, 1, 1));
 
   ze_command_queue_handle_t qq = nullptr;
   ze_command_queue_desc_t qdesc = {ZE_STRUCTURE_TYPE_COMMAND_QUEUE_DESC,
@@ -586,24 +793,121 @@ int main(int argc, char **argv) {
       setarg(kh[ROPE], 3, sizeof(void *), &dSin);
       setarg(kh[ROPE], 4, sizeof(void *), &dCtrl);
       launch(R, kh[ROPE], 28);
-      void *kcS = (char *)dKc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
-      void *vcS = (char *)dVc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
-      setarg(kh[KV], 0, sizeof(void *), &kcS);
-      setarg(kh[KV], 1, sizeof(void *), &vcS);
-      setarg(kh[KV], 2, sizeof(void *), &dKn);
-      setarg(kh[KV], 3, sizeof(void *), &dV16);
-      setarg(kh[KV], 4, sizeof(void *), &dCtrl);
-      setarg(kh[KV], 5, sizeof(int), &tmax);
-      launch(R, kh[KV], KVW);
-      setarg(kh[ATTN], 0, sizeof(void *), &dAtt);
-      setarg(kh[ATTN], 1, sizeof(void *), &dQn);
-      setarg(kh[ATTN], 2, sizeof(void *), &kcS);
-      setarg(kh[ATTN], 3, sizeof(void *), &vcS);
-      setarg(kh[ATTN], 4, sizeof(void *), &dGate);
-      setarg(kh[ATTN], 5, sizeof(void *), &dCtrl);
-      setarg(kh[ATTN], 6, sizeof(int), &tmax);
-      setarg(kh[ATTN], 7, sizeof(void *), &dWts);
-      launch(R, kh[ATTN], 24);
+      if (kv8 && !hyb) {
+        void *kcS = (char *)dKc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+        void *vcS = (char *)dVc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+        void *ksS = (char *)dKscl + ((size_t)slot * MAXCTX) * 4 * 4;
+        void *vsS = (char *)dVscl + ((size_t)slot * MAXCTX) * 4 * 4;
+        setarg(kh[KV8], 0, sizeof(void *), &kcS);
+        setarg(kh[KV8], 1, sizeof(void *), &vcS);
+        setarg(kh[KV8], 2, sizeof(void *), &ksS);
+        setarg(kh[KV8], 3, sizeof(void *), &vsS);
+        setarg(kh[KV8], 4, sizeof(void *), &dKn);
+        setarg(kh[KV8], 5, sizeof(void *), &dV16);
+        setarg(kh[KV8], 6, sizeof(void *), &dCtrl);
+        setarg(kh[KV8], 7, sizeof(int), &tmax);
+        // KvAppendI8 is one WI per HEAD (d loop inside) — NOT KVW=1024 like
+        // the element-wise BF16 kernel. Launching 1024 overran the heaps
+        // 256x (hh up to 1023) and trashed neighboring slots.
+        launch(R, kh[KV8], 4);
+        setarg(kh[ATTN8], 0, sizeof(void *), &dAtt);
+        setarg(kh[ATTN8], 1, sizeof(void *), &dQn);
+        setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+        setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+        setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+        setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+        setarg(kh[ATTN8], 6, sizeof(void *), &dGate);
+        setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl);
+        setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+        setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+        launch(R, kh[ATTN8], 24);
+      } else {
+        void *kcS = (char *)dKc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+        void *vcS = (char *)dVc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+        setarg(kh[KV], 0, sizeof(void *), &kcS);
+        setarg(kh[KV], 1, sizeof(void *), &vcS);
+        setarg(kh[KV], 2, sizeof(void *), &dKn);
+        setarg(kh[KV], 3, sizeof(void *), &dV16);
+        setarg(kh[KV], 4, sizeof(void *), &dCtrl);
+        setarg(kh[KV], 5, sizeof(int), &tmax);
+        launch(R, kh[KV], KVW);
+        if (hyb) {
+          // Hybrid GEMM-form attention (experimental): full MAXCTX width
+          // baked (garbage cols beyond active T are unread — softmax is
+          // Ctrl-bounded — or zero-weighted: V beyond T is zero-filled).
+          // Q fp32 -> fp16.
+          setarg(kh[CVT2], 0, sizeof(void *), &dQnh);
+          setarg(kh[CVT2], 1, sizeof(void *), &dQn);
+          launch(R, kh[CVT2], QN);
+          // QK: 4 kv-group appends.
+          int nnX = (MAXCTX + 15) / 16;
+          setarg(kh[QKG], 0, sizeof(void *), &dQnh);
+          setarg(kh[QKG], 1, sizeof(void *), &kcS);
+          setarg(kh[QKG], 2, sizeof(void *), &dS8);
+          setarg(kh[QKG], 3, sizeof(int), &tmax);
+          setarg(kh[QKG], 4, sizeof(int), &tmax);
+          setarg(kh[QKG], 6, (size_t)8 * 256 * 2, nullptr);
+          setarg(kh[QKG], 7, (size_t)16 * 16 * 2, nullptr);
+          setarg(kh[QKG], 8, (size_t)8 * 16 * 4, nullptr);
+          for (int kv = 0; kv < 4; ++kv) {
+            setarg(kh[QKG], 5, sizeof(int), &kv);
+            launch(R, kh[QKG], nnX);
+          }
+          // Softmax (Ctrl-driven) + W fp32 -> fp16.
+          setarg(kh[SMR], 0, sizeof(void *), &dW8);
+          setarg(kh[SMR], 1, sizeof(void *), &dS8);
+          setarg(kh[SMR], 2, sizeof(void *), &dCtrl);
+          setarg(kh[SMR], 3, sizeof(int), &tmax);
+          launch(R, kh[SMR], 24);
+          setarg(kh[CVT2], 0, sizeof(void *), &dWh8);
+          setarg(kh[CVT2], 1, sizeof(void *), &dW8);
+          launch(R, kh[CVT2], (uint32_t)((size_t)24 * MAXCTX));
+          // WV: 16 appends (kv x K-chunk) into partial slabs + combine.
+          setarg(kh[WVG], 0, sizeof(void *), &dWh8);
+          setarg(kh[WVG], 1, sizeof(void *), &vcS);
+          setarg(kh[WVG], 3, sizeof(int), &tmax);
+          setarg(kh[WVG], 4, sizeof(int), &tmax);
+          setarg(kh[WVG], 7, (size_t)8 * 16 * 2, nullptr);
+          setarg(kh[WVG], 8, (size_t)16 * 16 * 2, nullptr);
+          setarg(kh[WVG], 9, (size_t)8 * 16 * 4, nullptr);
+          for (int kv = 0; kv < 4; ++kv) {
+            setarg(kh[WVG], 5, sizeof(int), &kv);
+            for (int cc = 0; cc < 4; ++cc) {
+              void *po = (char *)dWVO + (size_t)cc * 24 * 256 * 4;
+              setarg(kh[WVG], 2, sizeof(void *), &po);
+              setarg(kh[WVG], 6, sizeof(int), &cc);
+              launch(R, kh[WVG], 16);
+            }
+          }
+          auto res3 = [&](void *Y, void *A, void *B) {
+            setarg(kh[RES], 0, sizeof(void *), &Y);
+            setarg(kh[RES], 1, sizeof(void *), &A);
+            setarg(kh[RES], 2, sizeof(void *), &B);
+            launch(R, kh[RES], (uint32_t)(24 * 256));
+          };
+          void *p0 = dWVO, *p1 = (char *)dWVO + (size_t)24 * 256 * 4,
+               *p2 = (char *)dWVO + (size_t)2 * 24 * 256 * 4,
+               *p3 = (char *)dWVO + (size_t)3 * 24 * 256 * 4;
+          res3(dWTmp, p0, p1);
+          res3(dWTmp, dWTmp, p2);
+          res3(dAtt, dWTmp, p3);
+          // Gate in place (Y==A elementwise-safe, SiluMul precedent).
+          setarg(kh[GMUL], 0, sizeof(void *), &dAtt);
+          setarg(kh[GMUL], 1, sizeof(void *), &dAtt);
+          setarg(kh[GMUL], 2, sizeof(void *), &dGate);
+          launch(R, kh[GMUL], QN);
+        } else {
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+        }
+      }
       xq(R, dAtt, V6);
       gemvE(R, find(nm(L, "self_attn.o_proj.weight")), H, V6, dMix);
     } else {
@@ -723,6 +1027,379 @@ int main(int argc, char **argv) {
     if (prof)
       buckets[label].push_back(now_ns() - t0);
   };
+  // ---- T7.4 in-process chunked prefill (single-binary production path) ----
+  // Flagged by --prefill-chunks N (NCH chunks of M rows, M via CHUNK_M env,
+  // default 256; inputs via CHUNK64MC_HOST_IN prefix, same convention as
+  // chunk64mc_replay). Records per-chunk 64-layer lists against the SHARED
+  // payArena/scArena (weights loaded once — kills the 11 h re-upload
+  // traffic AND the >24 GB duplicate-arena trap), appends KV/SSM straight
+  // into decode-layout dKc/dVc/dConv/dS, then hands dX + impP to the loop
+  // below (same seam as --import-caches, no file round-trip).
+  // Score buffer aliased S==Sm (row-wise read-before-write, bitwise-safe);
+  // saves 1.5 GiB at 64K (budget 21.4 vs 22.71 GiB heap).
+  double prefill_ms = 0;
+  if (preChunks > 0) {
+    int M = 256;
+    if (const char *me = std::getenv("CHUNK_M")) {
+      int v = std::atoi(me);
+      if (v >= 8 && v <= 512)
+        M = v;
+    }
+    const char *pfx = std::getenv("CHUNK64MC_HOST_IN");
+    if (!pfx) {
+      std::fprintf(stderr, "--prefill-chunks needs CHUNK64MC_HOST_IN=<prefix>\n");
+      return 2;
+    }
+    const int NCH = preChunks, TC = NCH * M, PNQ = 24;
+    const size_t MH = (size_t)M * H;
+    if (P < TC) {
+      std::fprintf(stderr, "--prefill-chunks: prompt P=%d < TC=%d\n", P, TC);
+      return 2;
+    }
+    // Chunk scratch (decode-layout state arenas are shared, not duplicated).
+    void *dXa_ = alloc(MH * 4), *dXb_ = alloc(MH * 4);
+    void *dH_ = alloc(MH * 4), *dTmp_ = alloc(MH * 4), *dMix_ = alloc(MH * 4),
+         *dHh_ = alloc(MH * 2);
+    const size_t MC = (size_t)M * C, MV = (size_t)M * V6, MI = (size_t)M * I,
+                 MH48 = (size_t)M * NH, MVQ = (size_t)M * QN;
+    void *dQKV_ = alloc((size_t)M * QW * 4);
+    void *dMxC_ = alloc(MC * 4), *dMxR_ = alloc(MV * 4);
+    void *dZ_ = alloc(MV * 4), *dQ48_ = alloc(MV * 4), *dK48_ = alloc(MV * 4),
+         *dV48_ = alloc(MV * 4);
+    void *dAttL_ = alloc(MV * 4), *dAtthL_ = alloc(MV * 2);
+    void *dB_ = alloc(MH48 * 4), *dA_ = alloc(MH48 * 4),
+         *dBt_ = alloc(MH48 * 4), *dG48_ = alloc(MH48 * 4);
+    void *dK16_ = alloc((size_t)M * KVW * 4),
+         *dV16_ = alloc((size_t)M * KVW * 4),
+         *dKn_ = alloc((size_t)M * KVW * 4);
+    void *dQn_ = alloc(MVQ * 4), *dGate_ = alloc(MVQ * 4),
+         *dAttF_ = alloc(MVQ * 4), *dCore_ = alloc(MVQ * 4),
+         *dQnh_ = alloc(MVQ * 2), *dAtthF_ = alloc(MVQ * 2);
+    void *dWts_ = alloc((size_t)M * PNQ * TC * 4),
+         *dWsmh_ = alloc((size_t)M * PNQ * TC * 2);
+    void *dG17_ = alloc(MI * 4), *dU17_ = alloc(MI * 4),
+         *dG17h_ = alloc(MI * 2);
+    void *dCtrlP = alloc(sizeof(DecodeControl)),
+         *dCtrlSmP = alloc(sizeof(DecodeControl));
+    auto wsp = [&](int L, const char *s, void **pp, void **ps) {
+      const Entry *e = find(nm(L, s));
+      if (!e) {
+        std::fprintf(stderr, "prefill: missing %s\n", s);
+        std::exit(1);
+      }
+      *pp = (char *)payArena + (e->d_off - pay_lo);
+      *ps = (char *)scArena + (e->sc_off - sc_lo);
+    };
+    auto upChunkCtrl = [&](int ch) {
+      int base = ch * M, W = (ch + 1) * M;
+      DecodeControl c{9000 + ch, base, base + 1, -1}, csm{0, 0, W, 0};
+      CHECK(zeCommandListAppendMemoryCopy(up, dCtrlP, &c, sizeof(c), nullptr,
+                                          0, nullptr));
+      CHECK(zeCommandListAppendMemoryCopy(up, dCtrlSmP, &csm, sizeof(csm),
+                                          nullptr, 0, nullptr));
+    };
+    std::vector<float> hXc(MH);
+    int pfTmax = MAXCTX, pfN256 = 256, pfMmA = M, pfRowsSM = M * PNQ;
+    for (int ch = 0; ch < NCH; ++ch) {
+      int base = ch * M, W = (ch + 1) * M, nBcQK = (W + 15) / 16;
+      char pp[256];
+      std::snprintf(pp, sizeof pp, "%s_%d.bin", pfx, ch);
+      FILE *fi = std::fopen(pp, "rb");
+      if (!fi && ch < 2) {
+        // Legacy a/b naming (prefill_arb.py embed output).
+        std::snprintf(pp, sizeof pp, "%s_%c.bin", pfx, ch == 0 ? 'a' : 'b');
+        fi = std::fopen(pp, "rb");
+      }
+      if (!fi) {
+        std::fprintf(stderr, "prefill: no input %s\n", pp);
+        return 2;
+      }
+      size_t nr = std::fread(hXc.data(), 4, MH, fi);
+      std::fclose(fi);
+      if (nr != (size_t)MH) {
+        std::fprintf(stderr, "prefill: short input %s\n", pp);
+        return 2;
+      }
+      upChunkCtrl(ch);
+      for (int L = 0; L < 64; ++L) {
+        bool full = (L % 4 == 3);
+        int slot = L / 4, sl = L - (L + 1) / 4;
+        Rec R{newList()};
+        void *dXi = (L % 2 == 0) ? dXa_ : dXb_;
+        void *dXo = (L % 2 == 0) ? dXb_ : dXa_;
+        if (L == 0) {
+          CHECK(zeCommandListAppendMemoryCopy(up, dXi, hXc.data(), MH * 4,
+                                              nullptr, 0, nullptr));
+        }
+        auto normYa = [&](void *Y, void *X, void *Wn) {
+          int nn = H;
+          for (int m = 0; m < M; ++m) {
+            void *yy = (char *)Y + (size_t)m * H * 4;
+            void *xx = (char *)X + (size_t)m * H * 4;
+            setarg(kh[NORM], 0, sizeof(void *), &yy);
+            setarg(kh[NORM], 1, sizeof(void *), &xx);
+            setarg(kh[NORM], 2, sizeof(void *), &Wn);
+            setarg(kh[NORM], 3, sizeof(int), &nn);
+            setarg(kh[NORM], 4, (size_t)256 * 8, nullptr);
+            launch(R, kh[NORM], 1);
+          }
+        };
+        auto cvtYa = [&](void *Oh, void *X, int nn) {
+          setarg(kh[CVT2], 0, sizeof(void *), &Oh);
+          setarg(kh[CVT2], 1, sizeof(void *), &X);
+          launch(R, kh[CVT2], nn);
+        };
+        auto cgemmW = [&](void *Wp, void *Ws, int nn, int kk, void *Ah,
+                          void *Y) {
+          int mm = M;
+          setarg(kh[CGEMM], 0, sizeof(void *), &Ah);
+          setarg(kh[CGEMM], 1, sizeof(void *), &Wp);
+          setarg(kh[CGEMM], 2, sizeof(void *), &Ws);
+          setarg(kh[CGEMM], 3, sizeof(void *), &Y);
+          setarg(kh[CGEMM], 4, sizeof(int), &mm);
+          setarg(kh[CGEMM], 5, sizeof(int), &kk);
+          setarg(kh[CGEMM], 6, sizeof(int), &nn);
+          setarg(kh[CGEMM], 7, (size_t)512 * 2, nullptr);
+          setarg(kh[CGEMM], 8, (size_t)256 * 2, nullptr);
+          setarg(kh[CGEMM], 9, (size_t)512 * 4, nullptr);
+          launch(R, kh[CGEMM], ((mm + 31) / 32) * (nn / 16));
+        };
+        auto resYa = [&](void *Y, void *A, void *B) {
+          for (int m = 0; m < M; ++m) {
+            void *yy = (char *)Y + (size_t)m * H * 4;
+            void *aa = (char *)A + (size_t)m * H * 4;
+            void *bb = (char *)B + (size_t)m * H * 4;
+            setarg(kh[RES], 0, sizeof(void *), &yy);
+            setarg(kh[RES], 1, sizeof(void *), &aa);
+            setarg(kh[RES], 2, sizeof(void *), &bb);
+            launch(R, kh[RES], H);
+          }
+        };
+        auto mlpTail = [&](void *dXo_, void *dTmp_) {
+          void *pWg, *pWgS, *pWu, *pWuS, *pWd, *pWdS;
+          wsp(L, "mlp.gate_proj.weight", &pWg, &pWgS);
+          wsp(L, "mlp.up_proj.weight", &pWu, &pWuS);
+          wsp(L, "mlp.down_proj.weight", &pWd, &pWdS);
+          normYa(dH_, dTmp_,
+                 (char *)dPostN + (size_t)L * H * 4);
+          cvtYa(dHh_, dH_, M * H);
+          cgemmW(pWg, pWgS, I, H, dHh_, dG17_);
+          cgemmW(pWu, pWuS, I, H, dHh_, dU17_);
+          setarg(kh[SILU], 0, sizeof(void *), &dG17_);
+          setarg(kh[SILU], 1, sizeof(void *), &dU17_);
+          setarg(kh[SILU], 2, sizeof(void *), &dG17_);
+          launch(R, kh[SILU], MI);
+          cvtYa(dG17h_, dG17_, MI);
+          cgemmW(pWd, pWdS, H, I, dG17h_, dMix_);
+          resYa(dXo_, dTmp_, dMix_);
+        };
+        if (!full) {
+          void *pWq, *pWqS, *pWz, *pWzS, *pWb, *pWbS, *pWa, *pWaS, *pWo, *pWoS;
+          wsp(L, "linear_attn.in_proj_qkv.weight", &pWq, &pWqS);
+          wsp(L, "linear_attn.in_proj_z.weight", &pWz, &pWzS);
+          wsp(L, "linear_attn.in_proj_b.weight", &pWb, &pWbS);
+          wsp(L, "linear_attn.in_proj_a.weight", &pWa, &pWaS);
+          wsp(L, "linear_attn.out_proj.weight", &pWo, &pWoS);
+          normYa(dH_, dXi, (char *)dInN + (size_t)L * H * 4);
+          cvtYa(dHh_, dH_, M * H);
+          cgemmW(pWq, pWqS, C, H, dHh_, dQKV_);
+          cgemmW(pWz, pWzS, V6, H, dHh_, dZ_);
+          cgemmW(pWb, pWbS, NH, H, dHh_, dB_);
+          cgemmW(pWa, pWaS, NH, H, dHh_, dA_);
+          void *csS = (char *)dConv + (size_t)sl * C * 3 * 4;
+          void *cwS = (char *)dConvW + (size_t)sl * C * 4 * 4;
+          setarg(kh[CCONV], 0, sizeof(void *), &dMxC_);
+          setarg(kh[CCONV], 1, sizeof(void *), &dQKV_);
+          setarg(kh[CCONV], 2, sizeof(void *), &csS);
+          setarg(kh[CCONV], 3, sizeof(void *), &cwS);
+          setarg(kh[CCONV], 4, sizeof(int), &C);
+          setarg(kh[CCONV], 5, sizeof(int), &pfMmA);
+          launch(R, kh[CCONV], C);
+          for (int m = 0; m < M; ++m) {
+            void *mx = (char *)dMxC_ + (size_t)m * C * 4;
+            void *q4 = (char *)dQ48_ + (size_t)m * V6 * 4;
+            void *k4 = (char *)dK48_ + (size_t)m * V6 * 4;
+            void *v4 = (char *)dV48_ + (size_t)m * V6 * 4;
+            setarg(kh[SPLIT2], 0, sizeof(void *), &mx);
+            setarg(kh[SPLIT2], 1, sizeof(void *), &q4);
+            setarg(kh[SPLIT2], 2, sizeof(void *), &k4);
+            setarg(kh[SPLIT2], 3, sizeof(void *), &v4);
+            launch(R, kh[SPLIT2], V6);
+            setarg(kh[L2], 0, sizeof(void *), &q4);
+            setarg(kh[L2], 1, sizeof(void *), &k4);
+            launch(R, kh[L2], 96);
+            void *b1 = (char *)dB_ + (size_t)m * NH * 4;
+            void *a1 = (char *)dA_ + (size_t)m * NH * 4;
+            void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
+            void *g1 = (char *)dG48_ + (size_t)m * NH * 4;
+            void *alS = (char *)dAL + (size_t)sl * 48 * 4;
+            void *dtS = (char *)dDT + (size_t)sl * 48 * 4;
+            setarg(kh[BETA], 0, sizeof(void *), &bt1);
+            setarg(kh[BETA], 1, sizeof(void *), &g1);
+            setarg(kh[BETA], 2, sizeof(void *), &b1);
+            setarg(kh[BETA], 3, sizeof(void *), &a1);
+            setarg(kh[BETA], 4, sizeof(void *), &alS);
+            setarg(kh[BETA], 5, sizeof(void *), &dtS);
+            launch(R, kh[BETA], NH);
+          }
+          void *sS = (char *)dS + (size_t)sl * NH * D * D * 4;
+          setarg(kh[CRECUR], 0, sizeof(void *), &dMxR_);
+          setarg(kh[CRECUR], 1, sizeof(void *), &dQ48_);
+          setarg(kh[CRECUR], 2, sizeof(void *), &dK48_);
+          setarg(kh[CRECUR], 3, sizeof(void *), &dV48_);
+          setarg(kh[CRECUR], 4, sizeof(void *), &sS);
+          setarg(kh[CRECUR], 5, sizeof(void *), &dBt_);
+          setarg(kh[CRECUR], 6, sizeof(void *), &dG48_);
+          setarg(kh[CRECUR], 7, sizeof(int), &pfMmA);
+          launch(R, kh[CRECUR], NH);
+          for (int m = 0; m < M; ++m) {
+            void *mx = (char *)dMxR_ + (size_t)m * V6 * 4;
+            void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
+            void *at = (char *)dAttL_ + (size_t)m * V6 * 4;
+            void *zz = (char *)dZ_ + (size_t)m * V6 * 4;
+            setarg(kh[RMSI], 0, sizeof(void *), &bt1);
+            setarg(kh[RMSI], 1, sizeof(void *), &mx);
+            launch(R, kh[RMSI], NH);
+            setarg(kh[GATE], 0, sizeof(void *), &at);
+            setarg(kh[GATE], 1, sizeof(void *), &mx);
+            setarg(kh[GATE], 2, sizeof(void *), &zz);
+            void *ngS = (char *)dLinN + (size_t)sl * 128 * 4;
+            setarg(kh[GATE], 3, sizeof(void *), &ngS);
+            setarg(kh[GATE], 4, sizeof(void *), &bt1);
+            launch(R, kh[GATE], V6);
+          }
+          cvtYa(dAtthL_, dAttL_, M * V6);
+          cgemmW(pWo, pWoS, H, V6, dAtthL_, dMix_);
+          resYa(dTmp_, dXi, dMix_);
+          mlpTail(dXo, dTmp_);
+        } else {
+          void *pWq, *pWqS, *pWk, *pWkS, *pWv, *pWvS, *pWo, *pWoS;
+          wsp(L, "self_attn.q_proj.weight", &pWq, &pWqS);
+          wsp(L, "self_attn.k_proj.weight", &pWk, &pWkS);
+          wsp(L, "self_attn.v_proj.weight", &pWv, &pWvS);
+          wsp(L, "self_attn.o_proj.weight", &pWo, &pWoS);
+          normYa(dH_, dXi, (char *)dInN + (size_t)L * H * 4);
+          cvtYa(dHh_, dH_, M * H);
+          cgemmW(pWq, pWqS, QW, H, dHh_, dQKV_);
+          cgemmW(pWk, pWkS, KVW, H, dHh_, dK16_);
+          cgemmW(pWv, pWvS, KVW, H, dHh_, dV16_);
+          for (int m = 0; m < M; ++m) {
+            void *q16 = (char *)dQKV_ + (size_t)m * QW * 4;
+            void *k16 = (char *)dK16_ + (size_t)m * KVW * 4;
+            void *qn = (char *)dQn_ + (size_t)m * QN * 4;
+            void *gt = (char *)dGate_ + (size_t)m * QN * 4;
+            void *kn = (char *)dKn_ + (size_t)m * KVW * 4;
+            setarg(kh[SPLIT], 0, sizeof(void *), &q16);
+            setarg(kh[SPLIT], 1, sizeof(void *), &qn);
+            setarg(kh[SPLIT], 2, sizeof(void *), &gt);
+            launch(R, kh[SPLIT], QN);
+            setarg(kh[BNORM], 0, sizeof(void *), &qn);
+            setarg(kh[BNORM], 1, sizeof(void *), &qn);
+            void *qnW = (char *)dQNW + (size_t)slot * 256 * 4;
+            setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+            setarg(kh[BNORM], 3, sizeof(int), &pfN256);
+            launch(R, kh[BNORM], 24);
+            setarg(kh[BNORM], 0, sizeof(void *), &kn);
+            setarg(kh[BNORM], 1, sizeof(void *), &k16);
+            void *knW = (char *)dKNW + (size_t)slot * 256 * 4;
+            setarg(kh[BNORM], 2, sizeof(void *), &knW);
+            setarg(kh[BNORM], 3, sizeof(int), &pfN256);
+            launch(R, kh[BNORM], 4);
+          }
+          void *kcS = (char *)dKc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          void *vcS = (char *)dVc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          setarg(kh[CROPE], 0, sizeof(void *), &dQn_);
+          setarg(kh[CROPE], 1, sizeof(void *), &dKn_);
+          setarg(kh[CROPE], 2, sizeof(void *), &dCos);
+          setarg(kh[CROPE], 3, sizeof(void *), &dSin);
+          setarg(kh[CROPE], 4, sizeof(void *), &dCtrlP);
+          setarg(kh[CROPE], 5, sizeof(int), &pfTmax);
+          setarg(kh[CROPE], 6, sizeof(int), &pfMmA);
+          launch(R, kh[CROPE], M * 28);
+          setarg(kh[CKV], 0, sizeof(void *), &kcS);
+          setarg(kh[CKV], 1, sizeof(void *), &vcS);
+          setarg(kh[CKV], 2, sizeof(void *), &dKn_);
+          setarg(kh[CKV], 3, sizeof(void *), &dV16_);
+          setarg(kh[CKV], 4, sizeof(void *), &dCtrlP);
+          setarg(kh[CKV], 5, sizeof(int), &pfTmax);
+          setarg(kh[CKV], 6, sizeof(int), &pfMmA);
+          launch(R, kh[CKV], M * 1024);
+          cvtYa(dQnh_, dQn_, M * QN);
+          {
+            int pp = base, ww = W, ss = TC;
+            setarg(kh[CQK], 0, sizeof(void *), &dQnh_);
+            setarg(kh[CQK], 1, sizeof(void *), &kcS);
+            setarg(kh[CQK], 2, sizeof(void *), &dWts_);
+            setarg(kh[CQK], 3, sizeof(int), &pp);
+            setarg(kh[CQK], 4, sizeof(int), &pfMmA);
+            setarg(kh[CQK], 5, sizeof(int), &ww);
+            setarg(kh[CQK], 6, sizeof(int), &ss);
+            setarg(kh[CQK], 7, (size_t)8 * 256 * 2, nullptr);
+            setarg(kh[CQK], 8, (size_t)16 * 16 * 2, nullptr);
+            setarg(kh[CQK], 9, (size_t)8 * 16 * 4, nullptr);
+            launch(R, kh[CQK], (uint32_t)(M * 4 * nBcQK));
+          }
+          {
+            int rows = M * PNQ;
+            setarg(kh[CSM], 0, sizeof(void *), &dWts_);
+            setarg(kh[CSM], 1, sizeof(void *), &dWts_);
+            setarg(kh[CSM], 2, sizeof(void *), &dCtrlSmP);
+            setarg(kh[CSM], 3, sizeof(int), &TC);
+            setarg(kh[CSM], 4, sizeof(int), &rows);
+            launch(R, kh[CSM], (uint32_t)rows);
+          }
+          cvtYa(dWsmh_, dWts_, M * PNQ * TC);
+          {
+            int kk = W; // K = valid cols; KMAX = row stride TC
+            setarg(kh[CWV], 0, sizeof(void *), &dWsmh_);
+            setarg(kh[CWV], 1, sizeof(void *), &vcS);
+            setarg(kh[CWV], 2, sizeof(void *), &dCore_);
+            setarg(kh[CWV], 3, sizeof(int), &kk);
+            setarg(kh[CWV], 4, sizeof(int), &TC);
+            setarg(kh[CWV], 5, (size_t)8 * 16 * 2, nullptr);
+            setarg(kh[CWV], 6, (size_t)16 * 16 * 2, nullptr);
+            setarg(kh[CWV], 7, (size_t)8 * 16 * 4, nullptr);
+            launch(R, kh[CWV], (uint32_t)(M * 64));
+          }
+          setarg(kh[GMUL], 0, sizeof(void *), &dAttF_);
+          setarg(kh[GMUL], 1, sizeof(void *), &dCore_);
+          setarg(kh[GMUL], 2, sizeof(void *), &dGate_);
+          launch(R, kh[GMUL], (uint32_t)(M * QN));
+          cvtYa(dAtthF_, dAttF_, M * QN);
+          cgemmW(pWo, pWoS, H, QN, dAtthF_, dMix_);
+          resYa(dTmp_, dXi, dMix_);
+          mlpTail(dXo, dTmp_);
+        }
+        CHECK(zeCommandListClose(R.h));
+        double t0 = now_ns();
+        CHECK(zeCommandQueueExecuteCommandLists(qq, 1, &R.h, fence));
+        CHECK(zeFenceHostSynchronize(fence, UINT64_MAX));
+        CHECK(zeFenceReset(fence));
+        prefill_ms += (now_ns() - t0) / 1e6;
+        if ((L & 15) == 0 || L == 63)
+          std::fprintf(stderr, "[prefill] chunk %d layer %d recorded+run (%s)\n",
+                       ch, L, full ? "full" : "linear");
+        zeCommandListDestroy(R.h);
+      }
+    }
+    // Hand final hidden to the decode loop (same seam as --import-caches).
+    CHECK(zeCommandListAppendMemoryCopy(up, dX, (char *)dXa_ + (size_t)(M - 1) * H * 4,
+                                        (size_t)H * 4, nullptr, 0, nullptr));
+    if (const char *pd = std::getenv("AINFER_PREFILL_DUMP")) {
+      // Bitwise gate vs chunk64mc out_b (same inputs => identical hidden).
+      std::vector<float> hpx(MH);
+      CHECK(zeCommandListAppendMemoryCopy(up, hpx.data(), dXa_, MH * 4,
+                                          nullptr, 0, nullptr));
+      FILE *pf = std::fopen(pd, "wb");
+      if (pf) {
+        std::fwrite(hpx.data(), 4, MH, pf);
+        std::fclose(pf);
+      }
+    }
+    impP = TC;
+    std::fprintf(stderr, "[prefill] %d chunks x %d rows, %.1f ms exec, impP=%d\n",
+                 NCH, M, prefill_ms, impP);
+  }
   std::vector<int> generated;
   std::vector<std::vector<int>> tops5;
   std::vector<std::vector<float>> tops5v;
@@ -739,7 +1416,17 @@ int main(int argc, char **argv) {
   std::vector<int> lidx(V);
   std::vector<float> lgS(V); // T7.1 sampler scratch (penalty mutates a copy)
   uint64_t samp_rng = samp.seed;
-  for (int step = 0; step < P + G; ++step) {
+  // T7.4 import mode: slots 0..impP-1 prefilled externally; skip them and
+  // run tail-only at step impP-1 (re-executing layers would duplicate the
+  // slot and clobber the injected hidden). ids[impP..P-1] loop-decode as
+  // the question when present; tail runs at P-1 as usual.
+  const bool impTailOnly = impP > 0;
+  // Unbuffered per-step trace for long runs (buffered stdout hides pace for
+  // tens of minutes at 64K; lesson from the first needle attempt).
+  const bool steplog = std::getenv("AINFER_STEPLOG") != nullptr;
+  double tRun0 = steplog ? now_ns() : 0;
+  (void)tRun0;
+  for (int step = impTailOnly ? impP - 1 : 0; step < P + G; ++step) {
     int pos = step;
     if (pos >= MAXCTX) {
       std::fprintf(stderr, "context overflow: pos %d >= MAXCTX %d\n", pos,
@@ -750,11 +1437,15 @@ int main(int argc, char **argv) {
       std::fprintf(stderr, "internal: missing id at step %d\n", step);
       return 3;
     }
+    if (steplog)
+      std::fprintf(stderr, "[step %d pos %d %.1fs]\n", step, pos,
+                   (now_ns() - tRun0) / 1e9);
     DecodeControl c{ids[step], pos, pos + 1, -1};
     double tCtl = prof ? now_ns() : 0;
     CHECK(zeCommandListAppendMemoryCopy(up, dCtrl, &c, sizeof(c), nullptr, 0,
                                         nullptr));
     seg("control", tCtl);
+    if (!(impTailOnly && step == impP - 1)) {
     exec(embR.h, "embed");
     // Diagnostic per-layer dump (step 0 only): mirrors decode.cpp's dump
     // slots so the recorded loop diffs layer-by-layer vs the SYCL oracle.
@@ -767,6 +1458,7 @@ int main(int argc, char **argv) {
         CHECK(zeCommandListAppendMemoryCopy(up, dbgStates.data() + (size_t)L * H,
                                             dX, (size_t)H * 4, nullptr, 0,
                                             nullptr));
+    }
     }
     if (step >= P - 1) {
       exec(tail.h, "tail");
@@ -853,7 +1545,13 @@ int main(int argc, char **argv) {
     }
     json += "]}";
   }
-  json += "]}";
+  json += "]";
+  if (preChunks > 0) {
+    char pb[64];
+    std::snprintf(pb, sizeof pb, ",\"prefill_ms\":%.1f", prefill_ms);
+    json += pb;
+  }
+  json += "}";
   FILE *o = stdout;
   if (pos.size() > 4) {
     o = std::fopen(pos[4] ? pos[4] : "/dev/stdout", "w");

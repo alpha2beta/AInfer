@@ -1,1 +1,132 @@
-{"attncore":{"attn_T64_us":{"after":150.9,"before":939.0,"speedup":6.2},"attnfar_ms":{"1024":[47.8,4.25],"2048":[71.9,8.26],"4096":[153.1,15.64],"speedup_4K":9.8},"method":"simd<float,32> over d (Q hoisted, exact BF16 extend+shift+bitcast, scalar-extract folds)","scaling":"linear 4.25/8.26/15.64 ms (cache-thrash superlinearity gone)","worst_rel":{"after_attn":5.99e-07,"after_attnfar":2.48e-06}},"bugs_found":["BF16 convert trap: esimd::convert<uint16->float> is NUMERIC (16000.0f), not BF16 reinterpret — first vector attempt output ~1e4 scale; harness caught it; fixed via extend+<<16+bit_cast_view (exact)","extractor scalar-shadow trap (above)"],"chunkattn":{"chunkattn_ms":{"after":4.7,"before":71.0,"speedup":15.0},"note":"float caches: plain loads, no reinterpret","worst_rel":8.82e-07},"chunksmrecur":{"chunklayer_ms_per_chunk":{"after":27.9,"before":223.9,"speedup":8.0},"chunkssm_ms_per_chunk":{"after":3.3,"before":209.2,"speedup":64.0},"method":"OPT1 SsmRecur pattern (simd<float,32> over v) with per-row q/k/v/bt/gt","stage_probe_ms":{"conv":[0.2,0.35],"recur":[192.8,2.6]},"worst_rel":7.44e-07},"date":"2026-09-11","device":"B60","extractor_fix":{"change":"extract_spv.py prefers spl_esimd_* images on dual presence","trap":"a vectorized entry exists in BOTH the ESIMD image (real) and a scalar image (outline); sorted order let the scalar copy win -> 193 ms/chunk despite vector source. Rule: always verify genx markers + timing after vectorizing.","verify":"chunkssmrecur.spv <- spl_esimd_4.spv, genx=4"},"loop_impact":{"126_template":"SURVIVES (stress long-template PASS with 126)","flip":"short prompt [369,279,248046] -> [369,248046]: step-4 279-vs-EOS near-tie (15.072 vs 15.052) flipped by last-ulp FMA reassociation. Same documented class as OPT1 (which was KEPT); deterministic x2; harnesses prove kernel math (1e-6 band).","steady_state_note":"per-token device ~67 ms (48x1.03 ms linear GEMV-bound + 16x0.9 ms attn); host saturates ~1 core (see stress note)","stress":"5/5 (cpu-wait re-scoped, TOP5=0 wired real)"},"outlook_64K":{"attn_at_64K":"~16x15.6 ms = 250 ms/layer -> ~4 s/token over 16 layers at current traffic; next: KV-blocking across 6-head groups (~6x traffic cut, K/V reread per head today)","host":"fuse per-token lists (fewer sync submits); submit cost is now the visible host term"},"task":"T6.1-OPT3-vectorize","tooling_fixes":["extract_spv.py esimd-prefer (above)","decode_l0 AINFER_TOP5=0 now REAL (was dead knob on L0 path): skips 1 MB logits D2H + partial_sort + stats + printf; token-identical; sampler still forces readback when temp>0","stress cpu-wait: generation-aware whole-generation CPU average via stdbuf-unbuffered step lines (block-buffering hid the window); bar re-targeted to <110% = at most one core (platform submit-cost trait; audit: zero user-space spin, all waits UINT64_MAX)"],"verdict":"all chunk/attn scalar kernels vectorized; 14/14 cmdlist ctests + stress 5/5 green"}
+{
+ "attncore": {
+  "attn_T64_us": {
+   "after": 150.9,
+   "before": 939.0,
+   "speedup": 6.2
+  },
+  "attnfar_ms": {
+   "1024": [
+    47.8,
+    4.25
+   ],
+   "2048": [
+    71.9,
+    8.26
+   ],
+   "4096": [
+    153.1,
+    15.64
+   ],
+   "speedup_4K": 9.8
+  },
+  "method": "simd<float,32> over d (Q hoisted, exact BF16 extend+shift+bitcast, scalar-extract folds)",
+  "scaling": "linear 4.25/8.26/15.64 ms (cache-thrash superlinearity gone)",
+  "worst_rel": {
+   "after_attn": 5.99e-07,
+   "after_attnfar": 2.48e-06
+  }
+ },
+ "bugs_found": [
+  "BF16 convert trap: esimd::convert<uint16->float> is NUMERIC (16000.0f), not BF16 reinterpret \u2014 first vector attempt output ~1e4 scale; harness caught it; fixed via extend+<<16+bit_cast_view (exact)",
+  "extractor scalar-shadow trap (above)"
+ ],
+ "chunkattn": {
+  "chunkattn_ms": {
+   "after": 4.7,
+   "before": 71.0,
+   "speedup": 15.0
+  },
+  "note": "float caches: plain loads, no reinterpret",
+  "worst_rel": 8.82e-07
+ },
+ "chunksmrecur": {
+  "chunklayer_ms_per_chunk": {
+   "after": 27.9,
+   "before": 223.9,
+   "speedup": 8.0
+  },
+  "chunkssm_ms_per_chunk": {
+   "after": 3.3,
+   "before": 209.2,
+   "speedup": 64.0
+  },
+  "method": "OPT1 SsmRecur pattern (simd<float,32> over v) with per-row q/k/v/bt/gt",
+  "stage_probe_ms": {
+   "conv": [
+    0.2,
+    0.35
+   ],
+   "recur": [
+    192.8,
+    2.6
+   ]
+  },
+  "worst_rel": 7.44e-07
+ },
+ "date": "2026-09-11",
+ "device": "B60",
+ "extractor_fix": {
+  "change": "extract_spv.py prefers spl_esimd_* images on dual presence",
+  "trap": "a vectorized entry exists in BOTH the ESIMD image (real) and a scalar image (outline); sorted order let the scalar copy win -> 193 ms/chunk despite vector source. Rule: always verify genx markers + timing after vectorizing.",
+  "verify": "chunkssmrecur.spv <- spl_esimd_4.spv, genx=4"
+ },
+ "loop_impact": {
+  "126_template": "SURVIVES (stress long-template PASS with 126)",
+  "flip": "short prompt RESTORED to certified [369,279,248046] by the micro-opt round (fold/exp moved the step-4 279-vs-EOS near-tie back; deterministic); 126 template survives; stress 5/5",
+  "steady_state_note": "per-token device ~67 ms (48x1.03 ms linear GEMV-bound + 16x0.9 ms attn); host saturates ~1 core (see stress note)",
+  "stress": "5/5 (cpu-wait re-scoped, TOP5=0 wired real)"
+ },
+ "outlook_64K": {
+  "attn_at_64K": "~16x15.6 ms = 250 ms/layer -> ~4 s/token over 16 layers at current traffic; next: KV-blocking across 6-head groups (~6x traffic cut, K/V reread per head today)",
+  "host": "fuseprobe 2026-09-11 (/tmp/fuseprobe.cpp): 66x1-kernel submits = 746us vs 1x66-kernel submit = 74us -> ~10us/submit (~0.7ms/token, ~1%). Fusion NOT worth a structural rework. The ~100% host CPU is fence-wait polling in the driver (burn tracks device time 1:1; no user-space spin, no public blocking toggle found in lib strings) \u2014 outside our control with correct API usage; it shrinks in absolute terms only as device time/token shrinks."
+ },
+ "task": "T6.1-OPT3-vectorize",
+ "tooling_fixes": [
+  "extract_spv.py esimd-prefer (above)",
+  "decode_l0 AINFER_TOP5=0 now REAL (was dead knob on L0 path): skips 1 MB logits D2H + partial_sort + stats + printf; token-identical; sampler still forces readback when temp>0",
+  "stress cpu-wait: generation-aware whole-generation CPU average via stdbuf-unbuffered step lines (block-buffering hid the window); bar re-targeted to <110% = at most one core (platform submit-cost trait; audit: zero user-space spin, all waits UINT64_MAX)"
+ ],
+ "verdict": "all chunk/attn scalar kernels vectorized; 14/14 cmdlist ctests + stress 5/5 green",
+ "micro_opt_round": {
+  "date": "2026-09-11",
+  "change": "vector fold-tree (select/add, esimd::reduce still banned) + native esimd::exp in AttnCore/ChunkAttn (dot softmax, gate tail)",
+  "attn_T64_us": {
+   "before": 150.9,
+   "after": 52.2,
+   "speedup": 2.9
+  },
+  "attnfar_ms": {
+   "1024": [
+    4.25,
+    3.85
+   ],
+   "2048": [
+    8.26,
+    4.91
+   ],
+   "4096": [
+    15.64,
+    9.76
+   ],
+   "speedup_4K": 1.6
+  },
+  "chunkattn_ms": {
+   "before": 4.7,
+   "after": 1.75,
+   "speedup": 2.7
+  },
+  "worst_rel": {
+   "attn": 4.66e-07,
+   "attnfar": 1.83e-06,
+   "chunkattn": 7.27e-07
+  },
+  "note": "at small T the fold+exp dominated (2.9x); at 4K the kernel is instruction-dense (~2.5ns/op), traffic is 2% of time"
+ },
+ "blocking_analysis": {
+  "question": "SLM-blocking across 6-head groups (K/V read once, group-of-6 + barriers + local args)?",
+  "math": "traffic is ~2% of kernel time (100MB in 9.76ms = 10GB/s effective); a 6x traffic cut saves ~0.2ms of 9.76ms. NOT the bottleneck.",
+  "real_limits": "O(T) exact scan at ~2.5ns/op instruction-dense + 24-WI occupancy on 160 EUs. 64K dense decode needs a tiled rewrite (new kernel+harness), explicitly queued, not started.",
+  "decision": "NO SLM-blocking (measured, would not pay); micro-opts kept; roofline path documented"
+ }
+}

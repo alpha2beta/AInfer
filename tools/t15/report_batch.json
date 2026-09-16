@@ -1,0 +1,72 @@
+{
+ "cross_check_llama": "all 5 prompts sane/on-topic (candy reasoning, universe fact, qubits, reverse() code, tale fragment cut by -n 64). Text-level compare vs decoded trajectories at final scoring.",
+ "date": "2026-09-11",
+ "method": "streamed-CPU BF16 greedy (truth) vs decode_l0 INT4 greedy; loop sides 9 tokens (G+1), BF16 8 steps; correct step alignment P-1+k",
+ "quality": {
+  "sole_miss": "p2 final step: BF16 11182@19.738 vs 3428@19.66 (0.4% margin); loop 3428@19.48. Identical candidate set reordered = documented near-tie flip class, both decodes valid.",
+  "top1": "47/48 all 6 prompts (pilot 8/8 + p2 7/8 + p3/p4/p5/p0-rerun 8/8 each)",
+  "top5_sets": "3-5/5 every step (mode 4/5)"
+ },
+ "per_prompt": {
+  "p0": {
+   "top1": "8/8 on quiet-box rerun",
+   "bf16": [
+    271,
+    760,
+    9572,
+    383,
+    279,
+    30517,
+    369,
+    264
+   ],
+   "note": "first attempt OOM-killed (llama batch concurrent); rerun clean"
+  },
+  "p2": {
+   "loop": [
+    271,
+    8160,
+    369,
+    264,
+    25450,
+    2029,
+    421,
+    3428,
+    43923
+   ],
+   "bf16": [
+    271,
+    8160,
+    369,
+    264,
+    25450,
+    2029,
+    421,
+    11182
+   ],
+   "top1": "7/8"
+  },
+  "p3": {
+   "top1": "8/8"
+  },
+  "p4": {
+   "top1": "8/8"
+  },
+  "p5": {
+   "top1": "8/8",
+   "top5_sets": [
+    5,
+    5,
+    4,
+    4,
+    4,
+    4,
+    4,
+    5
+   ]
+  }
+ },
+ "task": "T1.5-batch",
+ "fusion_probe": "fuseprobe: ~10us/submit (~1% of token) -> list fusion NOT worth structural rework; ~100% host CPU is driver fence-polling (no toggle found), shrinks only with device time/token",
+ "status": "FINAL 2026-09-12"
+}

@@ -1,0 +1,15 @@
+{
+  "device": "B60",
+  "task": "T7.4-prefill-decode-handoff",
+  "date": "2026-09-13",
+  "method": "chunk64mc (M=32/N=2, real e2e ids via CHUNK64MC_HOST_IN) + CHUNK_DUMP_CACHES (kc/vc/conv/ssm/hidlast/meta, decode-layout arenas) -> decode_l0 --import-caches= (per-layer strided KV H2D into MAXCTX arenas, full SSM, dX hidden inject, tail-only step P-1) -> 8 gen tokens; control = direct loop-decode on same 64 ids",
+  "postmortem": "First attempt used space-separated --import-caches <dir>; the parser only accepted equals-form, so the dir became a stray positional (silently ignored) and BOTH runs loop-decoded from scratch — the original 9/9 claim was VOID. Fixed: equals- AND space-form accepted + stray-positional hard error + AINFER_STEPLOG. Lesson: a passing differential test with a silently-disabled treatment proves nothing; assert the treatment banner.",
+  "result": {
+    "import_trajectory": [198, 248045, 248068, 198, 1596, 1144, 4087, 1156, 579],
+    "direct_trajectory": [198, 248045, 248045, 248068, 198, 1596, 1144, 4087, 1156],
+    "agree": "2/9 top-1, then reroute",
+    "divergence": "step 65: direct 248045 (24.57) vs 248068 (24.57) — 0.00 margin perfect near-tie; import flips it (24.45 vs 23.9, margin 0.55). Documented near-tie class, not a handoff bug; values within ~3% (1.4% hidden noise via lm_head)."
+  },
+  "verdict": "HANDOFF-OK (mechanics): import banner + step-63 start verified; strided KV import, SSM transfer, hidden inject, tail-only start all function; first divergence is a 0.00-margin near-tie flip. Real-import trajectories legitimately differ after flips — exact-match is the wrong metric; near-tie-aware comparison is.",
+  "next": "64K needle eval (retrieval presence, robust to reroutes)"
+}

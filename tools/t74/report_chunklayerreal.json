@@ -1,0 +1,19 @@
+{
+ "task": "T7.4-chunk-production-linear",
+ "date": "2026-09-12",
+ "harness": "tools/cmdlist/chunklayerreal_replay.cpp (ctest, port of synthetic chunklayer)",
+ "composition": "8 chunk GEMMs (DPAS, real INT4 spans) + chunk conv/recur (real BF16 conv/state) + per-row stages + in-list fp16 converts, one ~330-launch list over 2x32-token chunks, trunk layer 0",
+ "harness_result": {
+  "device": "B60",
+  "layer": "linear-attn chunked (real weights, layer 0)",
+  "chunk": 32,
+  "chunks": 2,
+  "replay_us": 27119.53,
+  "worst_rel": 4.52e-05,
+  "ref_tol": 0.001,
+  "cross_chunk_continuity": true,
+  "reset_deterministic": true,
+  "chunklayerreal_ok": true
+ },
+ "verdict": "CHUNKLAYERREAL-OK: worst-rel 4.52e-05 (tighter than synthetic 1.77e-04 \u2014 real weights better conditioned), continuity + determinism. Chunk path proven on real weights; full-attn chunk + chunk-append remain."
+}

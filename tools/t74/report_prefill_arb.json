@@ -1,0 +1,14 @@
+{
+  "task": "T7.4-prefill-quality-arbitration",
+  "date": "2026-09-13",
+  "question": "does chunked-prefill hidden-state noise (~1.7% worst) flip next-token prediction vs the certified path?",
+  "method": "first 64 ids of the 70-token e2e prompt -> host BF16 embed -> chunk64mc with host inputs (CHUNK64MC_HOST_IN) -> device chunk-B hidden -> host BF16 lm_head top-1 (positions 32..63) vs T=64 INT4-float chain + BF16 head top-1 (tools/forward/prefill_arb.py + arb_ref.py; same quant level both sides isolates fp16-chunk-path noise; BF16-vs-INT4 separately 53/60 in T1.4)",
+  "result": {
+    "agree": 32,
+    "n": 32,
+    "near_tie_misses": 0,
+    "hard_misses": 0
+  },
+  "verdict": "ARBITRATED CLEAN 32/32: at 64-token scale on real ids, chunked-prefill noise flips nothing. (The recorded loop only stores gen-step top-5, so this rides on the INT4-float chain rather than the loop directly; loop agreement at full-model level remains 47/48 from T1.5.)",
+  "artifacts": ["/tmp/arb_top1.json", "/tmp/arb_ref.json"]
+}

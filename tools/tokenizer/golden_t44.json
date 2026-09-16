@@ -1,0 +1,151 @@
+{
+ "version": 1,
+ "model_rev": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+ "assets": {
+  "tokenizer.json": {
+   "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+   "crc32": "6b61f895"
+  },
+  "tokenizer_config.json": {
+   "sha256": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+   "crc32": "f3d608c1"
+  },
+  "vocab.json": {
+   "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+   "crc32": "da8db314"
+  },
+  "merges.txt": {
+   "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+   "crc32": "1824fcb5"
+  },
+  "chat_template.jinja": {
+   "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+   "crc32": "367cbad5"
+  }
+ },
+ "specials_count": 33,
+ "encode": [
+  {
+   "label": "plain_hello",
+   "input": "Hello, world!",
+   "ids": [
+    9419,
+    11,
+    1814,
+    0
+   ]
+  },
+  {
+   "label": "plain_math",
+   "input": "What is 84 * 3 / 2?",
+   "ids": [
+    3710,
+    369,
+    220,
+    23,
+    19,
+    348,
+    220,
+    18,
+    593,
+    220,
+    17,
+    30
+   ]
+  },
+  {
+   "label": "unicode",
+   "input": "Unicode: café 中文 😀",
+   "ids": [
+    32798,
+    25,
+    50203,
+    220,
+    99986,
+    87209
+   ]
+  },
+  {
+   "label": "empty",
+   "input": "",
+   "ids": []
+  },
+  {
+   "label": "ws_lead",
+   "input": "  indented",
+   "ids": [
+    220,
+    1214,
+    15397
+   ]
+  },
+  {
+   "label": "ws_trail",
+   "input": "trailing space ",
+   "ids": [
+    371,
+    13868,
+    3433,
+    220
+   ]
+  },
+  {
+   "label": "chat_markup",
+   "input": "<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n",
+   "ids": [
+    248045,
+    846,
+    198,
+    12675,
+    248046,
+    198,
+    248045,
+    74455,
+    198
+   ]
+  },
+  {
+   "label": "malformed_unclosed",
+   "input": "<|im_start|>user\nHi",
+   "ids": [
+    248045,
+    846,
+    198,
+    12675
+   ]
+  },
+  {
+   "label": "malformed_unknown",
+   "input": "<|foo|>bar",
+   "ids": [
+    27,
+    91,
+    7724,
+    91,
+    29,
+    2185
+   ]
+  }
+ ],
+ "templates": {
+  "minimal_no_think": "<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "system_no_think": "<|im_start|>system\nBe brief.<|im_end|>\n<|im_start|>user\nWhat is 84 * 3 / 2?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "multiturn_no_think": "<|im_start|>system\nBe brief.<|im_end|>\n<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHello.<|im_end|>\n<|im_start|>user\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+  "multiturn_think": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.\n\nBe brief.<|im_end|>\n<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nHello.<|im_end|>\n<|im_start|>user\n<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ "prompt_ids_e2e": [
+  248045,
+  846,
+  198,
+  12675,
+  248046,
+  198,
+  248045,
+  74455,
+  198,
+  248068,
+  271,
+  248069,
+  271
+ ]
+}

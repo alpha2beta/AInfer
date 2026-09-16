@@ -1,0 +1,17 @@
+{
+  "task": "T7.4-chunk-production-GEMM-fullattn",
+  "date": "2026-09-13",
+  "harness": "tools/cmdlist/chunkqkwvreal_replay.cpp (ctest M=32/P=64; scaling via CHUNK_M/CHUNK_P env)",
+  "composition": "chunkattnreal composition, scan ChunkAttn swapped for Q-convert + ChunkQkGemm (causal, one launch) + ChunkSoftmaxRow (dedicated Ctrl, W=TC) + W-convert + ChunkWvGemm (one launch) + GateMul; host ref unchanged (implementation-independent math)",
+  "harness_result": {
+    "device": "B60",
+    "M32": {"replay_us": 35417.44, "worst_rel": 1.68e-04, "ref": "scan-form 1.14e-04, 33.6ms — parity on both axes"},
+    "M256_P256": {"replay_us": 157000.0, "worst_rel": 2.21e-04, "per_token_per_layer_ms": 0.61},
+    "ref_tol": 0.001,
+    "guards": "prefix-guard integrity clean",
+    "reset_deterministic": true,
+    "chunkqkwvreal_ok": true
+  },
+  "verdict": "CHUNKQKWVREAL-OK first try: GEMM-form == scan-form on real weights (quality and speed). M=256 scales cleanly (env override, ctest contract stays M=32). Production math: ~0.61 ms/token/layer compute-bound (ChunkGemm 2.54 TFLOPS roof) -> 64K prefill ~43 min one-time vs loop-prefill infeasible (scan attn alone -> seconds/token at 64K). Chunked prefill is the 64K enabler, not a marginal speedup.",
+  "next": "64-layer orchestration (48 linear + 16 GEMM-form chunks, state carry) + prefill-to-decode handoff, then 64K quality"
+}

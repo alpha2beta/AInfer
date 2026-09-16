@@ -26,7 +26,7 @@ find_program(SYCL_POST_LINK sycl-post-link
 if(NOT LLVM_SPIRV OR NOT SYCL_POST_LINK)
   message(FATAL_ERROR "llvm-spirv/sycl-post-link not found (needed for T5.3 SPIR-V)")
 endif()
-set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkattn chunkssmconv chunkssmrecur cvtf32f16)
+set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
 set(SPV_FILES "")
 foreach(m IN LISTS SPV_MODS)
   list(APPEND SPV_FILES ${CMAKE_CURRENT_BINARY_DIR}/${m}.spv)
@@ -114,6 +114,235 @@ add_test(NAME attn_replay
   COMMAND attn_replay ${CMAKE_CURRENT_BINARY_DIR}/attn.spv
                        ${CMAKE_CURRENT_BINARY_DIR}/report_attn.json)
 set_tests_properties(attn_replay PROPERTIES TIMEOUT 1200)
+
+# T6.3 INT8 KV port: append + attention over per-token INT8 caches.
+add_executable(attni8_replay attni8_replay.cpp)
+target_include_directories(attni8_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(attni8_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(attni8_replay spv_mods)
+add_test(NAME attni8_replay
+  COMMAND attni8_replay ${CMAKE_CURRENT_BINARY_DIR}/kvappendi8.spv
+                        ${CMAKE_CURRENT_BINARY_DIR}/attni8.spv
+                        ${CMAKE_CURRENT_BINARY_DIR}/report_attni8.json)
+set_tests_properties(attni8_replay PROPERTIES TIMEOUT 1200)
+
+# T7.4 tiled attention probe: SLM-shared single-pass scan (synthetic).
+add_executable(tiledattn_replay tiledattn_replay.cpp)
+target_include_directories(tiledattn_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(tiledattn_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(tiledattn_replay spv_mods)
+add_test(NAME tiledattn_replay
+  COMMAND tiledattn_replay ${CMAKE_CURRENT_BINARY_DIR}/tiledattn.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/report_tiledattn.json)
+set_tests_properties(tiledattn_replay PROPERTIES TIMEOUT 1800)
+
+# T7.4 QK-GEMM probe: fp16 x BF16-cache DPAS GEMM (GEMM-form attention step).
+add_executable(qkgemm_replay qkgemm_replay.cpp)
+target_include_directories(qkgemm_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(qkgemm_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(qkgemm_replay spv_mods)
+add_test(NAME qkgemm_replay
+  COMMAND qkgemm_replay ${CMAKE_CURRENT_BINARY_DIR}/qkgemm.spv
+                       ${CMAKE_CURRENT_BINARY_DIR}/report_qkgemm.json)
+set_tests_properties(qkgemm_replay PROPERTIES TIMEOUT 1200)
+
+# T7.4 hybrid attention probe: qk-gemm + softmax + cvt + wv-gemm stages.
+add_executable(hybridattn_replay hybridattn_replay.cpp)
+target_include_directories(hybridattn_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(hybridattn_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(hybridattn_replay spv_mods)
+add_test(NAME hybridattn_replay
+  COMMAND hybridattn_replay ${CMAKE_CURRENT_BINARY_DIR}/qkgemm.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/softmaxrow.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/wvgemm.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                         ${CMAKE_CURRENT_BINARY_DIR}/report_hybridattn.json)
+set_tests_properties(hybridattn_replay PROPERTIES TIMEOUT 1800)
+
+# T7.4 chunk production: full linear chunk layer on REAL weights (layer 0).
+add_executable(chunklayerreal_replay chunklayerreal_replay.cpp)
+target_include_directories(chunklayerreal_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunklayerreal_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunklayerreal_replay spv_mods)
+add_test(NAME chunklayerreal_replay
+  COMMAND chunklayerreal_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                          ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkssmconv.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkssmrecur.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/splitrepeat.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/l2normqk.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/betag.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/rmsinv.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/normgated.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/report_chunklayerreal.json)
+set_tests_properties(chunklayerreal_replay PROPERTIES TIMEOUT 1800)
+
+# T7.4 chunk production: full full-attn chunk on REAL weights (layer 3).
+add_executable(chunkattnreal_replay chunkattnreal_replay.cpp)
+target_include_directories(chunkattnreal_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunkattnreal_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunkattnreal_replay spv_mods)
+add_test(NAME chunkattnreal_replay
+  COMMAND chunkattnreal_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                          ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/splitqk.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/batchnorm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkrope.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkkvappend.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/chunkattn.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/report_chunkattnreal.json)
+set_tests_properties(chunkattnreal_replay PROPERTIES TIMEOUT 1800)
+
+# T7.4 chunk production: GEMM-form full-attn chunk on REAL weights (layer 3).
+add_executable(chunkqkwvreal_replay chunkqkwvreal_replay.cpp)
+target_include_directories(chunkqkwvreal_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunkqkwvreal_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunkqkwvreal_replay spv_mods)
+add_test(NAME chunkqkwvreal_replay
+  COMMAND chunkqkwvreal_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                           ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/splitqk.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/batchnorm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkrope.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkkvappend.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkqkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunksoftmaxrow.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkwvgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/gatemul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/report_chunkqkwvreal.json)
+set_tests_properties(chunkqkwvreal_replay PROPERTIES TIMEOUT 1800)
+
+# T7.4 chunk production: full 64-layer chunked prefill on REAL weights.
+add_executable(chunk64real_replay chunk64real_replay.cpp)
+target_include_directories(chunk64real_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunk64real_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunk64real_replay spv_mods)
+add_test(NAME chunk64real_replay
+  COMMAND chunk64real_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                           ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkssmconv.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkssmrecur.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/splitrepeat.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/l2normqk.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/betag.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/rmsinv.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/normgated.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/splitqk.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/batchnorm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkrope.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkkvappend.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkqkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunksoftmaxrow.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkwvgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/gatemul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/report_chunk64real.json)
+set_tests_properties(chunk64real_replay PROPERTIES TIMEOUT 3600)
+
+# T7.4 chunk production: two-chunk 64-layer prefill (carry + continuity).
+add_executable(chunk64mc_replay chunk64mc_replay.cpp)
+target_include_directories(chunk64mc_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunk64mc_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunk64mc_replay spv_mods)
+add_test(NAME chunk64mc_replay
+  COMMAND chunk64mc_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                           ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkssmconv.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkssmrecur.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/splitrepeat.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/l2normqk.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/betag.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/rmsinv.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/normgated.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/splitqk.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/batchnorm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkrope.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkkvappend.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkqkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunksoftmaxrow.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkwvgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/gatemul.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/report_chunk64mc.json)
+set_tests_properties(chunk64mc_replay PROPERTIES TIMEOUT 3600)
+
+# T7.4 chunked prefill: GEMM-form chunk attention probe (causal QK + softmax + WV).
+add_executable(chunkqkwv_replay chunkqkwv_replay.cpp)
+target_include_directories(chunkqkwv_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunkqkwv_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunkqkwv_replay spv_mods)
+add_test(NAME chunkqkwv_replay
+  COMMAND chunkqkwv_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkqkgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunksoftmaxrow.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/cvtf32f16.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/chunkwvgemm.spv
+                           ${CMAKE_CURRENT_BINARY_DIR}/report_chunkqkwv.json)
+set_tests_properties(chunkqkwv_replay PROPERTIES TIMEOUT 1800)
+
+# T7.2 MTP draft slice: MTP-1 draft as one recorded list, real weights.
+add_executable(mtpdraft_replay mtpdraft_replay.cpp)
+target_include_directories(mtpdraft_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(mtpdraft_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(mtpdraft_replay spv_mods)
+add_test(NAME mtpdraft_replay
+  COMMAND mtpdraft_replay ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                          ${CMAKE_CURRENT_BINARY_DIR}/norm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/gemv.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/concat.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/splitqk.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/batchnorm.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/rope.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/kvappend.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/attn.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/scalesmax.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/quantize.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/silumul.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/resaddf.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/argmax1.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/argmax2.spv
+                          ${CMAKE_CURRENT_BINARY_DIR}/report_mtpdraft.json)
+set_tests_properties(mtpdraft_replay PROPERTIES TIMEOUT 1800)
 
 # T7.4 long-context scan: AttnCore at T=1K/2K/4K (same SPIR-V, 4K sizing).
 add_executable(attnfar_replay attnfar_replay.cpp)
@@ -301,3 +530,16 @@ target_include_directories(layer3real_replay PRIVATE
 target_link_libraries(layer3real_replay PRIVATE
   /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
 add_dependencies(layer3real_replay spv_mods)
+
+# T8.2 release gate: strict-parse every tracked JSON evidence report (Gate A).
+# Host-only (no GPU, ms-scale) — belongs in the per-change FAST gate.
+add_test(NAME reports_json
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/../validate_reports.py)
+set_tests_properties(reports_json PROPERTIES TIMEOUT 300)
+
+# T8.4 release gate: pinned tokenizer golden (Gate B). Host-only, needs the
+# project venv (`tokenizers`, `jinja2`) — in the per-change FAST gate.
+add_test(NAME tokenizer_golden
+  COMMAND $ENV{HOME}/.venvs/ainfer/bin/python
+          ${CMAKE_CURRENT_SOURCE_DIR}/../tokenizer/validate_golden.py)
+set_tests_properties(tokenizer_golden PROPERTIES TIMEOUT 300)

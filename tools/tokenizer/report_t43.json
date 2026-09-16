@@ -1,6 +1,6 @@
 {
- "cases": 14,
- "passed": 14,
+ "cases": 27,
+ "passed": 27,
  "all_pass": true,
  "results": [
   {
@@ -72,6 +72,71 @@
    "case": "prompt_ids:e2e",
    "pass": true,
    "detail": "[248045, 846, 198, 12675, 248046, 198, 248045, 74455, 198, 248068, 271, 248069, 271]"
+  },
+  {
+   "case": "decode:chat-markup-skip=True",
+   "pass": true,
+   "detail": "'user\\nHi\\nassistant\\n'"
+  },
+  {
+   "case": "decode:chat-markup-skip=False",
+   "pass": true,
+   "detail": "'<|im_start|>user\\nHi<|im_end|>\\n<|im_start|>assist'"
+  },
+  {
+   "case": "encode:ws:'  indented'",
+   "pass": true,
+   "detail": "ours=[220, 1214, 15397] ref=[220, 1214, 15397]"
+  },
+  {
+   "case": "encode:ws:'trailing space '",
+   "pass": true,
+   "detail": "ours=[371, 13868, 3433, 220] ref=[371, 13868, 3433, 220]"
+  },
+  {
+   "case": "encode:ws:'\\ttab\\nnewline'",
+   "pass": true,
+   "detail": "ours=[56196, 198, 86133] ref=[56196, 198, 86133]"
+  },
+  {
+   "case": "encode:ws:'multiple   spaces'",
+   "pass": true,
+   "detail": "ours=[34493, 256, 12258] ref=[34493, 256, 12258]"
+  },
+  {
+   "case": "encode:ws:' \\n '",
+   "pass": true,
+   "detail": "ours=[695, 220] ref=[695, 220]"
+  },
+  {
+   "case": "encode:malformed:'<|im_start|>user\\nHi'",
+   "pass": true,
+   "detail": "ours=[248045, 846, 198, 12675] ref=[248045, 846, 198, 12675]"
+  },
+  {
+   "case": "encode:malformed:'<|foo|>bar'",
+   "pass": true,
+   "detail": "ours=[27, 91, 7724, 91, 29, 2185] ref=[27, 91, 7724, 91, 29, 2185]"
+  },
+  {
+   "case": "encode:malformed:'<|im_end|>'",
+   "pass": true,
+   "detail": "ours=[248046] ref=[248046]"
+  },
+  {
+   "case": "encode:malformed:'<|im_start|>'",
+   "pass": true,
+   "detail": "ours=[248045] ref=[248045]"
+  },
+  {
+   "case": "chat-template:multiturn-think=False",
+   "pass": true,
+   "detail": "ours='<|im_start|>system\\nBe brief.<|im_end|>\\n<|im_start|>user\\nHi<|'"
+  },
+  {
+   "case": "chat-template:multiturn-think=True",
+   "pass": true,
+   "detail": "ours='<|im_start|>system\\nReasoning effort is set to xhigh. Please '"
   }
  ],
  "note": "reference = transformers AutoTokenizer(Qwen2Tokenizer) on pinned dir"

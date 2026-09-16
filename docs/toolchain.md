@@ -74,3 +74,25 @@ Notes:
   uncached device reads on every work-item). Confirms the plan.md rule: never
   assume zero-copy is fastest on this discrete GPU. One `kernels.o` bundle
   feeds multiple SPIR-V extractions (silu-mul + control-add so far).
+
+## Chunk-GEMM finding (2026-09-13)
+
+- ARG-STRIP TRAP (dead-strip family, third instance): an UNREFERENCED functor
+  member is silently stripped from the kernel signature — remaining arg
+  indices shift down, and `zeKernelSetArgumentValue` fails with
+  INVALID_ARGUMENT (0x78000004) on the now-out-of-range index, far from the
+  cause. `ChunkQkGemm` reported 9 args instead of 10 because `M` was never
+  read in the body (row index came from grid decomposition). Caught by a
+  30-line `numKernelArgs` runtime probe (`zeKernelGetProperties`), not the
+  compiler. Rule: EVERY functor member gets referenced — a bounds guard
+  (`if (m >= M) return;`) doubles as the liveness guard. The TMAX lesson
+  (unused whole kernel vanishes) and Concat2 guard are the same family.
+- FILL-PATTERN TRAP (2026-09-13, chunk64): `zeCommandListAppendMemoryFill`
+  takes the pattern as a POINTER — passing integer `0` compiles (null
+  conversion) and segfaults inside the driver with no diagnostic. Always
+  pass a real pattern word (`uint8_t zpat = 0; ... &zpat ...`). Sibling
+  rule of the address-capture family: recorded lists bake addresses, so
+  shared weight buffers must be uploaded per layer BEFORE that layer
+  executes (never bulk up front — every list would read the last layer's
+  weights); every tensor kind gets its own buffer pair (in_proj_z has V6
+  rows, not KVW — mis-binning overruns the device allocation).

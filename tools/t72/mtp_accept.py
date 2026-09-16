@@ -123,14 +123,19 @@ def trunk_prefill(ids, cos, sin, mask):
 
 
 def main():
-    out_path = os.path.join(REPO, "tools", "t72", "report_accept.json")
+    # Confirmatory mode (2026-09-11): argv[1] = truncation length; non-8
+    # values write a variant report (original 8-token run untouched) with
+    # fresh positions (full prompt ids reach 12 tokens).
+    tr = int(sys.argv[1]) if len(sys.argv) > 1 else 8
+    out_path = os.path.join(REPO, "tools", "t72", "report_accept.json"
+                            if tr == 8 else "report_accept_full.json")
     corpus = json.load(open(os.path.join(REPO, "reference", "corpus_t15.json")))
     rope = Qwen3_5TextRotaryEmbedding(cfg)
     MW = mtp_tensors()
     print("MTP weights loaded", flush=True)
     samples = []
     for pi, pids in enumerate(corpus["prompt_ids"]):
-        ids = pids[:8]
+        ids = pids[:tr]
         T = len(ids)
         pos = torch.arange(T).unsqueeze(0)
         cos, sin = rope(torch.empty(1, T, 5120), pos)

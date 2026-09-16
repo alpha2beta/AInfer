@@ -1,0 +1,263 @@
+{
+ "task": "T1.4-logits-batch",
+ "prompts": [
+  {
+   "prompt": "What animal is on the candy?",
+   "ids": [
+    3710,
+    9572,
+    369,
+    383,
+    279,
+    30517,
+    30
+   ],
+   "seconds": 575.8,
+   "top5_last": [
+    271,
+    1358,
+    198,
+    7054,
+    561
+   ],
+   "top5v_last": [
+    18.662,
+    18.051,
+    17.767,
+    15.633,
+    15.107
+   ],
+   "logit_std": 2.4009,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "prompt": "What is 84 * 3 / 2?",
+   "ids": [
+    3710,
+    369,
+    220,
+    23,
+    19,
+    348,
+    220,
+    18,
+    593,
+    220,
+    17,
+    30
+   ],
+   "seconds": 605.0,
+   "top5_last": [
+    271,
+    7054,
+    198,
+    3437,
+    1358
+   ],
+   "top5v_last": [
+    21.329,
+    17.252,
+    16.966,
+    16.915,
+    16.488
+   ],
+   "logit_std": 2.1475,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    false,
+    false,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ]
+  },
+  {
+   "prompt": "Tell me an interesting fact about the universe!",
+   "ids": [
+    39113,
+    728,
+    449,
+    6821,
+    2029,
+    883,
+    279,
+    15039,
+    0
+   ],
+   "seconds": 566.4,
+   "top5_last": [
+    271,
+    198,
+    471,
+    1358,
+    10838
+   ],
+   "top5v_last": [
+    19.736,
+    15.455,
+    13.868,
+    12.963,
+    12.87
+   ],
+   "logit_std": 2.4229,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true
+   ]
+  },
+  {
+   "prompt": "Explain quantum computing in simple terms.",
+   "ids": [
+    814,
+    20139,
+    29144,
+    23470,
+    303,
+    4145,
+    3665,
+    13
+   ],
+   "seconds": 566.8,
+   "top5_last": [
+    271,
+    28763,
+    2500,
+    5272,
+    1358
+   ],
+   "top5v_last": [
+    21.061,
+    16.82,
+    16.133,
+    16.008,
+    15.809
+   ],
+   "logit_std": 2.3183,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true
+   ]
+  },
+  {
+   "prompt": "Write a Python function that reverses a string.",
+   "ids": [
+    7734,
+    264,
+    12654,
+    709,
+    421,
+    16915,
+    287,
+    264,
+    886,
+    13
+   ],
+   "seconds": 567.6,
+   "top5_last": [
+    271,
+    1358,
+    198,
+    9357,
+    561
+   ],
+   "top5v_last": [
+    20.643,
+    19.18,
+    18.026,
+    16.485,
+    16.379
+   ],
+   "logit_std": 2.3506,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true
+   ]
+  },
+  {
+   "prompt": "Summarize the plot of a famous fairy tale in two sentences.",
+   "ids": [
+    8917,
+    5437,
+    537,
+    279,
+    6868,
+    314,
+    264,
+    10919,
+    43008,
+    22557,
+    303,
+    1330,
+    22157,
+    13
+   ],
+   "seconds": 566.3,
+   "top5_last": [
+    271,
+    248068,
+    1358,
+    198,
+    9358
+   ],
+   "top5v_last": [
+    19.846,
+    14.166,
+    13.625,
+    13.517,
+    12.776
+   ],
+   "logit_std": 2.2666,
+   "int4_top1_agree": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true
+   ]
+  }
+ ]
+}

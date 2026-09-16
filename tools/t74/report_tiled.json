@@ -1,0 +1,20 @@
+{
+ "task": "T7.4-tiled-attention",
+ "date": "2026-09-12",
+ "v1_plain_sycl": {
+  "result": "TILEDATTN-OK, 2.83e-06, but 37ms @4K (0.5 GB/s) \u2014 scalar inner loops; SLM sharing can't beat compute density",
+  "lesson": "traffic was 2% of time; sharing it while scalarizing compute loses"
+ },
+ "v2_esimd": {
+  "result": "19.1ms @4K, 2.78e-06 \u2014 2x on v1 via vector compute, still 2x BEHIND the 24-WI vector kernel (9.8ms)",
+  "lesson": "per-head compute is identical with/without sharing (every head scans all T); sharing saves only traffic. Occupancy (24 WIs on 160 EUs) is the binding constraint, not traffic."
+ },
+ "pivot": "GEMM-form attention: QK as DPAS GEMM (prefill-style) instead of GEMV-scan. T3.7's pending causal-tiled-prefill item is the same machinery.",
+ "qk_gemm_primitive": {
+  "kernel": "_ZTS6QkGemm (fp16 Q x BF16-cache strided, bf16 DPAS, fp32 accum)",
+  "result": "QKGEMM-OK, 4.09e-04, 135us for 24x4096x256 (0.37 TFLOPS)",
+  "read": "22x on the QK portion (135us vs ~3ms scan-QK). DPAS engages weakly (T3.4 caveat live) but the FORM wins anyway; occupancy-thin at 768 groups (60% of HW threads).",
+  "note": "B reads cache directly with stride (no transpose, no SLM-B); A staged once; partial-M guard present but untested (T multiple of 16 assumed)"
+ },
+ "next": "WV-GEMM (weights x V, same skeleton, fp16-converted weights) + hybrid fuse (QK-GEMM + vector softmax/WV or full GEMM) targeting ~0.5ms @4K (~20x). Then real-weight + adoption."
+}

@@ -242,6 +242,15 @@ struct AttnCore {
       u <<= 16;
       return u.template bit_cast_view<float>();
     };
+    // Vector fold 32 -> 1 (select/add tree; esimd::reduce miscompiles, T3.2).
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
     float mx = -1e30f;
     for (int t = 0; t < T; ++t) {
       const uint16_t *kr = Kc + ((size_t)t * 4 + kv) * 256;
@@ -253,22 +262,24 @@ struct AttnCore {
       esimd::simd<float, 32> k5 = bf16row(kr + 160);
       esimd::simd<float, 32> k6 = bf16row(kr + 192);
       esimd::simd<float, 32> k7 = bf16row(kr + 224);
-      esimd::simd<float, 32> p0 = q0 * k0, p1 = q1 * k1, p2 = q2 * k2,
-                             p3 = q3 * k3, p4 = q4 * k4, p5 = q5 * k5,
-                             p6 = q6 * k6, p7 = q7 * k7;
-      float s = 0;
-#pragma unroll
-      for (int l = 0; l < 32; ++l)
-        s += (float)p0[l] + (float)p1[l] + (float)p2[l] + (float)p3[l] +
-             (float)p4[l] + (float)p5[l] + (float)p6[l] + (float)p7[l];
-      s /= 16.0f;
+      esimd::simd<float, 32> ps = q0 * k0 + q1 * k1 + q2 * k2 + q3 * k3 +
+                                  q4 * k4 + q5 * k5 + q6 * k6 + q7 * k7;
+      float s = fold32(ps) / 16.0f;
       wts[t] = s;
       mx = s > mx ? s : mx;
     }
+    // Vector exp over the score row (native esimd::exp, 32 lanes at once).
     float se = 0;
-    for (int t = 0; t < T; ++t) {
-      float w = sycl::exp(wts[t] - mx);
-      wts[t] = w;
+    int te = 0;
+    for (; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> sc = esimd::block_load<float, 32>(wts + te);
+      esimd::simd<float, 32> w = esimd::exp(sc - mx);
+      esimd::block_store<float, 32>(wts + te, w);
+      se += fold32(w);
+    }
+    for (; te < T; ++te) {
+      float w = sycl::exp(wts[te] - mx);
+      wts[te] = w;
       se += w;
     }
     float inv_se = 1.0f / se;
@@ -292,16 +303,121 @@ struct AttnCore {
     for (int j = 0; j < 8; ++j) {
       esimd::simd<float, 32> g =
           esimd::block_load<float, 32>(gh + (size_t)j * 32);
-      esimd::simd<float, 32> o(0);
-#pragma unroll
-      for (int l = 0; l < 32; ++l) {
-        float gl = (float)g[l];
-        o[l] = (float)acc[j][l] / (1.0f + sycl::exp(-gl));
-      }
+      esimd::simd<float, 32> o = acc[j] / (1.0f + esimd::exp(-g));
       esimd::block_store<float, 32>(ah + (size_t)j * 32, o);
     }
   }
 };
+
+// T6.3 AttnCore over INT8 caches: identical vector structure to AttnCore,
+// rows dequantized as convert(int8)*row-scale (numeric convert is EXACT for
+// int8 here, unlike the BF16 reinterpret). Same members/layout/order.
+struct AttnCoreI8 {
+  float *Att;        // 24*256 out
+  const float *Q;    // 24*256
+  const int8_t *Kc;  // 4*TMAX*256 INT8 cache
+  const int8_t *Vc;
+  const float *Kscl; // TMAX*4 row scales
+  const float *Vscl;
+  const float *Gate; // 24*256
+  const int *Ctrl;
+  int TMAX;
+  float *Wts; // 24*TMAX scratch
+  void operator()(sycl::id<1> id) const SYCL_ESIMD_KERNEL {
+    int hh = id[0], kv = hh / 6, T = Ctrl[2];
+    if (T > TMAX)
+      T = TMAX;
+    float *wts = Wts + (size_t)hh * TMAX;
+    const float *qh = Q + (size_t)hh * 256;
+    esimd::simd<float, 32> q0 = esimd::block_load<float, 32>(qh + 0);
+    esimd::simd<float, 32> q1 = esimd::block_load<float, 32>(qh + 32);
+    esimd::simd<float, 32> q2 = esimd::block_load<float, 32>(qh + 64);
+    esimd::simd<float, 32> q3 = esimd::block_load<float, 32>(qh + 96);
+    esimd::simd<float, 32> q4 = esimd::block_load<float, 32>(qh + 128);
+    esimd::simd<float, 32> q5 = esimd::block_load<float, 32>(qh + 160);
+    esimd::simd<float, 32> q6 = esimd::block_load<float, 32>(qh + 192);
+    esimd::simd<float, 32> q7 = esimd::block_load<float, 32>(qh + 224);
+    auto i8row = [](const int8_t *p, float sc) SYCL_ESIMD_FUNCTION {
+      return esimd::convert<float>(esimd::block_load<int8_t, 32>(p)) * sc;
+    };
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
+    float mx = -1e30f;
+    for (int t = 0; t < T; ++t) {
+      float ks = Kscl[(size_t)t * 4 + kv];
+      const int8_t *kr = Kc + ((size_t)t * 4 + kv) * 256;
+      esimd::simd<float, 32> k0 = i8row(kr + 0, ks);
+      esimd::simd<float, 32> k1 = i8row(kr + 32, ks);
+      esimd::simd<float, 32> k2 = i8row(kr + 64, ks);
+      esimd::simd<float, 32> k3 = i8row(kr + 96, ks);
+      esimd::simd<float, 32> k4 = i8row(kr + 128, ks);
+      esimd::simd<float, 32> k5 = i8row(kr + 160, ks);
+      esimd::simd<float, 32> k6 = i8row(kr + 192, ks);
+      esimd::simd<float, 32> k7 = i8row(kr + 224, ks);
+      esimd::simd<float, 32> ps = q0 * k0 + q1 * k1 + q2 * k2 + q3 * k3 +
+                                  q4 * k4 + q5 * k5 + q6 * k6 + q7 * k7;
+      float s = fold32(ps) / 16.0f;
+      wts[t] = s;
+      mx = s > mx ? s : mx;
+    }
+    float se = 0;
+    int te = 0;
+    for (; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> sc = esimd::block_load<float, 32>(wts + te);
+      esimd::simd<float, 32> w = esimd::exp(sc - mx);
+      esimd::block_store<float, 32>(wts + te, w);
+      se += fold32(w);
+    }
+    for (; te < T; ++te) {
+      float w = sycl::exp(wts[te] - mx);
+      wts[te] = w;
+      se += w;
+    }
+    float inv_se = 1.0f / se;
+    esimd::simd<float, 32> a0(0), a1(0), a2(0), a3(0), a4(0), a5(0), a6(0),
+        a7(0);
+    for (int t = 0; t < T; ++t) {
+      float w = wts[t] * inv_se;
+      float vs = Vscl[(size_t)t * 4 + kv];
+      const int8_t *vr = Vc + ((size_t)t * 4 + kv) * 256;
+      a0 += w * i8row(vr + 0, vs);
+      a1 += w * i8row(vr + 32, vs);
+      a2 += w * i8row(vr + 64, vs);
+      a3 += w * i8row(vr + 96, vs);
+      a4 += w * i8row(vr + 128, vs);
+      a5 += w * i8row(vr + 160, vs);
+      a6 += w * i8row(vr + 192, vs);
+      a7 += w * i8row(vr + 224, vs);
+    }
+    float *ah = Att + (size_t)hh * 256;
+    const float *gh = Gate + (size_t)hh * 256;
+    esimd::simd<float, 32> acc[8] = {a0, a1, a2, a3, a4, a5, a6, a7};
+    for (int j = 0; j < 8; ++j) {
+      esimd::simd<float, 32> g =
+          esimd::block_load<float, 32>(gh + (size_t)j * 32);
+      esimd::simd<float, 32> o = acc[j] / (1.0f + esimd::exp(-g));
+      esimd::block_store<float, 32>(ah + (size_t)j * 32, o);
+    }
+  }
+};
+
+// Dead-strip guard (Concat2 lesson).
+void launch_attncorei8(sycl::queue &q, float *Att, const float *Q,
+                       const int8_t *Kc, const int8_t *Vc, const float *Kscl,
+                       const float *Vscl, const float *Gate, const int *Ctrl,
+                       int TMAX, float *Wts) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>(24),
+                   AttnCoreI8{Att, Q, Kc, Vc, Kscl, Vscl, Gate, Ctrl, TMAX,
+                              Wts});
+  }).wait();
+}
 
 void launch_attncore(sycl::queue &q, float *Att, const float *Q,
                      const uint16_t *Kc, const uint16_t *Vc,
@@ -460,6 +576,766 @@ struct KvAppend {
         kv_f32_to_bf16(V[(size_t)hh * 256 + d]);
   }
 };
+
+// T6.3 INT8 KV: per-token symmetric INT8 caches (dynamic row scales, no
+// calibration). KvAppendI8: 1 WI/head computes row max-abs scales then
+// quantizes (round-half-away + clamp, matching the Quantize kernel and host
+// refs bit-exactly). Diagnostic verdict (tools/t63/diag_kvint8.py on real
+// K/V): uniform per-token K+V misses (4-7% worst on random queries, K
+// dominates via softmax amplification; finer groups don't help); peaked
+// (realistic) regime hits ~5e-3 — viable, e2e batch agreement arbitrates.
+struct KvAppendI8 {
+  int8_t *Kc;   // 4*TMAX*256 INT8 cache
+  int8_t *Vc;
+  float *Kscl;  // TMAX*4 per-row K scales
+  float *Vscl;  // TMAX*4 per-row V scales
+  const float *Kn; // 4*256 incoming keys
+  const float *V;  // 4*256 incoming values
+  const int *Ctrl;
+  int TMAX;
+  void operator()(sycl::id<1> id) const {
+    int hh = id[0], pos = Ctrl[1];
+    // Bounds guard: 1 WI/head design — a wider launch (e.g. copy-pasted
+    // KVW=1024 from the element-wise kernel) once overran heaps 256x and
+    // trashed neighboring slots. Never trust the launch count alone.
+    if (hh >= 4)
+      return;
+    int p = pos < TMAX ? pos : TMAX - 1;
+    float mk = 0, mv = 0;
+    for (int d = 0; d < 256; ++d) {
+      float a = Kn[(size_t)hh * 256 + d];
+      float fa = a >= 0 ? a : -a;
+      if (fa > mk)
+        mk = fa;
+      float b = V[(size_t)hh * 256 + d];
+      float fb = b >= 0 ? b : -b;
+      if (fb > mv)
+        mv = fb;
+    }
+    float sk = mk == 0 ? 1.0f : mk / 127.0f;
+    float sv = mv == 0 ? 1.0f : mv / 127.0f;
+    Kscl[(size_t)p * 4 + hh] = sk;
+    Vscl[(size_t)p * 4 + hh] = sv;
+    for (int d = 0; d < 256; ++d) {
+      float vk = Kn[(size_t)hh * 256 + d] / sk;
+      int qk = (int)(vk >= 0 ? vk + 0.5f : vk - 0.5f);
+      Kc[((size_t)p * 4 + hh) * 256 + d] =
+          (int8_t)(qk < -127 ? -127 : (qk > 127 ? 127 : qk));
+      float vv = V[(size_t)hh * 256 + d] / sv;
+      int qv = (int)(vv >= 0 ? vv + 0.5f : vv - 0.5f);
+      Vc[((size_t)p * 4 + hh) * 256 + d] =
+          (int8_t)(qv < -127 ? -127 : (qv > 127 ? 127 : qv));
+    }
+  }
+};
+
+// T7.4 tiled attention (step 1: SLM-shared single pass). 4 groups x 6 WIs;
+// group g serves KV head g, WI lid serves Q head 6g+lid. K/V blocks (64
+// rows) load ONCE per group into SLM (half, 64 KB; every bf16 value is
+// exactly representable in fp16 at these magnitudes), all 6 heads consume —
+// kills the 6x re-read of the per-head kernels. Online softmax (m/l/acc
+// rescale) needs no Wts scratch and a single cache sweep. Plain SYCL
+// (nd_item + local_accessor + group barrier — the proven ArgmaxS1 pattern;
+// no ESIMD/subgroup APIs). Q/acc live in private float8 regs. Launch: 24
+// WIs, group size 6, SLM args by size+NULL under raw L0.
+struct TiledAttn {
+  float *Att;         // 24*256 out
+  const float *Q;     // 24*256 queries
+  const uint16_t *Kc; // 4*TMAX*256 BF16 cache
+  const uint16_t *Vc;
+  const float *Gate; // 24*256
+  const int *Ctrl;   // [2] = active_length
+  int TMAX;
+  sycl::local_accessor<sycl::half, 1> sK; // 64*256 half
+  sycl::local_accessor<sycl::half, 1> sV; // 64*256 half
+  // v2: ESIMD-vectorized compute (the scalar v1 proved the structure at
+  // 2.83e-06 but ran 37 ms — scalar inner loops. Same blocking/online
+  // algorithm, simd<float,32> lanes like AttnCore; SLM rows via multi_ptr
+  // block loads, half->float converts exact).
+  void operator()(sycl::nd_item<1> it) const SYCL_ESIMD_KERNEL {
+    constexpr int BLK = 64, D = 256;
+    int lid = (int)it.get_local_id(0), gid = (int)it.get_group(0);
+    int kv = gid, hh = gid * 6 + lid;
+    int T = Ctrl[2];
+    if (T > TMAX)
+      T = TMAX;
+    auto slmK = sK.template get_multi_ptr<sycl::access::decorated::legacy>();
+    auto slmV = sV.template get_multi_ptr<sycl::access::decorated::legacy>();
+    const float *qh = Q + (size_t)hh * D;
+    esimd::simd<float, 32> q0 = esimd::block_load<float, 32>(qh + 0);
+    esimd::simd<float, 32> q1 = esimd::block_load<float, 32>(qh + 32);
+    esimd::simd<float, 32> q2 = esimd::block_load<float, 32>(qh + 64);
+    esimd::simd<float, 32> q3 = esimd::block_load<float, 32>(qh + 96);
+    esimd::simd<float, 32> q4 = esimd::block_load<float, 32>(qh + 128);
+    esimd::simd<float, 32> q5 = esimd::block_load<float, 32>(qh + 160);
+    esimd::simd<float, 32> q6 = esimd::block_load<float, 32>(qh + 192);
+    esimd::simd<float, 32> q7 = esimd::block_load<float, 32>(qh + 224);
+    esimd::simd<float, 32> a0(0), a1(0), a2(0), a3(0), a4(0), a5(0), a6(0),
+        a7(0);
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
+    float m = -1e30f, l = 0.0f;
+    for (int b0 = 0; b0 < T; b0 += BLK) {
+      int nt = T - b0 < BLK ? T - b0 : BLK;
+      for (int rr = lid; rr < BLK; rr += 6) {
+        if (rr < nt) {
+          int t = b0 + rr;
+          const uint16_t *kr = Kc + ((size_t)t * 4 + kv) * D;
+          const uint16_t *vr = Vc + ((size_t)t * 4 + kv) * D;
+          for (int j = 0; j < D; ++j) {
+            sK[(size_t)rr * D + j] = sycl::half(kv_bf16_to_f32(kr[j]));
+            sV[(size_t)rr * D + j] = sycl::half(kv_bf16_to_f32(vr[j]));
+          }
+        }
+      }
+      it.barrier(sycl::access::fence_space::local_space);
+      for (int r = 0; r < nt; ++r) {
+        esimd::simd<float, 32> k0 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 0));
+        esimd::simd<float, 32> k1 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 32));
+        esimd::simd<float, 32> k2 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 64));
+        esimd::simd<float, 32> k3 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 96));
+        esimd::simd<float, 32> k4 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 128));
+        esimd::simd<float, 32> k5 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 160));
+        esimd::simd<float, 32> k6 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 192));
+        esimd::simd<float, 32> k7 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmK + (size_t)r * D + 224));
+        esimd::simd<float, 32> ps = q0 * k0 + q1 * k1 + q2 * k2 + q3 * k3 +
+                                    q4 * k4 + q5 * k5 + q6 * k6 + q7 * k7;
+        float s = fold32(ps) / 16.0f;
+        float nm = s > m ? s : m;
+        float e1 = sycl::exp(m - nm), e2 = sycl::exp(s - nm);
+        l = l * e1 + e2;
+        esimd::simd<float, 32> v0 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 0));
+        esimd::simd<float, 32> v1 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 32));
+        esimd::simd<float, 32> v2 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 64));
+        esimd::simd<float, 32> v3 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 96));
+        esimd::simd<float, 32> v4 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 128));
+        esimd::simd<float, 32> v5 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 160));
+        esimd::simd<float, 32> v6 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 192));
+        esimd::simd<float, 32> v7 = esimd::convert<float>(
+            esimd::block_load<sycl::half, 32>(slmV + (size_t)r * D + 224));
+        a0 = a0 * e1 + v0 * e2;
+        a1 = a1 * e1 + v1 * e2;
+        a2 = a2 * e1 + v2 * e2;
+        a3 = a3 * e1 + v3 * e2;
+        a4 = a4 * e1 + v4 * e2;
+        a5 = a5 * e1 + v5 * e2;
+        a6 = a6 * e1 + v6 * e2;
+        a7 = a7 * e1 + v7 * e2;
+        m = nm;
+      }
+      it.barrier(sycl::access::fence_space::local_space);
+    }
+    float inv_l = 1.0f / l;
+    float *ah = Att + (size_t)hh * D;
+    const float *gh = Gate + (size_t)hh * D;
+    esimd::simd<float, 32> acc[8] = {a0, a1, a2, a3, a4, a5, a6, a7};
+    for (int j = 0; j < 8; ++j) {
+      esimd::simd<float, 32> g =
+          esimd::block_load<float, 32>(gh + (size_t)j * 32);
+      esimd::simd<float, 32> o = acc[j] * inv_l / (1.0f + esimd::exp(-g));
+      esimd::block_store<float, 32>(ah + (size_t)j * 32, o);
+    }
+  }
+};
+
+// T7.4 QK-GEMM (tiled-attention step 2): S[M][N] = A[M][K] (fp16) x B[K][N]
+// where B is the BF16 KV cache read DIRECTLY with stride (no transpose, no
+// SLM staging for B — joint_matrix_load takes a stride). A is Q (24x256,
+// fp16, uploaded once); B rows are cache slots (T-major, stride 256).
+// 8x16x16 bf16 DPAS, fp32 accumulate. M=24 fixed by GQA (3x8-row groups),
+// N=T variable, K=256. Launch: groups = 3*(N/16), size 16 (SG16 structural).
+struct QkGemm {
+  const sycl::half *A; // 24*K fp16 Q (row hh)
+  const uint16_t *B;   // TMAX*4*K BF16 cache (slot t, head kv at (t*4+kv)*K)
+  float *S;            // 24*TMAX fp32 scores
+  int N;               // T (columns)
+  int TMAX;
+  int KvOff; // 0..3: this GEMM covers Q rows KvOff*6..+6 (GQA grouping)
+  sycl::local_accessor<sycl::half, 1> sA; // 8*256 staging
+  sycl::local_accessor<sycl::half, 1> sB; // 16*16 staging
+  sycl::local_accessor<float, 1> sC;      // 8*16 staging
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16;
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    // Ceil blocking: decode MAXCTX is rarely a multiple of 16 (partial
+    // final column-block guarded on write; launchers use ceil(N/16)).
+    int nBc = (N + 15) / 16, bc = gid % nBc;
+    (void)(gid / nBc);
+    int lid = (int)sg.get_local_id()[0];
+    // Stage A block (6 Q rows + 2 zero pad) to SLM once.
+    for (int u = 0; u < 128; ++u) {
+      int idx = lid * 128 + u, rr = idx / 256, c = idx % 256;
+      sycl::half v = sycl::half(0);
+      if (rr < 6)
+        v = A[((size_t)KvOff * 6 + rr) * 256 + c];
+      sA[(size_t)rr * 256 + c] = v;
+    }
+    sg.barrier();
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc;
+    mx::joint_matrix_fill(sg, acc, 0.0f);
+    for (int kt = 0; kt < 256; kt += TC) {
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                       mx::layout::row_major>
+          ta;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                       mx::layout::row_major>
+          tb;
+      // A tile rows 0..7, cols kt..kt+15 out of the staged 8x256 block.
+      mx::joint_matrix_load(
+          sg, ta,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sA[(size_t)kt]),
+          256);
+      // B tile: K rows kt..kt+15 of THIS kv head, N cols bc*16...
+      // Col guard is LOAD-BEARING (not just cosmetic): without it the last
+      // partial block reads cache slots past TMAX (OOB device read ->
+      // DEVICE_LOST; small overruns silently hit the next slot's memory).
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (bc * 16 + n2 < N) {
+          uint16_t bits =
+              B[(((size_t)bc * 16 + n2) * 4 + KvOff) * 256 + kt + i];
+          uint32_t uu = (uint32_t)bits << 16;
+          float x;
+          __builtin_memcpy(&x, &uu, 4);
+          v = sycl::half(x);
+        }
+        sB[(size_t)i * 16 + n2] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, tb,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sB[0]),
+          16);
+      mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+      sg.barrier();
+    }
+    mx::joint_matrix_store(
+        sg, acc,
+        sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+            &sC[0]),
+        16, mx::layout::row_major);
+    sg.barrier();
+    for (int u = 0; u < 8; ++u) {
+      int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+      // Scores carry the /16 scale (AttnCore convention); folding it into
+      // the write keeps S as true attention scores. Partial final column
+      // block guarded (decode MAXCTX rarely multiple-of-16).
+      if (rr < 6 && bc * 16 + c < N)
+        S[((size_t)KvOff * 6 + rr) * TMAX + bc * 16 + c] =
+            sC[(size_t)rr * 16 + c] * (1.0f / 16.0f);
+    }
+  }
+};
+
+// Dead-strip guard (Concat2 lesson).
+void launch_qkgemm(sycl::queue &q, const sycl::half *A, const uint16_t *B,
+                   float *S, int N, int TMAX, int KvOff) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(8 * 256, h);
+    sycl::local_accessor<sycl::half, 1> sB(16 * 16, h);
+    sycl::local_accessor<float, 1> sC(8 * 16, h);
+    h.parallel_for(sycl::nd_range<1>({(size_t)(N / 16) * 16}, {16}),
+                   QkGemm{A, B, S, N, TMAX, KvOff, sA, sB, sC});
+  }).wait();
+}
+
+// T7.4 WV-GEMM (hybrid attention step 2): O[M][N] = W[M][K] (fp16 weights)
+// x V[K][N] (BF16 cache, strided reads), 8x16x16 DPAS, fp32 accumulate.
+// M=24 (Q heads), N=256 (head dim), K=T variable (partial-K zero-padded).
+// Launch: groups = 3*16, size 16 (SG16 structural).
+struct WvGemm {
+  const sycl::half *W; // 24*KMAX fp16 weights (row hh: T scores)
+  const uint16_t *V;   // KMAX*4*256 BF16 cache (slot t, head kv)
+  float *O;            // 24*256 fp32 partial out (one K-chunk)
+  int K;               // T (rows used)
+  int KMAX;            // stride of W rows
+  int KvOff;           // 0..3: this GEMM covers Q rows KvOff*6..+6
+  int KChunk;          // 0..3: this GEMM covers K rows [cc*K4, min(K,+K4))
+  sycl::local_accessor<sycl::half, 1> sA; // 8*16 staging
+  sycl::local_accessor<sycl::half, 1> sB; // 16*16 staging
+  sycl::local_accessor<float, 1> sC;      // 8*16 staging
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16;
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    int nBc = 256 / 16, bc = gid % nBc;
+    (void)(gid / nBc);
+    int lid = (int)sg.get_local_id()[0];
+    int K4 = (K + 3) / 4;
+    int kbeg = KChunk * K4, kend = K < (KChunk + 1) * K4 ? K : (KChunk + 1) * K4;
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc;
+    mx::joint_matrix_fill(sg, acc, 0.0f);
+    for (int kt = kbeg; kt < kend; kt += TC) {
+      int nt = kend - kt < TC ? kend - kt : TC;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                       mx::layout::row_major>
+          ta;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                       mx::layout::row_major>
+          tb;
+      // A tile: 6 weight rows + 2 zero pad, cols kt...
+      for (int u = 0; u < 8; ++u) {
+        int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (rr < 6 && c < nt)
+          v = W[((size_t)KvOff * 6 + rr) * KMAX + kt + c];
+        sA[(size_t)rr * 16 + c] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, ta,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sA[0]),
+          TC);
+      // B tile: K rows kt.. of THIS kv head, N cols bc*16...
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (i < nt) {
+          uint16_t bits =
+              V[(((size_t)kt + i) * 4 + KvOff) * 256 + bc * 16 + n2];
+          uint32_t uu = (uint32_t)bits << 16;
+          float x;
+          __builtin_memcpy(&x, &uu, 4);
+          v = sycl::half(x);
+        }
+        sB[(size_t)i * 16 + n2] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, tb,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sB[0]),
+          TC);
+      mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+      sg.barrier();
+    }
+    mx::joint_matrix_store(
+        sg, acc,
+        sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+            &sC[0]),
+        16, mx::layout::row_major);
+    sg.barrier();
+    for (int u = 0; u < 8; ++u) {
+      int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+      if (rr < 6)
+        O[((size_t)KvOff * 6 + rr) * 256 + bc * 16 + c] =
+            sC[(size_t)rr * 16 + c];
+    }
+  }
+};
+
+// T7.4 row softmax (hybrid step): Out[m][0..T) = softmax(In[m][0..T]).
+// 1 WI/row; scalar max pass (T cheap compares) + ESIMD-vectorized exp/sum
+// (fold32) + vector normalize. Same provision as AttnCore's tail.
+struct SoftmaxRow {
+  float *Out;
+  const float *In;
+  const int *Ctrl; // [2] = active_length (decode-variable T)
+  int TMAX;
+  void operator()(sycl::id<1> id) const SYCL_ESIMD_KERNEL {
+    int m = id[0];
+    if (m >= 24)
+      return;
+    int T = Ctrl[2];
+    if (T > TMAX)
+      T = TMAX; // clamp keeps TMAX live (AttnCore lesson)
+    const float *ir = In + (size_t)m * TMAX;
+    float *orr = Out + (size_t)m * TMAX;
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
+    float mx = -1e30f;
+    for (int t = 0; t < T; ++t) {
+      float s = ir[t];
+      mx = s > mx ? s : mx;
+    }
+    float se = 0;
+    int te = 0;
+    for (; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> sc = esimd::block_load<float, 32>(ir + te);
+      esimd::simd<float, 32> w = esimd::exp(sc - mx);
+      esimd::block_store<float, 32>(orr + te, w);
+      se += fold32(w);
+    }
+    for (; te < T; ++te) {
+      float w = sycl::exp(ir[te] - mx);
+      orr[te] = w;
+      se += w;
+    }
+    float inv = 1.0f / se;
+    esimd::simd<float, 32> vinv(inv);
+    for (te = 0; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> w = esimd::block_load<float, 32>(orr + te);
+      esimd::block_store<float, 32>(orr + te, w * vinv);
+    }
+    for (; te < T; ++te)
+      orr[te] *= inv;
+  }
+};
+
+// Dead-strip guards (Concat2 lesson).
+void launch_wvgemm(sycl::queue &q, const sycl::half *W, const uint16_t *V,
+                   float *O, int K, int KMAX, int KvOff, int KChunk) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(8 * 16, h);
+    sycl::local_accessor<sycl::half, 1> sB(16 * 16, h);
+    sycl::local_accessor<float, 1> sC(8 * 16, h);
+    h.parallel_for(sycl::nd_range<1>({(size_t)16 * 16}, {16}),
+                   WvGemm{W, V, O, K, KMAX, KvOff, KChunk, sA, sB, sC});
+  }).wait();
+}
+
+void launch_softmaxrow(sycl::queue &q, float *Out, const float *In,
+                       const int *Ctrl, int TMAX) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>(24), SoftmaxRow{Out, In, Ctrl, TMAX});
+  }).wait();
+}
+
+// T7.4 chunked prefill: GEMM-form chunk attention (hybrid GEMMs redirected
+// from decode, where launch tax lost, to prefill chunks where per-launch
+// work is 256x larger). ChunkQkGemm: S[(M*24)][W] = Q[(M*24)][256] x Kc^T
+// with causal mask (chunk row m sees cols <= P+m, others -FLT_MAX); the
+// OOB lesson from decode QkGemm applies identically (B-read N-guard).
+// Grid folds (m, kv-group, col-block) into ONE launch: M*4*nBc groups.
+struct ChunkQkGemm {
+  const sycl::half *A; // (M*24)*256 fp16 Q (row m*24+hh)
+  const uint16_t *B;   // cache, decode layout (slot t, kv at (t*4+kv)*256)
+  float *S;            // (M*24)*SMAX fp32 scores (row m*24+hh)
+  int P;               // prefix length (valid slots before chunk)
+  int M;               // chunk rows
+  int W;               // score width = P+M (valid slots)
+  int SMAX;            // row stride of S
+  sycl::local_accessor<sycl::half, 1> sA; // 8*256 staging
+  sycl::local_accessor<sycl::half, 1> sB; // 16*16 staging
+  sycl::local_accessor<float, 1> sC;      // 8*16 staging
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16;
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    int nBc = (W + 15) / 16, bc = gid % nBc;
+    int k2 = (gid / nBc) % 4, m = gid / (nBc * 4);
+    // Bounds guard doubles as a liveness guard: an unreferenced functor
+    // member is stripped from the kernel signature (arg indices shift —
+    // caught by a runtime numKernelArgs probe, not the compiler).
+    if (m >= M)
+      return;
+    int lid = (int)sg.get_local_id()[0];
+    // Stage A block (6 Q rows of chunk row m, heads k2*6..+6, + 2 zero pad).
+    for (int u = 0; u < 128; ++u) {
+      int idx = lid * 128 + u, rr = idx / 256, c = idx % 256;
+      sycl::half v = sycl::half(0);
+      if (rr < 6)
+        v = A[((size_t)m * 24 + k2 * 6 + rr) * 256 + c];
+      sA[(size_t)rr * 256 + c] = v;
+    }
+    sg.barrier();
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc;
+    mx::joint_matrix_fill(sg, acc, 0.0f);
+    for (int kt = 0; kt < 256; kt += TC) {
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                       mx::layout::row_major>
+          ta;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                       mx::layout::row_major>
+          tb;
+      mx::joint_matrix_load(
+          sg, ta,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sA[(size_t)kt]),
+          256);
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (bc * 16 + n2 < W) {
+          uint16_t bits =
+              B[(((size_t)bc * 16 + n2) * 4 + k2) * 256 + kt + i];
+          uint32_t uu = (uint32_t)bits << 16;
+          float x;
+          __builtin_memcpy(&x, &uu, 4);
+          v = sycl::half(x);
+        }
+        sB[(size_t)i * 16 + n2] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, tb,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sB[0]),
+          16);
+      mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+      sg.barrier();
+    }
+    mx::joint_matrix_store(
+        sg, acc,
+        sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+            &sC[0]),
+        16, mx::layout::row_major);
+    sg.barrier();
+    for (int u = 0; u < 8; ++u) {
+      int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+      // /16 scale folded into the write (AttnCore convention); causal mask
+      // as -FLT_MAX (softmax-safe: exp underflows to 0, max stays finite).
+      if (rr < 6 && bc * 16 + c < W)
+        S[((size_t)m * 24 + k2 * 6 + rr) * SMAX + bc * 16 + c] =
+            (bc * 16 + c <= P + m)
+                ? sC[(size_t)rr * 16 + c] * (1.0f / 16.0f)
+                : -3.402823466e+38f;
+    }
+  }
+};
+
+// T7.4 chunked prefill: O[(M*24)][256] = W[(M*24)][K] (fp16 softmax weights)
+// x V[K][256] (BF16 cache). Masked weight cols are exactly 0 (softmax of
+// -FLT_MAX), so no causal guard is needed beyond K <= cache fill. Single
+// K pass (the decode K-split was neutral); grid folds (m, kv, dcol-block)
+// into ONE launch: M*4*16 groups.
+struct ChunkWvGemm {
+  const sycl::half *W; // (M*24)*KMAX fp16 weights (row m*24+hh)
+  const uint16_t *V;   // cache, decode layout
+  float *O;            // (M*24)*256 fp32 out
+  int K;               // rows used (= P+M)
+  int KMAX;            // stride of W rows
+  sycl::local_accessor<sycl::half, 1> sA; // 8*16 staging
+  sycl::local_accessor<sycl::half, 1> sB; // 16*16 staging
+  sycl::local_accessor<float, 1> sC;      // 8*16 staging
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16;
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    int bc = gid % 16, k2 = (gid / 16) % 4, m = gid / 64;
+    int lid = (int)sg.get_local_id()[0];
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc;
+    mx::joint_matrix_fill(sg, acc, 0.0f);
+    for (int kt = 0; kt < K; kt += TC) {
+      int nt = K - kt < TC ? K - kt : TC;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                       mx::layout::row_major>
+          ta;
+      mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                       mx::layout::row_major>
+          tb;
+      for (int u = 0; u < 8; ++u) {
+        int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (rr < 6 && c < nt)
+          v = W[((size_t)m * 24 + k2 * 6 + rr) * KMAX + kt + c];
+        sA[(size_t)rr * 16 + c] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, ta,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sA[0]),
+          TC);
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        sycl::half v = sycl::half(0);
+        if (i < nt) {
+          uint16_t bits =
+              V[(((size_t)kt + i) * 4 + k2) * 256 + bc * 16 + n2];
+          uint32_t uu = (uint32_t)bits << 16;
+          float x;
+          __builtin_memcpy(&x, &uu, 4);
+          v = sycl::half(x);
+        }
+        sB[(size_t)i * 16 + n2] = v;
+      }
+      sg.barrier();
+      mx::joint_matrix_load(
+          sg, tb,
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>(
+              &sB[0]),
+          TC);
+      mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+      sg.barrier();
+    }
+    mx::joint_matrix_store(
+        sg, acc,
+        sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+            &sC[0]),
+        16, mx::layout::row_major);
+    sg.barrier();
+    for (int u = 0; u < 8; ++u) {
+      int idx = lid * 8 + u, rr = idx / 16, c = idx % 16;
+      if (rr < 6)
+        O[((size_t)m * 24 + k2 * 6 + rr) * 256 + bc * 16 + c] =
+            sC[(size_t)rr * 16 + c];
+    }
+  }
+};
+
+// T7.4 chunked prefill: row softmax over M*24 rows (SoftmaxRow is fixed at
+// 24 decode rows). Identical math (scalar max + ESIMD exp/sum + normalize);
+// -FLT_MAX causal entries flow through (exp -> 0, max stays finite). The
+// T-length comes from Ctrl[2] (one width W for all chunk rows).
+struct ChunkSoftmaxRow {
+  float *Out;
+  const float *In;
+  const int *Ctrl; // [2] = active_length
+  int TMAX;
+  int ROWS; // M*24 (member keeps TMAX live alongside Ctrl)
+  void operator()(sycl::id<1> id) const SYCL_ESIMD_KERNEL {
+    int m = id[0];
+    if (m >= ROWS)
+      return;
+    int T = Ctrl[2];
+    if (T > TMAX)
+      T = TMAX; // clamp keeps TMAX live (AttnCore lesson)
+    const float *ir = In + (size_t)m * TMAX;
+    float *orr = Out + (size_t)m * TMAX;
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
+    float mx = -1e30f;
+    for (int t = 0; t < T; ++t) {
+      float s = ir[t];
+      mx = s > mx ? s : mx;
+    }
+    float se = 0;
+    int te = 0;
+    for (; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> sc = esimd::block_load<float, 32>(ir + te);
+      esimd::simd<float, 32> w = esimd::exp(sc - mx);
+      esimd::block_store<float, 32>(orr + te, w);
+      se += fold32(w);
+    }
+    for (; te < T; ++te) {
+      float w = sycl::exp(ir[te] - mx);
+      orr[te] = w;
+      se += w;
+    }
+    float inv = 1.0f / se;
+    esimd::simd<float, 32> vinv(inv);
+    for (te = 0; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> w = esimd::block_load<float, 32>(orr + te);
+      esimd::block_store<float, 32>(orr + te, w * vinv);
+    }
+    for (; te < T; ++te)
+      orr[te] *= inv;
+  }
+};
+
+// Dead-strip guards (Concat2 lesson).
+void launch_chunkqkgemm(sycl::queue &q, const sycl::half *A, const uint16_t *B,
+                         float *S, int P, int M, int W, int SMAX) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(8 * 256, h);
+    sycl::local_accessor<sycl::half, 1> sB(16 * 16, h);
+    sycl::local_accessor<float, 1> sC(8 * 16, h);
+    int nBc = (W + 15) / 16;
+    h.parallel_for(sycl::nd_range<1>({(size_t)M * 4 * nBc * 16}, {16}),
+                   ChunkQkGemm{A, B, S, P, M, W, SMAX, sA, sB, sC});
+  }).wait();
+}
+
+void launch_chunkwvgemm(sycl::queue &q, const sycl::half *W, const uint16_t *V,
+                         float *O, int K, int KMAX, int M) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(8 * 16, h);
+    sycl::local_accessor<sycl::half, 1> sB(16 * 16, h);
+    sycl::local_accessor<float, 1> sC(8 * 16, h);
+    h.parallel_for(sycl::nd_range<1>({(size_t)M * 64 * 16}, {16}),
+                   ChunkWvGemm{W, V, O, K, KMAX, sA, sB, sC});
+  }).wait();
+}
+
+void launch_chunksoftmaxrow(sycl::queue &q, float *Out, const float *In,
+                             const int *Ctrl, int TMAX, int ROWS) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>(ROWS),
+                   ChunkSoftmaxRow{Out, In, Ctrl, TMAX, ROWS});
+  }).wait();
+}
+
+// T7.4 hybrid adoption: plain gate multiply Out = A * sigmoid(G), the
+// AttnCore tail as a standalone stage (hybrid GEMMs produce the ungated
+// core). Launch N, 1 WI/group.
+struct GateMul {
+  float *Out;
+  const float *A;
+  const float *G;
+  void operator()(sycl::id<1> id) const {
+    int i = id[0];
+    float g = G[i];
+    Out[i] = A[i] / (1.0f + sycl::exp(-g));
+  }
+};
+
+// Dead-strip guard (Concat2 lesson).
+void launch_gatemul(sycl::queue &q, float *Out, const float *A,
+                    const float *G, int N) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>(N), GateMul{Out, A, G});
+  }).wait();
+}
+
+// Dead-strip guard (Concat2 lesson).
+void launch_tiledattn(sycl::queue &q, float *Att, const float *Q,
+                      const uint16_t *Kc, const uint16_t *Vc,
+                      const float *Gate, const int *Ctrl, int TMAX) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sK(64 * 256, h);
+    sycl::local_accessor<sycl::half, 1> sV(64 * 256, h);
+    h.parallel_for(
+        sycl::nd_range<1>(sycl::range<1>(24), sycl::range<1>(6)),
+        TiledAttn{Att, Q, Kc, Vc, Gate, Ctrl, TMAX, sK, sV});
+  }).wait();
+}
+
+// Dead-strip guard (Concat2 lesson).
+void launch_kvappendi8(sycl::queue &q, int8_t *Kc, int8_t *Vc, float *Kscl,
+                       float *Vscl, const float *Kn, const float *V,
+                       const int *Ctrl, int TMAX) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>(4),
+                   KvAppendI8{Kc, Vc, Kscl, Vscl, Kn, V, Ctrl, TMAX});
+  }).wait();
+}
 
 void launch_ropekv(sycl::queue &q, float *Q, float *K, const float *Cos,
                    const float *Sin, const int *Ctrl, uint16_t *Kc,
@@ -720,8 +1596,11 @@ struct ChunkGemm {
       for (int r = 0; r < UR; ++r)
         for (int u = 0; u < 8; ++u) {
           int idx = lid * 8 + u, rr = idx / TC, c = idx % TC;
+          // Partial-M guard (MTP verify runs M=2; launch covers ceil(M/32)
+          // blocks, this skips out-of-range rows on both read and write).
+          int ar = br * TR * UR + r * TR + rr;
           sA[r * 128 + rr * TC + c] =
-              A[(br * TR * UR + r * TR + rr) * K + kt + c];
+              ar < M ? A[(size_t)ar * K + kt + c] : sycl::half(0);
         }
       int g = kt / 128;
       for (int u = 0; u < 16; ++u) {
@@ -767,8 +1646,9 @@ struct ChunkGemm {
     for (int u = 0; u < 32; ++u) {
       int idx = lid * 32 + u, r = idx / 128, rest = idx % 128;
       int rr = rest / 16, c = rest % 16;
-      C[(br * TR * UR + r * TR + rr) * TN + bc * 16 + c] =
-          sC[r * 128 + rr * 16 + c];
+      int row = br * TR * UR + r * TR + rr;
+      if (row < M)
+        C[(size_t)row * TN + bc * 16 + c] = sC[r * 128 + rr * 16 + c];
     }
   }
 };
@@ -784,16 +1664,89 @@ void launch_chunkgemm(sycl::queue &q, const sycl::half *A, const uint8_t *P,
   }).wait();
 }
 
+// T7.4 chunk production: KV append + RoPE over a token chunk. ChunkKvAppend
+// writes M (Kn,V) rows into the single-slot BF16 cache at global positions
+// base+m (base = Ctrl[1]); ChunkRope rotates M Q/K head-blocks in place at
+// the same positions. Both parallel over rows (no sequential dependence —
+// slots are disjoint); clamps keep TMAX live (AttnCore lesson). Launch
+// M*1024 / M*28, group size 1.
+struct ChunkKvAppend {
+  uint16_t *Kc; // 4*TMAX*256 BF16 cache
+  uint16_t *Vc;
+  const float *Kn; // M*4*256 rotated keys
+  const float *V;  // M*4*256 values
+  const int *Ctrl; // [1] = chunk_start (global pos of chunk row 0)
+  int TMAX;
+  int M;
+  void operator()(sycl::id<1> id) const {
+    int i = id[0], m = i / 1024, j = i % 1024, hh = j / 256, d = j % 256;
+    if (m >= M)
+      return;
+    int p = Ctrl[1] + m;
+    if (p >= TMAX)
+      p = TMAX - 1;
+    Kc[((size_t)p * 4 + hh) * 256 + d] =
+        kv_f32_to_bf16(Kn[((size_t)m * 4 + hh) * 256 + d]);
+    Vc[((size_t)p * 4 + hh) * 256 + d] =
+        kv_f32_to_bf16(V[((size_t)m * 4 + hh) * 256 + d]);
+  }
+};
+
+struct ChunkRope {
+  float *Q; // M*24*256 queries
+  float *K; // M*4*256 keys
+  const float *Cos; // 64*TMAX
+  const float *Sin;
+  const int *Ctrl; // [1] = chunk_start
+  int TMAX;
+  int M;
+  void operator()(sycl::id<1> id) const {
+    int i = id[0], m = i / 28, hh = i % 28;
+    if (m >= M)
+      return;
+    int pos = Ctrl[1] + m;
+    if (pos >= TMAX)
+      pos = TMAX - 1;
+    float *X = hh < 24 ? Q + ((size_t)m * 24 + hh) * 256
+                       : K + ((size_t)m * 4 + (hh - 24)) * 256;
+    for (int d = 0; d < 32; ++d) {
+      float x0 = X[d], x1 = X[d + 32];
+      float c = Cos[(size_t)pos * 64 + d], s = Sin[(size_t)pos * 64 + d];
+      X[d] = x0 * c - x1 * s;
+      X[d + 32] = x0 * s + x1 * c;
+    }
+  }
+};
+
+// Dead-strip guards (Concat2 lesson): raw-L0 never calls these, but the
+// references retain the entry points in the bundle.
+void launch_chunkkv(sycl::queue &q, uint16_t *Kc, uint16_t *Vc,
+                    const float *Kn, const float *V, const int *Ctrl, int TMAX,
+                    int M) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>((size_t)M * 1024),
+                   ChunkKvAppend{Kc, Vc, Kn, V, Ctrl, TMAX, M});
+  }).wait();
+}
+
+void launch_chunkrope(sycl::queue &q, float *Q, float *K, const float *Cos,
+                      const float *Sin, const int *Ctrl, int TMAX, int M) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>((size_t)M * 28),
+                   ChunkRope{Q, K, Cos, Sin, Ctrl, TMAX, M});
+  }).wait();
+}
+
 // T7.4 chunked prefill: causal attention over a token chunk against a cache
 // prefix. Query m of the chunk (global pos = base+m) attends t = 0..base+m
 // over the shared KV cache; gate applied like decode. Mirrors AttnCore's
 // math with the per-query offset; all members live (Wts scratch sized
 // M*24*TMAX). Launch 1 WI per (chunk-pos, head), group size 1.
 struct ChunkAttn {
-  float *Att;        // M*6144 out
-  const float *Q;    // M*6144 queries (split, normed, roped)
-  const float *Kc;   // 4*TC*256 cache
-  const float *Vc;
+  float *Att;          // M*6144 out
+  const float *Q;      // M*6144 queries (split, normed, roped)
+  const uint16_t *Kc;  // 4*TC*256 BF16 cache (production alignment with
+  const uint16_t *Vc;  // decode; was float in the prototype harness)
   const float *Gate; // M*6144
   const int *Ctrl;   // [1] = chunk_start (global pos of chunk row 0)
   int TMAX;          // cache depth (clamp)
@@ -815,35 +1768,51 @@ struct ChunkAttn {
     esimd::simd<float, 32> q5 = esimd::block_load<float, 32>(qh + 160);
     esimd::simd<float, 32> q6 = esimd::block_load<float, 32>(qh + 192);
     esimd::simd<float, 32> q7 = esimd::block_load<float, 32>(qh + 224);
-    // NOTE: Kc/Vc are float caches in the chunk path (kept fp32, unlike
-    // decode BF16) — plain float loads, no BF16 reinterpret needed.
+    // BF16 cache rows decode exactly (same helper as AttnCore).
+    auto bf16row = [](const uint16_t *p) SYCL_ESIMD_FUNCTION {
+      esimd::simd<uint32_t, 32> u =
+          esimd::convert<uint32_t>(esimd::block_load<uint16_t, 32>(p));
+      u <<= 16;
+      return u.template bit_cast_view<float>();
+    };
+    auto fold32 = [](esimd::simd<float, 32> v) SYCL_ESIMD_FUNCTION {
+      esimd::simd<float, 16> s16 =
+          v.select<16, 2>(0) + v.select<16, 2>(1);
+      esimd::simd<float, 8> s8 = s16.select<8, 2>(0) + s16.select<8, 2>(1);
+      esimd::simd<float, 4> s4 = s8.select<4, 2>(0) + s8.select<4, 2>(1);
+      esimd::simd<float, 2> s2 = s4.select<2, 2>(0) + s4.select<2, 2>(1);
+      return (float)(s2[0] + s2[1]);
+    };
     float mx = -1e30f;
     for (int t = 0; t < T; ++t) {
-      const float *kr = Kc + ((size_t)t * 4 + kv) * 256;
-      esimd::simd<float, 32> k0 = esimd::block_load<float, 32>(kr + 0);
-      esimd::simd<float, 32> k1 = esimd::block_load<float, 32>(kr + 32);
-      esimd::simd<float, 32> k2 = esimd::block_load<float, 32>(kr + 64);
-      esimd::simd<float, 32> k3 = esimd::block_load<float, 32>(kr + 96);
-      esimd::simd<float, 32> k4 = esimd::block_load<float, 32>(kr + 128);
-      esimd::simd<float, 32> k5 = esimd::block_load<float, 32>(kr + 160);
-      esimd::simd<float, 32> k6 = esimd::block_load<float, 32>(kr + 192);
-      esimd::simd<float, 32> k7 = esimd::block_load<float, 32>(kr + 224);
+      const uint16_t *kr = Kc + ((size_t)t * 4 + kv) * 256;
+      esimd::simd<float, 32> k0 = bf16row(kr + 0);
+      esimd::simd<float, 32> k1 = bf16row(kr + 32);
+      esimd::simd<float, 32> k2 = bf16row(kr + 64);
+      esimd::simd<float, 32> k3 = bf16row(kr + 96);
+      esimd::simd<float, 32> k4 = bf16row(kr + 128);
+      esimd::simd<float, 32> k5 = bf16row(kr + 160);
+      esimd::simd<float, 32> k6 = bf16row(kr + 192);
+      esimd::simd<float, 32> k7 = bf16row(kr + 224);
       esimd::simd<float, 32> p0 = q0 * k0, p1 = q1 * k1, p2 = q2 * k2,
                              p3 = q3 * k3, p4 = q4 * k4, p5 = q5 * k5,
                              p6 = q6 * k6, p7 = q7 * k7;
-      float s = 0;
-#pragma unroll
-      for (int l = 0; l < 32; ++l)
-        s += (float)p0[l] + (float)p1[l] + (float)p2[l] + (float)p3[l] +
-             (float)p4[l] + (float)p5[l] + (float)p6[l] + (float)p7[l];
-      s /= 16.0f;
+      esimd::simd<float, 32> ps = p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7;
+      float s = fold32(ps) / 16.0f;
       wts[t] = s;
       mx = s > mx ? s : mx;
     }
     float se = 0;
-    for (int t = 0; t < T; ++t) {
-      float w = sycl::exp(wts[t] - mx);
-      wts[t] = w;
+    int te = 0;
+    for (; te + 32 <= T; te += 32) {
+      esimd::simd<float, 32> sc = esimd::block_load<float, 32>(wts + te);
+      esimd::simd<float, 32> w = esimd::exp(sc - mx);
+      esimd::block_store<float, 32>(wts + te, w);
+      se += fold32(w);
+    }
+    for (; te < T; ++te) {
+      float w = sycl::exp(wts[te] - mx);
+      wts[te] = w;
       se += w;
     }
     float inv_se = 1.0f / se;
@@ -851,15 +1820,15 @@ struct ChunkAttn {
         a7(0);
     for (int t = 0; t < T; ++t) {
       float w = wts[t] * inv_se;
-      const float *vr = Vc + ((size_t)t * 4 + kv) * 256;
-      a0 += w * esimd::block_load<float, 32>(vr + 0);
-      a1 += w * esimd::block_load<float, 32>(vr + 32);
-      a2 += w * esimd::block_load<float, 32>(vr + 64);
-      a3 += w * esimd::block_load<float, 32>(vr + 96);
-      a4 += w * esimd::block_load<float, 32>(vr + 128);
-      a5 += w * esimd::block_load<float, 32>(vr + 160);
-      a6 += w * esimd::block_load<float, 32>(vr + 192);
-      a7 += w * esimd::block_load<float, 32>(vr + 224);
+      const uint16_t *vr = Vc + ((size_t)t * 4 + kv) * 256;
+      a0 += w * bf16row(vr + 0);
+      a1 += w * bf16row(vr + 32);
+      a2 += w * bf16row(vr + 64);
+      a3 += w * bf16row(vr + 96);
+      a4 += w * bf16row(vr + 128);
+      a5 += w * bf16row(vr + 160);
+      a6 += w * bf16row(vr + 192);
+      a7 += w * bf16row(vr + 224);
     }
     float *ah = Att + (size_t)m * 6144 + hh * 256;
     const float *gh = Gate + (size_t)m * 6144 + hh * 256;
@@ -867,20 +1836,16 @@ struct ChunkAttn {
     for (int j = 0; j < 8; ++j) {
       esimd::simd<float, 32> g =
           esimd::block_load<float, 32>(gh + (size_t)j * 32);
-      esimd::simd<float, 32> o(0);
-#pragma unroll
-      for (int l = 0; l < 32; ++l) {
-        float gl = (float)g[l];
-        o[l] = (float)acc[j][l] / (1.0f + sycl::exp(-gl));
-      }
+      esimd::simd<float, 32> o = acc[j] / (1.0f + esimd::exp(-g));
       esimd::block_store<float, 32>(ah + (size_t)j * 32, o);
     }
   }
 };
 
 void launch_chunkattn(sycl::queue &q, float *Att, const float *Q,
-                      const float *Kc, const float *Vc, const float *Gate,
-                      const int *Ctrl, int TMAX, float *Wts, int M) {
+                      const uint16_t *Kc, const uint16_t *Vc,
+                      const float *Gate, const int *Ctrl, int TMAX, float *Wts,
+                      int M) {
   q.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1>((size_t)M * 24),
                    ChunkAttn{Att, Q, Kc, Vc, Gate, Ctrl, TMAX, Wts});
@@ -1026,6 +1991,31 @@ void launch_cvtf32f16(sycl::queue &q, sycl::half *Out, const float *In,
                       int N) {
   q.submit([&](sycl::handler &h) {
     h.parallel_for(sycl::range<1>(N), CvtF32F16{Out, In});
+  }).wait();
+}
+
+// T7.2 MTP draft: concatenate two N-vectors (fused fc input cat[e, hn]).
+// Launch 2*N, 1 WI/group; all members live (TMAX lesson).
+struct Concat2 {
+  float *Out; // 2*N
+  const float *A;
+  const float *B;
+  int N;
+  void operator()(sycl::id<1> id) const {
+    int i = id[0];
+    if (i >= 2 * N)
+      return;
+    Out[i] = i < N ? A[i] : B[i - N];
+  }
+};
+
+// Dead-strip guard (TMAX lesson): an unreferenced functor vanishes from the
+// bundle and extract_spv fails the build. The raw-L0 path never calls this,
+// but the reference retains the entry point.
+void launch_concat2(sycl::queue &q, float *Out, const float *A,
+                    const float *B, int N) {
+  q.submit([&](sycl::handler &h) {
+    h.parallel_for(sycl::range<1>((size_t)2 * N), Concat2{Out, A, B, N});
   }).wait();
 }
 

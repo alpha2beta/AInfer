@@ -1,0 +1,64 @@
+{
+ "task": "T7.4-hybrid-attention",
+ "date": "2026-09-12",
+ "composition": "QK-DPAS-GEMM (4 kv appends) + row-softmax + fp16 convert + WV-DPAS-GEMM (4 appends) as staged lists; same host ref as attnfar (gate host-side both sides)",
+ "result": "HYBRID-OK, worst-rel 2.31e-04 (tol 1e-3: half inputs)",
+ "stages_us_4096": {
+  "qk": 340.5,
+  "sm": 2183.5,
+  "cv": 109.0,
+  "wv": 2630.0,
+  "total": 5263.1
+ },
+ "vs_scan": "5.3ms vs 9.8ms vector scan (1.9x); scalar softmax (41%) + thin WV occupancy dominate",
+ "bugs": [
+  "GQA design miss: first QkGemm had no kv mapping (all heads read kv0); standalone probe passed vacuously (same wrong ref). Fixed with KvOff per-group GEMMs.",
+  "missing /16 in QkGemm (16.000x ratio caught it); probe ref was equally wrong (both-sides-agree trap again) \u2014 fixed both",
+  "harness sed\u7559\u4e0b kv<1 bisection reverted; stage forensics via HYB_DBG then removed"
+ ],
+ "honest_64K": "softmax transcendental floor: 25M exp/token @64K \u2248 125ms over 16 layers regardless of GEMM speed. Dense 64K \u2248 5 t/s (not 10): still 25x over scan-form 4s. Target recalibrated.",
+ "next": [
+  "vectorize SoftmaxRow (~10x: 2.2ms->0.2ms)",
+  "WV K-split 4x occupancy (2.6ms->0.7ms)",
+  "then real-weight + adoption; projected hybrid ~1.3ms @4K (~7.5x)"
+ ],
+ "result_hybrid_ok": {
+  "stages_us_4096": {
+   "qk": 370.3,
+   "sm": 472.0,
+   "cv": 114.6,
+   "wv": 2911.6,
+   "total": 3868.5
+  },
+  "worst_rel": 0.000219,
+  "vs_scan": "3.9ms vs 9.8ms (2.5x)"
+ },
+ "wv_ksplit": {
+  "change": "WV K into 4 chunks (64 groups) + ResAddF combine (3 appends)",
+  "result": "2.63ms -> 2.83ms+0.08 combine: NO WIN (barriers/launches eat the occupancy gain; still latency-bound)",
+  "kept": true,
+  "reason": "kept for the occupancy structure (pays at larger T where waves fill); combine is 74us, negligible"
+ },
+ "debug_postmortems": [
+  "double-offset O pointer (slab select + kernel kv rows both applied) -> every kv wrote wrong slots; caught by slab-mass forensics + minimal repro (1 cc-list x 2 appends); fixed to slab-only select",
+  "append-arg interaction fully exonerated (QK kv-loop proven clean, ResAddF combine bitwise, minimal repro pointed at data not args)",
+  "report-field regression (lost T==4096 accumulator while stripping debug) caught by 0.0 fields in JSON"
+ ],
+  "status": "LOOP-VERDICT 2026-09-13: quality-CLEARED, timing-LOSES, DEFERRED for decode (see loop_verdict)",
+  "loop_verdict": {
+    "date": "2026-09-13",
+    "oob_fix": "QkGemm B-tile staging had no col guard: last partial block read cache slots past TMAX (slots 98..111 of a 98-deep cache). Small overruns silently hit the next slot's memory (N=13 ran, wrong-but-mapped); large overruns past the last slot faulted -> DEVICE_LOST at the first embed replay. Non-monotonic signature (96/112/128 run, 98/104/108/174 crash) = multiples-of-16 have no partial block. Fixed with an N-guard staging zeros; all MAXCTX 32..174 run clean.",
+    "e2e_quality": "70-token 84*3/2 prompt, max-new 96: hybrid 59 tokens vs baseline 58, both EOS-stopped, both decode to '.../2=126. Final just number...' + '126<|im_end|>' (has126 TRUE both). Top-1 identical through step 24; step-0 top-5 order identical (values within ~1.2 on ~24-magnitude logits, fp16-vs-fp32 path noise); step-25 near-tie flip (1534 vs 12204, gap 0.24 = 0.9%) reroutes the tail, which re-converges to 126. Documented near-tie class, not structural divergence — the old L3 structural divergence is gone.",
+    "timing": "AINFER_PROFILE=1, same 70+8 run: attn_layer med 1.195 ms hybrid vs 0.959 ms scan (+25%). Linear 1.031 vs 1.030 (unchanged), tail 2.31 vs 2.37. Attention is ~24% of a decode step (16x0.96 of ~67 ms), so even a 2.5x attention win would net ~13% — but at T~78 hybrid PAYS ~23 launches+barriers per full layer vs ~5 for scan, and launch tax dominates. Synthetic 2.5x was measured @4K; break-even is somewhere in the hundreds-to-thousands.",
+    "decision": "DEFER for the decode loop; scan stays the default. GEMM-form (QkGemm DPAS + vector softmax) redirects to chunked prefill, where per-launch work is 256x larger and launch tax amortizes. Hybrid path stays env-gated (AINFER_ATTN=hybrid) as the experimental vehicle for that line.",
+    "artifacts": "/tmp/hyb_e2e96.json (59 tok, has126), /tmp/prof_base.json + /tmp/prof_hyb.json (profile medians), /tmp/base_e2e.json (58 tok baseline)"
+  },
+  "loop_integration": {
+   "status": "INTEGRATED (AINFER_ATTN=hybrid env-gated), quality-CLEARED on the e2e probe, timing-LOSES at decode T — DEFERRED (see loop_verdict)",
+  "wiring": "full MAXCTX-width bake, per-layer 4x QK + 16x WV appends + ResAddF combine + GateMul; softmax Ctrl-driven",
+  "trajectory": "[369,279,4087,310,279] vs baseline [369,279,248046] \u2014 diverges at step 2",
+  "dump_profile": "L0-L2 bitwise 0; L3 onward 98%+ elements off at median-rel ~0.4-1.0 \u2014 the hybrid stage output differs structurally, not by flip noise",
+  "stage_diagnosis": "device scores match CPU dots to 6.7e-02 (fp16-Q path); CORE (pre-gate WV output) wrong: got maxabs 0.80 vs want 0.069 per head0, elementwise mismatch from d=0 \u2014 suspect score-to-weight or gather path on real data (passing harness used synthetic balanced caches)",
+  "next": "elementwise truth table shows got >> want ~10-80x with mixed sign \u2014 likely wrong V rows (prefix not zero in probe terms) or weight row mismatch; inspect WvGemm A-row selection vs dumped dW8"
+ }
+}

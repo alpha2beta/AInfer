@@ -1,0 +1,2861 @@
+{
+ "task": "T8.5-quality-benchmark",
+ "scores": {
+  "factual": {
+   "int4": {
+    "pass": 40,
+    "total": 40,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 40,
+    "total": 40,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "arithmetic": {
+   "int4": {
+    "pass": 32,
+    "total": 40,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 32,
+    "total": 40,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "summarization": {
+   "int4": {
+    "pass": 20,
+    "total": 20,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 20,
+    "total": 20,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "longgen": {
+   "int4": {
+    "pass": 20,
+    "total": 20,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 20,
+    "total": 20,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "retrieval": {
+   "int4": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "coding": {
+   "int4": {
+    "pass": 30,
+    "total": 30,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 30,
+    "total": 30,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  },
+  "bilingual": {
+   "int4": {
+    "pass": 27,
+    "total": 28,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 27,
+    "total": 28,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 0,
+    "total": 0,
+    "graded": 0
+   }
+  }
+ },
+ "cases": {
+  "fact-000": {
+   "id": "fact-000",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Paris",
+    "text": "Paris"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Paris",
+    "text": "Paris"
+   },
+   "llama": "missing"
+  },
+  "fact-001": {
+   "id": "fact-001",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Tokyo",
+    "text": "Tokyo"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Tokyo",
+    "text": "Tokyo"
+   },
+   "llama": "missing"
+  },
+  "fact-002": {
+   "id": "fact-002",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Brasília",
+    "text": "Brasília"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Brasília",
+    "text": "Brasília"
+   },
+   "llama": "missing"
+  },
+  "fact-003": {
+   "id": "fact-003",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Ottawa",
+    "text": "Ottawa"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Ottawa",
+    "text": "Ottawa"
+   },
+   "llama": "missing"
+  },
+  "fact-004": {
+   "id": "fact-004",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Canberra",
+    "text": "Canberra"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Canberra",
+    "text": "Canberra"
+   },
+   "llama": "missing"
+  },
+  "fact-005": {
+   "id": "fact-005",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Cairo",
+    "text": "Cairo"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Cairo",
+    "text": "Cairo"
+   },
+   "llama": "missing"
+  },
+  "fact-006": {
+   "id": "fact-006",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "New Delhi",
+    "text": "New Delhi"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "New Delhi",
+    "text": "New Delhi"
+   },
+   "llama": "missing"
+  },
+  "fact-007": {
+   "id": "fact-007",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Berlin",
+    "text": "Berlin"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Berlin",
+    "text": "Berlin"
+   },
+   "llama": "missing"
+  },
+  "fact-008": {
+   "id": "fact-008",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Rome",
+    "text": "Rome"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Rome",
+    "text": "Rome"
+   },
+   "llama": "missing"
+  },
+  "fact-009": {
+   "id": "fact-009",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Madrid",
+    "text": "Madrid"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Madrid",
+    "text": "Madrid"
+   },
+   "llama": "missing"
+  },
+  "fact-010": {
+   "id": "fact-010",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Mexico City",
+    "text": "Mexico City"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Mexico City",
+    "text": "Mexico City"
+   },
+   "llama": "missing"
+  },
+  "fact-011": {
+   "id": "fact-011",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Buenos Aires",
+    "text": "Buenos Aires"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Buenos Aires",
+    "text": "Buenos Aires"
+   },
+   "llama": "missing"
+  },
+  "fact-012": {
+   "id": "fact-012",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Hydrogen",
+    "text": "Hydrogen"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Hydrogen",
+    "text": "Hydrogen"
+   },
+   "llama": "missing"
+  },
+  "fact-013": {
+   "id": "fact-013",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Helium",
+    "text": "Helium"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Helium",
+    "text": "Helium"
+   },
+   "llama": "missing"
+  },
+  "fact-014": {
+   "id": "fact-014",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Carbon",
+    "text": "Carbon"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Carbon",
+    "text": "Carbon"
+   },
+   "llama": "missing"
+  },
+  "fact-015": {
+   "id": "fact-015",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Nitrogen",
+    "text": "Nitrogen"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Nitrogen",
+    "text": "Nitrogen"
+   },
+   "llama": "missing"
+  },
+  "fact-016": {
+   "id": "fact-016",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Oxygen",
+    "text": "Oxygen"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Oxygen",
+    "text": "Oxygen"
+   },
+   "llama": "missing"
+  },
+  "fact-017": {
+   "id": "fact-017",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Sodium",
+    "text": "Sodium"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Sodium",
+    "text": "Sodium"
+   },
+   "llama": "missing"
+  },
+  "fact-018": {
+   "id": "fact-018",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Iron",
+    "text": "Iron"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Iron",
+    "text": "Iron"
+   },
+   "llama": "missing"
+  },
+  "fact-019": {
+   "id": "fact-019",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "Gold",
+    "text": "Gold"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Gold",
+    "text": "Gold"
+   },
+   "llama": "missing"
+  },
+  "fact-020": {
+   "id": "fact-020",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1969",
+    "text": "1969"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1969",
+    "text": "1969"
+   },
+   "llama": "missing"
+  },
+  "fact-021": {
+   "id": "fact-021",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1989",
+    "text": "1989"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1989",
+    "text": "1989"
+   },
+   "llama": "missing"
+  },
+  "fact-022": {
+   "id": "fact-022",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1896",
+    "text": "1896"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1896",
+    "text": "1896"
+   },
+   "llama": "missing"
+  },
+  "fact-023": {
+   "id": "fact-023",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1776",
+    "text": "1776"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1776",
+    "text": "1776"
+   },
+   "llama": "missing"
+  },
+  "fact-024": {
+   "id": "fact-024",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1903",
+    "text": "1903"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1903",
+    "text": "1903"
+   },
+   "llama": "missing"
+  },
+  "fact-025": {
+   "id": "fact-025",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1945",
+    "text": "1945"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1945",
+    "text": "1945"
+   },
+   "llama": "missing"
+  },
+  "fact-026": {
+   "id": "fact-026",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1957",
+    "text": "1957"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1957",
+    "text": "1957"
+   },
+   "llama": "missing"
+  },
+  "fact-027": {
+   "id": "fact-027",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "1876",
+    "text": "1876"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "1876",
+    "text": "1876"
+   },
+   "llama": "missing"
+  },
+  "fact-028": {
+   "id": "fact-028",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=19.89 want=19.88",
+    "text": "19.89"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=19.88 want=19.88",
+    "text": "19.88"
+   },
+   "llama": "missing"
+  },
+  "fact-029": {
+   "id": "fact-029",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=62.14 want=62.14",
+    "text": "62.14"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=62.14 want=62.14",
+    "text": "62.14"
+   },
+   "llama": "missing"
+  },
+  "fact-030": {
+   "id": "fact-030",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=11.02 want=11.02",
+    "text": "11.02"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=11.02 want=11.02",
+    "text": "11.02"
+   },
+   "llama": "missing"
+  },
+  "fact-031": {
+   "id": "fact-031",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=44.09 want=44.09",
+    "text": "44.09"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=44.09 want=44.09",
+    "text": "44.09"
+   },
+   "llama": "missing"
+  },
+  "fact-032": {
+   "id": "fact-032",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=67.63 want=67.63",
+    "text": "67.63"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=67.63 want=67.63",
+    "text": "67.63"
+   },
+   "llama": "missing"
+  },
+  "fact-033": {
+   "id": "fact-033",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=16.91 want=16.91",
+    "text": "16.91"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=16.91 want=16.91",
+    "text": "16.91"
+   },
+   "llama": "missing"
+  },
+  "fact-034": {
+   "id": "fact-034",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=77.0 want=77.0",
+    "text": "77.00"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=77.0 want=77.0",
+    "text": "77.00"
+   },
+   "llama": "missing"
+  },
+  "fact-035": {
+   "id": "fact-035",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=32.0 want=32.0",
+    "text": "32.00"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=32.0 want=32.0",
+    "text": "32.00"
+   },
+   "llama": "missing"
+  },
+  "fact-036": {
+   "id": "fact-036",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=32.81 want=32.81",
+    "text": "32.81"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=32.81 want=32.81",
+    "text": "32.81"
+   },
+   "llama": "missing"
+  },
+  "fact-037": {
+   "id": "fact-037",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=9.84 want=9.84",
+    "text": "9.84"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=9.84 want=9.84",
+    "text": "9.84"
+   },
+   "llama": "missing"
+  },
+  "fact-038": {
+   "id": "fact-038",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=17.3 want=17.3",
+    "text": "17.30"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=17.3 want=17.3",
+    "text": "17.30"
+   },
+   "llama": "missing"
+  },
+  "fact-039": {
+   "id": "fact-039",
+   "cat": "factual",
+   "int4": {
+    "grade": true,
+    "detail": "got=4.94 want=4.94",
+    "text": "4.94"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=4.94 want=4.94",
+    "text": "4.94"
+   },
+   "llama": "missing"
+  },
+  "arit-000": {
+   "id": "arit-000",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=921.0 want=921",
+    "text": "921"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=921.0 want=921",
+    "text": "921"
+   },
+   "llama": "missing"
+  },
+  "arit-001": {
+   "id": "arit-001",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1289.0 want=1289",
+    "text": "1289"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1289.0 want=1289",
+    "text": "1289"
+   },
+   "llama": "missing"
+  },
+  "arit-002": {
+   "id": "arit-002",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1253.0 want=1253",
+    "text": "1253"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1253.0 want=1253",
+    "text": "1253"
+   },
+   "llama": "missing"
+  },
+  "arit-003": {
+   "id": "arit-003",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=970.0 want=970",
+    "text": "970"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=970.0 want=970",
+    "text": "970"
+   },
+   "llama": "missing"
+  },
+  "arit-004": {
+   "id": "arit-004",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1094.0 want=1094",
+    "text": "1094"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1094.0 want=1094",
+    "text": "1094"
+   },
+   "llama": "missing"
+  },
+  "arit-005": {
+   "id": "arit-005",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1334.0 want=1334",
+    "text": "1334"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1334.0 want=1334",
+    "text": "1334"
+   },
+   "llama": "missing"
+  },
+  "arit-006": {
+   "id": "arit-006",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=7398.0 want=7398",
+    "text": "7398"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=7398.0 want=7398",
+    "text": "7398"
+   },
+   "llama": "missing"
+  },
+  "arit-007": {
+   "id": "arit-007",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=8355.0 want=8355",
+    "text": "8355"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=8355.0 want=8355",
+    "text": "8355"
+   },
+   "llama": "missing"
+  },
+  "arit-008": {
+   "id": "arit-008",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=9415.0 want=9415",
+    "text": "9415"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=9415.0 want=9415",
+    "text": "9415"
+   },
+   "llama": "missing"
+  },
+  "arit-009": {
+   "id": "arit-009",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=4795.0 want=4795",
+    "text": "4795"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=4795.0 want=4795",
+    "text": "4795"
+   },
+   "llama": "missing"
+  },
+  "arit-010": {
+   "id": "arit-010",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=3082.0 want=3082",
+    "text": "3082"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=3082.0 want=3082",
+    "text": "3082"
+   },
+   "llama": "missing"
+  },
+  "arit-011": {
+   "id": "arit-011",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=7533.0 want=7533",
+    "text": "7533"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=7533.0 want=7533",
+    "text": "7533"
+   },
+   "llama": "missing"
+  },
+  "arit-012": {
+   "id": "arit-012",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=4480.0 want=4480",
+    "text": "4480"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=4480.0 want=4480",
+    "text": "4480"
+   },
+   "llama": "missing"
+  },
+  "arit-013": {
+   "id": "arit-013",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=6045.0 want=6045",
+    "text": "6045"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=6045.0 want=6045",
+    "text": "6045"
+   },
+   "llama": "missing"
+  },
+  "arit-014": {
+   "id": "arit-014",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=62.0 want=62",
+    "text": "62"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=62.0 want=62",
+    "text": "62"
+   },
+   "llama": "missing"
+  },
+  "arit-015": {
+   "id": "arit-015",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=73.0 want=73",
+    "text": "73"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=73.0 want=73",
+    "text": "73"
+   },
+   "llama": "missing"
+  },
+  "arit-016": {
+   "id": "arit-016",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=432.0 want=432",
+    "text": "432"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=432.0 want=432",
+    "text": "432"
+   },
+   "llama": "missing"
+  },
+  "arit-017": {
+   "id": "arit-017",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1608.0 want=1608",
+    "text": "1608"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1608.0 want=1608",
+    "text": "1608"
+   },
+   "llama": "missing"
+  },
+  "arit-018": {
+   "id": "arit-018",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=740.0 want=740",
+    "text": "740"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=740.0 want=740",
+    "text": "740"
+   },
+   "llama": "missing"
+  },
+  "arit-019": {
+   "id": "arit-019",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=64.0 want=64",
+    "text": "64"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=64.0 want=64",
+    "text": "64"
+   },
+   "llama": "missing"
+  },
+  "arit-020": {
+   "id": "arit-020",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=483.0 want=483",
+    "text": "483"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=483.0 want=483",
+    "text": "483"
+   },
+   "llama": "missing"
+  },
+  "arit-021": {
+   "id": "arit-021",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=912.0 want=912",
+    "text": "912"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=912.0 want=912",
+    "text": "912"
+   },
+   "llama": "missing"
+  },
+  "arit-022": {
+   "id": "arit-022",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=927.0 want=927",
+    "text": "927"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=927.0 want=927",
+    "text": "927"
+   },
+   "llama": "missing"
+  },
+  "arit-023": {
+   "id": "arit-023",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=942.0 want=978",
+    "text": "942"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=942.0 want=978",
+    "text": "942"
+   },
+   "llama": "missing"
+  },
+  "arit-024": {
+   "id": "arit-024",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=140.0 want=140",
+    "text": "140"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=140.0 want=140",
+    "text": "140"
+   },
+   "llama": "missing"
+  },
+  "arit-025": {
+   "id": "arit-025",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=125.0 want=125",
+    "text": "125"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=125.0 want=125",
+    "text": "125"
+   },
+   "llama": "missing"
+  },
+  "arit-026": {
+   "id": "arit-026",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=175.0 want=175",
+    "text": "175"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=175.0 want=175",
+    "text": "175"
+   },
+   "llama": "missing"
+  },
+  "arit-027": {
+   "id": "arit-027",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=250.0 want=250",
+    "text": "250"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=250.0 want=250",
+    "text": "250"
+   },
+   "llama": "missing"
+  },
+  "arit-028": {
+   "id": "arit-028",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=350.0 want=350",
+    "text": "350"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=350.0 want=350",
+    "text": "350"
+   },
+   "llama": "missing"
+  },
+  "arit-029": {
+   "id": "arit-029",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=210.0 want=210",
+    "text": "210"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=210.0 want=210",
+    "text": "210"
+   },
+   "llama": "missing"
+  },
+  "arit-030": {
+   "id": "arit-030",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=150.0 want=150",
+    "text": "150"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=150.0 want=150",
+    "text": "150"
+   },
+   "llama": "missing"
+  },
+  "arit-031": {
+   "id": "arit-031",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=45.0 want=45",
+    "text": "45"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=45.0 want=45",
+    "text": "45"
+   },
+   "llama": "missing"
+  },
+  "arit-032": {
+   "id": "arit-032",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=2.0 want=14",
+    "text": "2"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=2.0 want=14",
+    "text": "2"
+   },
+   "llama": "missing"
+  },
+  "arit-033": {
+   "id": "arit-033",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": true,
+    "detail": "got=1.0 want=1",
+    "text": "1"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "got=1.0 want=1",
+    "text": "1"
+   },
+   "llama": "missing"
+  },
+  "arit-034": {
+   "id": "arit-034",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=5.0 want=14",
+    "text": "5"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=5.0 want=14",
+    "text": "5"
+   },
+   "llama": "missing"
+  },
+  "arit-035": {
+   "id": "arit-035",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=1.0 want=6",
+    "text": "1"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=1.0 want=6",
+    "text": "1"
+   },
+   "llama": "missing"
+  },
+  "arit-036": {
+   "id": "arit-036",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=5.0 want=2",
+    "text": "5"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=5.0 want=2",
+    "text": "5"
+   },
+   "llama": "missing"
+  },
+  "arit-037": {
+   "id": "arit-037",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=22.0 want=21",
+    "text": "22"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=22.0 want=21",
+    "text": "22"
+   },
+   "llama": "missing"
+  },
+  "arit-038": {
+   "id": "arit-038",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=18.0 want=26",
+    "text": "18"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=18.0 want=26",
+    "text": "18"
+   },
+   "llama": "missing"
+  },
+  "arit-039": {
+   "id": "arit-039",
+   "cat": "arithmetic",
+   "int4": {
+    "grade": false,
+    "detail": "got=1.0 want=34",
+    "text": "1"
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "got=18.0 want=34",
+    "text": "18"
+   },
+   "llama": "missing"
+  },
+  "codi-000": {
+   "id": "codi-000",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def add(a, b):\n    return a + b"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def add(a, b):\n    return a + b"
+   },
+   "llama": "missing"
+  },
+  "codi-001": {
+   "id": "codi-001",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def mul(a, b):\n    return a * b"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def mul(a, b):\n    return a * b"
+   },
+   "llama": "missing"
+  },
+  "codi-002": {
+   "id": "codi-002",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def is_even(n):\n    return n % 2 == 0"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def is_even(n):\n    return n % 2 == 0"
+   },
+   "llama": "missing"
+  },
+  "codi-003": {
+   "id": "codi-003",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef factorial(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    if n == 0 or n == 1:\n        return 1\n    return n * factorial(n - 1)\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def factorial(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    if n == 0 or n == 1:\n        return 1\n    return n * factorial(n - 1)"
+   },
+   "llama": "missing"
+  },
+  "codi-004": {
+   "id": "codi-004",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef fib(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef fib(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-005": {
+   "id": "codi-005",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def reverse_string(s):\n    return s[::-1]"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def reverse_string(s):\n    return s[::-1]"
+   },
+   "llama": "missing"
+  },
+  "codi-006": {
+   "id": "codi-006",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef is_palindrome(s):\n    return s == s[::-1]\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef is_palindrome(s):\n    return s == s[::-1]\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-007": {
+   "id": "codi-007",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef count_vowels(s):\n    return sum(1 for c in s.lower() if c in 'aeiou')\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef count_vowels(s):\n    return sum(1 for c in s.lower() if c in 'aeiou')\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-008": {
+   "id": "codi-008",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef sum_list(xs):\n    return sum(xs)\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef sum_list(xs):\n    return sum(xs)\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-009": {
+   "id": "codi-009",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef list_max(xs):\n    return max(xs)\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef list_max(xs):\n    return max(xs)\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-010": {
+   "id": "codi-010",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        return None\n    return distinct[1]\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        return None\n    return distinct[1]\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-011": {
+   "id": "codi-011",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef dedup(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not in seen:\n            seen.add(x)\n            result.append(x)\n    return result\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef dedup(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not in seen:\n            seen.add(x)\n            result.append(x)\n    return result\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-012": {
+   "id": "codi-012",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef flatten(xss):\n    return [x for xs in xss for x in xs]\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef flatten(xss):\n    return [x for xs in xss for x in xs]\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-013": {
+   "id": "codi-013",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef dot(a, b):\n    return sum(x * y for x, y in zip(a, b))\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef dot(a, b):\n    return sum(x * y for x, y in zip(a, b))\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-014": {
+   "id": "codi-014",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef mat2x2_mul(A, B):\n    return [\n        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],\n        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]]\n    ]\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef mat2x2_mul(A, B):\n    return [\n        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],\n        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]]\n    ]\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-015": {
+   "id": "codi-015",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-016": {
+   "id": "codi-016",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    for i in range(3, int(n**0.5) + 1, 2):\n        if n % i == 0:\n            return False\n    return True\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    for i in range(3, int(n**0.5) + 1, 2):\n        if n % i == 0:\n            return False\n    return True\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-017": {
+   "id": "codi-017",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef primes_upto(n):\n    if n < 2:\n        return []\n    sieve = [True] * (n + 1)\n    sieve[0] = False\n    sieve[1] = False\n    for i in range(2, int(n**0.5) + 1):\n        if sieve[i]:\n            for j in range(i*i, n + 1, i):\n                sieve[j] = False\n    return [i for i, is_prime in enumerate(sieve) if is_prime]\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef primes_upto(n):\n    if n < 2:\n        return []\n    sieve = [True] * (n + 1)\n    sieve[0] = False\n    sieve[1] = False\n    for i in range(2, int(n**0.5) + 1):\n        if sieve[i]:\n            for j in range(i*i, n + 1, i):\n                sieve[j] = False\n    return [i for i, is_prime in enumerate(sieve) if is_prime]\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-018": {
+   "id": "codi-018",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef binary_search(xs, x):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == x:\n            return mid\n        elif xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef binary_search(xs, x):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == x:\n            return mid\n        elif xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-019": {
+   "id": "codi-019",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef bubble_pass(xs):\n    n = len(xs)\n    for i in range(n - 1):\n        if xs[i] > xs[i + 1]:\n            xs[i], xs[i + 1] = xs[i + 1], xs[i]\n    return xs\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef bubble_pass(xs):\n    n = len(xs)\n    for i in range(n - 1):\n        if xs[i] > xs[i + 1]:\n            xs[i], xs[i + 1] = xs[i + 1], xs[i]\n    return xs\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-020": {
+   "id": "codi-020",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef merge_sorted(a, b):\n    merged = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            merged.append(a[i])\n            i += 1\n        else:\n            merged.append(b[j])\n            j += 1\n    merged.extend(a[i:])\n    merged.extend(b[j:])\n    return merged\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef merge_sorted(a, b):\n    merged = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            merged.append(a[i])\n            i += 1\n        else:\n            merged.append(b[j])\n            j += 1\n    merged.extend(a[i:])\n    merged.extend(b[j:])\n    return merged\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-021": {
+   "id": "codi-021",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef word_count(s):\n    words = s.split()\n    counts = {}\n    for word in words:\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef word_count(s):\n    words = s.split()\n    counts = {}\n    for word in words:\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-022": {
+   "id": "codi-022",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef most_common(xs):\n    return max(set(xs), key=xs.count)\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef most_common(xs):\n    return max(set(xs), key=xs.count)\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-023": {
+   "id": "codi-023",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef group_by_first(words):\n    result = {}\n    for word in words:\n        if not word:\n            continue\n        first_letter = word[0].lower()\n        if first_letter not in result:\n            result[first_letter] = []\n        result[first_letter].append(word)\n    return result\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef group_by_first(words):\n    result = {}\n    for word in words:\n        if not word:\n            continue\n        first_letter = word[0].lower()\n        if first_letter not in result:\n            result[first_letter] = []\n        result[first_letter].append(word)\n    return result\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-024": {
+   "id": "codi-024",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef fizzbuzz(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            result.append(\"FizzBuzz\")\n        elif i % 3 == 0:\n            result.append(\"Fizz\")\n        elif i % 5 == 0:\n            result.append(\"Buzz\")\n        else:\n            result.append(str(i))\n    return result\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef fizzbuzz(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            result.append(\"FizzBuzz\")\n        elif i % 3 == 0:\n            result.append(\"Fizz\")\n        elif i % 5 == 0:\n            result.append(\"Buzz\")\n        else:\n            result.append(str(i))\n    return result\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-025": {
+   "id": "codi-025",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef running_total(xs):\n    total = 0\n    result = []\n    for x in xs:\n        total += x\n        result.append(total)\n    return result\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef running_total(xs):\n    total = 0\n    result = []\n    for x in xs:\n        total += x\n        result.append(total)\n    return result\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-026": {
+   "id": "codi-026",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-027": {
+   "id": "codi-027",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef celsius_to_fahrenheit(c):\n    return c * 9/5 + 32\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef celsius_to_fahrenheit(c):\n    return c * 9/5 + 32\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-028": {
+   "id": "codi-028",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef char_freq(s):\n    freq = {}\n    for char in s:\n        freq[char] = freq.get(char, 0) + 1\n    return freq\n```"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef char_freq(s):\n    freq = {}\n    for char in s:\n        freq[char] = freq.get(char, 0) + 1\n    return freq\n```"
+   },
+   "llama": "missing"
+  },
+  "codi-029": {
+   "id": "codi-029",
+   "cat": "coding",
+   "int4": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def transpose(matrix):\n    return [[row[i] for row in matrix] for i in range(len(matrix[0]))]"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def transpose(matrix):\n    return [[row[i] for row in matrix] for i in range(len(matrix[0]))]"
+   },
+   "llama": "missing"
+  },
+  "summ-000": {
+   "id": "summ-000",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=143",
+    "text": "A harbor seal rested on warm rocks as gulls circled and fishermen worked, with the tide eventually receding to leave the water calm by evening."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=143",
+    "text": "A harbor seal rested on warm rocks as gulls circled and fishermen worked, with the tide eventually receding to leave the water calm by evening."
+   },
+   "llama": "missing"
+  },
+  "summ-001": {
+   "id": "summ-001",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=296",
+    "text": "A harbor seal remained stationary upon the heated rocks, while gulls circled in the airspace above. In the vicinity, fishermen engaged in the repair of their nets, as the receding tide gradually withdrew the vessels from the dock. By the evening, the water had returned to a state of tranquility."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=278",
+    "text": "A harbor seal remained stationary upon the warm rocks, while gulls circled overhead. In the vicinity, fishermen were engaged in the repair of their nets, and the receding tide gradually drew the vessels away from the dock. By evening, the waters had returned to a state of calm."
+   },
+   "llama": "missing"
+  },
+  "summ-002": {
+   "id": "summ-002",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=178",
+    "text": "Photosynthesis is the process by which green plants use chlorophyll to convert sunlight, water, and carbon dioxide into glucose and oxygen, thereby sustaining most life on Earth."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=178",
+    "text": "Photosynthesis is the process by which green plants use chlorophyll to convert sunlight, water, and carbon dioxide into glucose and oxygen, thereby sustaining most life on Earth."
+   },
+   "llama": "missing"
+  },
+  "summ-003": {
+   "id": "summ-003",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=303",
+    "text": "Photosynthesis enables green plants to transform sunlight, water, and carbon dioxide into glucose and oxygen. Within this process, chlorophyll absorbs light energy, thereby driving the chemical reactions occurring in the leaves. This mechanism serves as the foundation for the majority of life on Earth."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=303",
+    "text": "Photosynthesis enables green plants to transform sunlight, water, and carbon dioxide into glucose and oxygen. Within this process, chlorophyll absorbs light energy, thereby driving the chemical reactions occurring in the leaves. This mechanism serves as the foundation for the majority of life on Earth."
+   },
+   "llama": "missing"
+  },
+  "summ-004": {
+   "id": "summ-004",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=181",
+    "text": "The old library on Baker Street, featuring a grand reading room and a rare manuscript collection, attracts distant scholars to its extensive holdings of over forty thousand volumes."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=181",
+    "text": "The old library on Baker Street, featuring a grand reading room and a rare manuscript collection, attracts scholars from distant locations to access its over forty thousand volumes."
+   },
+   "llama": "missing"
+  },
+  "summ-005": {
+   "id": "summ-005",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=322",
+    "text": "The historic library located on Baker Street houses a collection comprising more than forty thousand volumes. Its reading room is characterized by tall oak shelving, brass lighting fixtures, and a marble staircase. Scholars from distant locations frequently visit the institution to consult its rare manuscript collection."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=322",
+    "text": "The historic library located on Baker Street houses a collection comprising more than forty thousand volumes. Its reading room is characterized by tall oak shelving, brass lighting fixtures, and a marble staircase. Scholars from distant locations frequently visit the institution to consult its rare manuscript collection."
+   },
+   "llama": "missing"
+  },
+  "summ-006": {
+   "id": "summ-006",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=144",
+    "text": "A midnight thunderstorm struck the valley, splitting a pine tree and drenching the cabin, leaving only wet leaves and the scent of pine by dawn."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=144",
+    "text": "A midnight thunderstorm struck the valley, splitting a pine tree and drenching the cabin, leaving only wet leaves and the scent of pine by dawn."
+   },
+   "llama": "missing"
+  },
+  "summ-007": {
+   "id": "summ-007",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=243",
+    "text": "A thunderstorm traversed the valley shortly after midnight. Lightning struck a tall pine on the ridge, while heavy rain impacted the cabin's tin roof. By dawn, the only remaining evidence consisted of wet leaves and the distinct scent of pine."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=243",
+    "text": "A thunderstorm traversed the valley shortly after midnight. Lightning struck a tall pine on the ridge, while heavy rain impacted the cabin's tin roof. By dawn, the only remaining evidence consisted of wet leaves and the distinct scent of pine."
+   },
+   "llama": "missing"
+  },
+  "summ-008": {
+   "id": "summ-008",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=154",
+    "text": "A bridge featuring three steel arches, which required four years of foundational work to construct, now supports thousands of cars crossing it every hour."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=154",
+    "text": "A bridge featuring three steel arches, which required four years of foundational work to construct, now supports thousands of cars crossing it every hour."
+   },
+   "llama": "missing"
+  },
+  "summ-009": {
+   "id": "summ-009",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=238",
+    "text": "The bridge traverses the river via three steel arches. Prior to the installation of the first girder, engineers dedicated four years to driving piles into the riverbed. Currently, the structure accommodates thousands of vehicles per hour."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=238",
+    "text": "The bridge traverses the river via three steel arches. Prior to the installation of the first girder, engineers dedicated four years to driving piles into the riverbed. Currently, the structure accommodates thousands of vehicles per hour."
+   },
+   "llama": "missing"
+  },
+  "summ-010": {
+   "id": "summ-010",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=154",
+    "text": "Bees use the waggle dance to communicate flower locations, where the dance's angle indicates direction and its duration signals distance to other workers."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=154",
+    "text": "Bees use the waggle dance to communicate flower locations, where the dance's angle indicates direction and its duration signals distance to other workers."
+   },
+   "llama": "missing"
+  },
+  "summ-011": {
+   "id": "summ-011",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=290",
+    "text": "Bees convey the location of floral resources via the waggle dance. In this communicative behavior, the angle of the dance relative to the sun denotes direction, whereas its duration indicates distance. Upon observing this display, other worker bees proceed directly to the specified source."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=290",
+    "text": "Bees convey the location of floral resources via the waggle dance. In this communicative behavior, the angle of the dance relative to the sun denotes direction, whereas its duration indicates distance. Upon observing this display, other worker bees proceed directly to the specified source."
+   },
+   "llama": "missing"
+  },
+  "summ-012": {
+   "id": "summ-012",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=181",
+    "text": "The museum's new wing features pottery from five ancient cultures, complete with detailed labels and interactive screens that allow visitors to virtually examine the fragile pieces."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=180",
+    "text": "The museum's new wing features pottery from five ancient cultures, complete with detailed labels and interactive screens that allow visitors to virtually rotate the fragile pieces."
+   },
+   "llama": "missing"
+  },
+  "summ-013": {
+   "id": "summ-013",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=379",
+    "text": "The museum’s newly inaugurated wing exhibits pottery originating from five distinct ancient cultures. Each artifact is accompanied by detailed labeling that specifies its provenance, estimated chronology, and the specific firing techniques employed in its creation. Furthermore, interactive digital interfaces enable visitors to virtually rotate and examine these fragile pieces."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=379",
+    "text": "The museum’s newly inaugurated wing exhibits pottery originating from five distinct ancient cultures. Each artifact is accompanied by detailed labeling that specifies its provenance, estimated chronology, and the specific firing techniques employed in its creation. Furthermore, interactive digital interfaces enable visitors to virtually rotate and examine these fragile pieces."
+   },
+   "llama": "missing"
+  },
+  "summ-014": {
+   "id": "summ-014",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=173",
+    "text": "Winter wheat is planted in autumn, survives winter under snow, and is harvested in early summer, with farmers closely monitoring spring rainfall to support its rapid growth."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=162",
+    "text": "Winter wheat is planted in autumn, survives winter under snow, and is harvested in early summer after farmers monitor spring rainfall to support its rapid growth."
+   },
+   "llama": "missing"
+  },
+  "summ-015": {
+   "id": "summ-015",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=295",
+    "text": "Winter wheat is sown in the autumn and harvested in early summer. The nascent plants endure frost beneath a snow cover, subsequently exhibiting rapid growth as temperatures increase. Consequently, farmers monitor precipitation levels with particular attention during the months of April and May."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=295",
+    "text": "Winter wheat is sown in the autumn and harvested in early summer. The nascent plants endure frost beneath a snow cover, subsequently exhibiting rapid growth as temperatures increase. Consequently, farmers monitor precipitation levels with particular attention during the months of April and May."
+   },
+   "llama": "missing"
+  },
+  "summ-016": {
+   "id": "summ-016",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=136",
+    "text": "Each evening, the lighthouse keeper climbed 112 steps to polish the lens, light the lamp, log ships, and sound the horn on foggy nights."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=136",
+    "text": "Each evening, the lighthouse keeper climbed 112 steps to polish the lens, light the lamp, log ships, and sound the horn on foggy nights."
+   },
+   "llama": "missing"
+  },
+  "summ-017": {
+   "id": "summ-017",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=2 chars=275",
+    "text": "Each evening, the lighthouse keeper ascended one hundred twelve steps to perform his duties, which included polishing the lens, igniting the lamp, and recording the passage of vessels. Additionally, on nights characterized by fog, he sounded the horn at two-minute intervals."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=2 chars=275",
+    "text": "Each evening, the lighthouse keeper ascended one hundred twelve steps to perform his duties, which included polishing the lens, igniting the lamp, and recording the passage of vessels. Additionally, on nights characterized by fog, he sounded the horn at two-minute intervals."
+   },
+   "llama": "missing"
+  },
+  "summ-018": {
+   "id": "summ-018",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=1 chars=180",
+    "text": "Coral reefs, which are built by polyps in warm, shallow waters to support diverse ecosystems, are increasingly threatened by rising temperatures that cause bleaching and weakening."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=1 chars=180",
+    "text": "Coral reefs, which are built by polyps in warm, shallow waters to support diverse ecosystems, are increasingly threatened by rising temperatures that cause bleaching and weakening."
+   },
+   "llama": "missing"
+  },
+  "summ-019": {
+   "id": "summ-019",
+   "cat": "summarization",
+   "int4": {
+    "grade": true,
+    "detail": "sents=3 chars=381",
+    "text": "Coral reefs develop in environments characterized by warm, shallow, and sunlit waters situated over rocky substrates. Over the course of centuries, minute polyps construct limestone skeletons, thereby establishing habitats that support thousands of distinct species. However, increasing water temperatures induce bleaching and diminish the structural integrity of these ecosystems."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "sents=3 chars=381",
+    "text": "Coral reefs develop in environments characterized by warm, shallow, and sunlit waters situated over rocky substrates. Over the course of centuries, minute polyps construct limestone skeletons, thereby establishing habitats that support thousands of distinct species. However, increasing water temperatures induce bleaching and diminish the structural integrity of these ecosystems."
+   },
+   "llama": "missing"
+  },
+  "bili-000": {
+   "id": "bili-000",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "The cat sat on the mat.",
+    "text": "The cat sat on the mat."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "The cat sat on the mat.",
+    "text": "The cat sat on the mat."
+   },
+   "llama": "missing"
+  },
+  "bili-001": {
+   "id": "bili-001",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   },
+   "llama": "missing"
+  },
+  "bili-002": {
+   "id": "bili-002",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "She sells seashells by the seashore.",
+    "text": "She sells seashells by the seashore."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "She sells seashells by the seashore.",
+    "text": "She sells seashells by the seashore."
+   },
+   "llama": "missing"
+  },
+  "bili-003": {
+   "id": "bili-003",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "The quick brown fox jumps over the lazy dog.",
+    "text": "The quick brown fox jumps over the lazy dog."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "The quick brown fox jumps over the lazy dog.",
+    "text": "The quick brown fox jumps over the lazy dog."
+   },
+   "llama": "missing"
+  },
+  "bili-004": {
+   "id": "bili-004",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "breaking news: markets rally on strong earnings.",
+    "text": "breaking news: markets rally on strong earnings."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "breaking news: markets rally on strong earnings.",
+    "text": "breaking news: markets rally on strong earnings."
+   },
+   "llama": "missing"
+  },
+  "bili-005": {
+   "id": "bili-005",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "An apple a day keeps the doctor away.",
+    "text": "An apple a day keeps the doctor away."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "An apple a day keeps the doctor away.",
+    "text": "An apple a day keeps the doctor away."
+   },
+   "llama": "missing"
+  },
+  "bili-006": {
+   "id": "bili-006",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "To be or not to be, that is the question.",
+    "text": "To be or not to be, that is the question."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "To be or not to be, that is the question.",
+    "text": "To be or not to be, that is the question."
+   },
+   "llama": "missing"
+  },
+  "bili-007": {
+   "id": "bili-007",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "The early bird catches the worm.",
+    "text": "The early bird catches the worm."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "The early bird catches the worm.",
+    "text": "The early bird catches the worm."
+   },
+   "llama": "missing"
+  },
+  "bili-008": {
+   "id": "bili-008",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "A journey of a thousand miles begins with a single step.",
+    "text": "A journey of a thousand miles begins with a single step."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "A journey of a thousand miles begins with a single step.",
+    "text": "A journey of a thousand miles begins with a single step."
+   },
+   "llama": "missing"
+  },
+  "bili-009": {
+   "id": "bili-009",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Honesty is the best policy.",
+    "text": "Honesty is the best policy."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Honesty is the best policy.",
+    "text": "Honesty is the best policy."
+   },
+   "llama": "missing"
+  },
+  "bili-010": {
+   "id": "bili-010",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Time flies like an arrow.",
+    "text": "Time flies like an arrow."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Time flies like an arrow.",
+    "text": "Time flies like an arrow."
+   },
+   "llama": "missing"
+  },
+  "bili-011": {
+   "id": "bili-011",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "The pen is mightier than the sword.",
+    "text": "The pen is mightier than the sword."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "The pen is mightier than the sword.",
+    "text": "The pen is mightier than the sword."
+   },
+   "llama": "missing"
+  },
+  "bili-012": {
+   "id": "bili-012",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "When in Rome, do as the Romans do.",
+    "text": "When in Rome, do as the Romans do."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "When in Rome, do as the Romans do.",
+    "text": "When in Rome, do as the Romans do."
+   },
+   "llama": "missing"
+  },
+  "bili-013": {
+   "id": "bili-013",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "No pain, no gain.",
+    "text": "No pain, no gain."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "No pain, no gain.",
+    "text": "No pain, no gain."
+   },
+   "llama": "missing"
+  },
+  "bili-014": {
+   "id": "bili-014",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Knowledge is power.",
+    "text": "Knowledge is power."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Knowledge is power.",
+    "text": "Knowledge is power."
+   },
+   "llama": "missing"
+  },
+  "bili-015": {
+   "id": "bili-015",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "The cat is sitting on the mat.",
+    "text": "The cat is sitting on the mat."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "The cat is sitting on the mat.",
+    "text": "The cat is sitting on the mat."
+   },
+   "llama": "missing"
+  },
+  "bili-016": {
+   "id": "bili-016",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   },
+   "llama": "missing"
+  },
+  "bili-017": {
+   "id": "bili-017",
+   "cat": "bilingual",
+   "int4": {
+    "grade": false,
+    "detail": "The weather is nice today.",
+    "text": "The weather is nice today."
+   },
+   "int8kv": {
+    "grade": false,
+    "detail": "The weather is nice today.",
+    "text": "The weather is nice today."
+   },
+   "llama": "missing"
+  },
+  "bili-018": {
+   "id": "bili-018",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "I love reading.",
+    "text": "I love reading."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "I love reading.",
+    "text": "I love reading."
+   },
+   "llama": "missing"
+  },
+  "bili-019": {
+   "id": "bili-019",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "Beijing is the capital of China.",
+    "text": "Beijing is the capital of China."
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "Beijing is the capital of China.",
+    "text": "Beijing is the capital of China."
+   },
+   "llama": "missing"
+  },
+  "bili-020": {
+   "id": "bili-020",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "早上好。",
+    "text": "早上好。"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "早上好。",
+    "text": "早上好。"
+   },
+   "llama": "missing"
+  },
+  "bili-021": {
+   "id": "bili-021",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "非常感谢。",
+    "text": "非常感谢。"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "非常感谢。",
+    "text": "非常感谢。"
+   },
+   "llama": "missing"
+  },
+  "bili-022": {
+   "id": "bili-022",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "明天见。",
+    "text": "明天见。"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "明天见。",
+    "text": "明天见。"
+   },
+   "llama": "missing"
+  },
+  "bili-023": {
+   "id": "bili-023",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "书在桌子上。",
+    "text": "书在桌子上。"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "书在桌子上。",
+    "text": "书在桌子上。"
+   },
+   "llama": "missing"
+  },
+  "bili-024": {
+   "id": "bili-024",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "我有两个苹果。",
+    "text": "我有两个苹果。"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "我有两个苹果。",
+    "text": "我有两个苹果。"
+   },
+   "llama": "missing"
+  },
+  "bili-025": {
+   "id": "bili-025",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "10",
+    "text": "10"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "10",
+    "text": "10"
+   },
+   "llama": "missing"
+  },
+  "bili-026": {
+   "id": "bili-026",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "5",
+    "text": "5"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "5",
+    "text": "5"
+   },
+   "llama": "missing"
+  },
+  "bili-027": {
+   "id": "bili-027",
+   "cat": "bilingual",
+   "int4": {
+    "grade": true,
+    "detail": "他喜欢喝茶吗？",
+    "text": "他喜欢喝茶吗？"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "他喜欢喝茶吗？",
+    "text": "他喜欢喝茶吗？"
+   },
+   "llama": "missing"
+  },
+  "bili-028": {
+   "id": "bili-028",
+   "cat": "bilingual",
+   "int4": {
+    "grade": null,
+    "detail": "因为今天下起了大雨，所以我决定待在家里看书。",
+    "text": "因为今天下起了大雨，所以我决定待在家里看书。"
+   },
+   "int8kv": {
+    "grade": null,
+    "detail": "因为今天下起了大雨，所以我决定待在家里看书。",
+    "text": "因为今天下起了大雨，所以我决定待在家里看书。"
+   },
+   "llama": "missing"
+  },
+  "bili-029": {
+   "id": "bili-029",
+   "cat": "bilingual",
+   "int4": {
+    "grade": null,
+    "detail": "浩瀚、深邃、包容",
+    "text": "浩瀚、深邃、包容"
+   },
+   "int8kv": {
+    "grade": null,
+    "detail": "浩瀚、深邃、包容",
+    "text": "浩瀚、深邃、包容"
+   },
+   "llama": "missing"
+  },
+  "long-000": {
+   "id": "long-000",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=231",
+    "text": "The wind off the North Atlantic didn’t just blow; it screamed. For Elias Thorne, the lighthouse keeper of Blackrock Point, that scream was the only conversation he had left. His wife had passed three winters ago, and his son had moved to the city, leaving Elias alone with the rhythmic *thump-thump-thump* of the waves and the eternal, blinding sweep of the Fresnel lens.\n\nElias was a man of routine. He polished the brass, he trimmed the wicks, he logged the weather. But on the night of the autumn "
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=232",
+    "text": "The wind off the North Atlantic didn’t just blow; it screamed. For Elias Thorne, the lighthouse keeper of Blackrock Point, that scream was the only conversation he had left. His wife had passed three winters ago, and his son had moved to the city, leaving Elias alone with the rhythmic *thump-thump-thump* of the waves and the eternal, blinding sweep of the Fresnel lens.\n\nElias was a man of routine. He polished the brass, he trimmed the wicks, he logged the weather. But on a Tuesday in November, w"
+   },
+   "llama": "missing"
+  },
+  "long-001": {
+   "id": "long-001",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=237",
+    "text": "That is a great question! Rain is actually a pretty amazing process that happens right above our heads. Think of it like a giant, invisible recycling system in the sky.\n\nHere is how rain forms, step by step:\n\n### Step 1: The Sun Heats Things Up\nIt all starts with the sun. When the sun shines on the ocean, lakes, rivers, or even puddles in your backyard, it warms the water. As the water gets warmer, it turns into **water vapor**. This is an invisible gas (just like the steam you see coming off a "
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=216",
+    "text": "Here is how rain forms, explained step-by-step for a curious 10-year-old:\n\n### 🌧️ How Rain Forms: A Step-by-Step Guide\n\nImagine the sky as a giant, invisible kitchen where water is being cooked and cooled. Here’s what happens:\n\n#### **Step 1: Evaporation (The Water Goes Up)**\nThe sun shines down on oceans, lakes, rivers, and even puddles in your backyard. The sun’s heat warms the water, turning it into **water vapor** (which is just water in gas form, like the steam you see coming off a hot cup "
+   },
+   "llama": "missing"
+  },
+  "long-002": {
+   "id": "long-002",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=232",
+    "text": "The sun has long since surrendered to the horizon, leaving behind a bruised purple sky that is rapidly fading into an inky void. Here, in the heart of the endless dunes, the night does not merely arrive; it descends like a heavy, cool blanket, silencing the day’s scorching roar.\n\nThe air, which had been thick with heat and dust, has transformed. It is now crisp, carrying a faint, dry chill that bites at exposed skin. The silence is profound, broken only by the rhythmic crunch of your boots sinki"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=227",
+    "text": "The sun has long since surrendered to the horizon, leaving behind a bruised purple sky that is rapidly fading into an inky void. Here, in the heart of the endless dunes, the night does not merely arrive; it descends like a heavy, cool blanket, silencing the day’s scorching roar.\n\nThe air, which had been thick with heat and dust, has transformed. It is now crisp, carrying a faint, dry chill that bites at exposed skin. The silence is profound, broken only by the rhythmic crunch of your boots sinki"
+   },
+   "llama": "missing"
+  },
+  "long-003": {
+   "id": "long-003",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=202",
+    "text": "**Setting:** *A dimly lit, high-tech laboratory. Rain lashes against the floor-to-ceiling windows. ELIAS, an elderly man with tired eyes, sits in a leather chair, staring at a holographic display. UNIT-7, a sleek, humanoid android with chrome plating and soft, blue optical sensors, stands perfectly still in the center of the room.*\n\n**ELIAS:**\n(Without looking up from the display)\nThe simulation is complete. You can walk, you can speak, you can even mimic the micro-expressions of empathy. But yo"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=191",
+    "text": "**Setting:** *A dimly lit, high-tech laboratory. Rain lashes against the floor-to-ceiling windows. ELIAS, an elderly man with tired eyes, sits in a leather chair, staring at a holographic display. UNIT-7, a sleek, humanoid android with matte black plating and glowing blue optical sensors, stands perfectly still in the center of the room.*\n\n**ELIAS:**\nYou’ve been standing there for forty minutes, Unit-7. My heart rate monitor is spiking. Are you experiencing distress?\n\n**UNIT-7:**\nNegative, Elias"
+   },
+   "llama": "missing"
+  },
+  "long-004": {
+   "id": "long-004",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=190",
+    "text": "The history of writing systems is a fascinating journey of human innovation, evolving from complex pictographic systems to the efficient alphabets we use today. This evolution was driven by the need for administrative efficiency, trade, and the spread of ideas across cultures.\n\nHere is a chronological overview of the major milestones from cuneiform to the alphabet:\n\n### 1. The Dawn of Writing: Cuneiform (c. 3400–3000 BCE)\n**Location:** Mesopotamia (modern-day Iraq)\n\n- **Origin:** Writing emerged"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=190",
+    "text": "The history of writing systems is a fascinating journey of human ingenuity, evolving from complex pictographic records to the efficient alphabetic systems we use today. This evolution was driven by the need for administrative efficiency, trade, and eventually, broader literacy.\n\nHere is a chronological overview of the major developments from cuneiform to the alphabet:\n\n### 1. The Dawn of Writing: Pictographs and Logograms (c. 3400–3000 BCE)\nWriting did not start with letters. It began in **Sumer"
+   },
+   "llama": "missing"
+  },
+  "long-005": {
+   "id": "long-005",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=0.99 ntok=182",
+    "text": "Baking sourdough is a rewarding process that relies on patience, temperature control, and understanding the biology of fermentation. Here is a comprehensive guide to baking sourdough bread, from feeding your starter to pulling the finished loaf out of the oven.\n\n### Phase 1: The Starter (Prerequisite)\nYou cannot bake sourdough without an active, mature starter.\n1.  **Create or Maintain:** If you don’t have one, mix equal parts flour and water (by weight) and feed it daily for 7–14 days until it "
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=179",
+    "text": "Baking sourdough is a rewarding process that relies on patience, temperature control, and understanding the biology of fermentation. Here is a comprehensive guide to baking sourdough bread, from cultivating your starter to pulling the finished loaf from the oven.\n\n### Phase 1: Cultivating the Starter\nYou cannot bake sourdough without an active, mature starter. If you don’t have one, this process takes 5–7 days.\n\n1.  **Day 1–2:** Mix 50g whole wheat flour and 50g water. Let it sit at room tempera"
+   },
+   "llama": "missing"
+  },
+  "long-006": {
+   "id": "long-006",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=222",
+    "text": "The blueprint was drawn in blue ink on the back of a pizza box, stained with grease and marked with aggressive red circles. It was July 4th, and the air in the backyard of Leo’s house was thick with the scent of cut grass and impending humidity.\n\n\"Phase One,\" Leo announced, tapping the pizza box with a pencil. \"We build the platform. Phase Two: The walls. Phase Three: The roof. Phase Four: We never come down.\"\n\nMaya, sitting cross-legged on the hot asphalt, looked up from her sketchbook. She was"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=229",
+    "text": "The blueprint was drawn in blue ink on the back of a pizza box, stained with grease and marked with aggressive red circles. It was July 4th, and the air in the backyard of Leo’s house was thick with the scent of cut grass and impending humidity.\n\n\"Phase One,\" Leo announced, tapping the pizza box with a pencil. \"We get the wood. Phase Two: We don’t get arrested. Phase Three: We build the thing.\"\n\nMia, who was currently trying to untangle a coil of wire from her bike, looked up. \"We are twelve yea"
+   },
+   "llama": "missing"
+  },
+  "long-007": {
+   "id": "long-007",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=206",
+    "text": "The **water cycle** (also known as the hydrological cycle) is the continuous movement of water on, above, and below the surface of the Earth. It is a natural process that recycles water, ensuring that fresh water is available for all living things.\n\n### How the Water Cycle Works\n\nThe cycle is driven by solar energy and gravity and consists of several key stages:\n\n1.  **Evaporation**: The sun heats water in oceans, lakes, rivers, and soil, turning it into water vapor (gas). Plants also release wa"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=207",
+    "text": "The **water cycle** (also known as the hydrological cycle) is the continuous movement of water on, above, and below the surface of the Earth. It is a fundamental natural process that sustains life, and for farmers, it is the backbone of agricultural productivity.\n\n### How the Water Cycle Works\n\nThe water cycle consists of several key stages that repeat endlessly:\n\n1.  **Evaporation**: The sun heats water in oceans, lakes, rivers, and soil, turning it into water vapor (gas) that rises into the at"
+   },
+   "llama": "missing"
+  },
+  "long-008": {
+   "id": "long-008",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=200",
+    "text": "The city of **Aethelgard** does not sit upon the earth; it hangs suspended in the air, a colossal, inverted bowl of white stone and iridescent glass, tethered to the clouds by thick, braided cables of woven starlight and ancient metal. Below it, the ocean stretches infinitely, a deep, churning indigo abyss that serves as both its foundation and its graveyard.\n\n### Morning: The Descent of Light\nDawn in Aethelgard is not marked by the sun rising over a horizon, but by the **Shimmering**. As the fi"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=213",
+    "text": "The city of **Aethelgard** does not sit upon the earth; it hangs suspended in the air, a sprawling archipelago of stone, steel, and glass tethered to the clouds by massive, humming gravity anchors. Below, the ocean is a churning, endless expanse of deep indigo, but for the residents of Aethelgard, life is defined by the wind, the light, and the constant, gentle sway of their home.\n\n### Morning: The Dawn Chorus\nDaybreak in Aethelgard is not marked by the sun rising over a horizon, but by the sun "
+   },
+   "llama": "missing"
+  },
+  "long-009": {
+   "id": "long-009",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=225",
+    "text": "The rain lashed against the studio windows of the old brick building in Brooklyn, a rhythmic drumming that usually helped Elias focus. But tonight, the rain was just noise. The real music was coming from the air itself.\n\nIt started as a single, high-pitched note, like a violin string plucked in a vacuum. It wasn’t loud, but it was impossibly clear, cutting through the ambient hum of the air conditioning and the distant sirens. Elias stopped playing his cello. He sat in the dimly lit room, his bo"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=230",
+    "text": "The rain lashed against the studio windows of the old brick building in Brooklyn, a rhythmic drumming that usually helped Elias focus. But tonight, the rain was just noise. The real music was coming from the air itself.\n\nIt started as a single, high-pitched note, like a violin string plucked in a vacuum. It wasn’t loud, but it was impossibly clear, cutting through the ambient hum of the air conditioning and the distant sirens. Elias stopped playing his cello. He sat in the dimly lit room, his bo"
+   },
+   "llama": "missing"
+  },
+  "long-010": {
+   "id": "long-010",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=225",
+    "text": "Living in a mountain valley is to live in a place where the calendar is not measured in months, but in the shifting light and the changing breath of the earth. Here is the journey through one full year in such a landscape:\n\n### **Spring: The Awakening**\nSpring in a mountain valley is not a gentle arrival; it is a violent, glorious eruption of life.\n*   **The Melt:** It begins with the sound of water. The snowpack, which has held the valley in a white silence for months, begins to weep. Streams t"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=222",
+    "text": "Life in a mountain valley is a study in contrasts, where the vertical drop in elevation creates distinct microclimates that shift dramatically with the turning of the year. Here is a description of the seasons across one full cycle:\n\n### **Spring: The Thaw and the Bloom**\nSpring in a mountain valley is not a gentle awakening but a violent, chaotic release of energy. It begins high on the peaks, where the last remnants of winter snow melt first, sending icy torrents cascading down the slopes. The"
+   },
+   "llama": "missing"
+  },
+  "long-011": {
+   "id": "long-011",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=207",
+    "text": "To understand how bridges stay up, we must look at the fundamental principles of **statics** and **structural mechanics**. A bridge is essentially a system designed to transfer loads (the weight of the bridge itself, traffic, wind, and environmental forces) from the deck (where the cars drive) to the ground (the abutments and piers) without collapsing.\n\nThe core mechanism relies on balancing **forces** and managing **stresses**. The two primary types of stress involved are:\n1.  **Compression:** "
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=215",
+    "text": "To understand how bridges stay up, we must look at the fundamental principles of **statics** and **structural mechanics**. A bridge is essentially a system designed to transfer loads (the weight of the bridge itself, traffic, wind, and environmental forces) from the deck (where the cars drive) to the ground (the abutments and piers) without collapsing.\n\nThe core mechanism involves managing two primary internal forces:\n1.  **Compression:** A force that squeezes materials together.\n2.  **Tension:*"
+   },
+   "llama": "missing"
+  },
+  "long-012": {
+   "id": "long-012",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=214",
+    "text": "The rain lashed against the windows of the *Northern Star* like a handful of gravel, blurring the landscape into a smear of black and gray. Inside Car 4, the air was thick with the scent of stale coffee, wet wool, and the faint, metallic tang of anxiety.\n\nElias Thorne adjusted his glasses, his eyes fixed on the passenger across the aisle. The man was unremarkable in every way that mattered: a beige trench coat, a fedora pulled low, and a briefcase that looked heavier than it should. Elias had be"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=224",
+    "text": "The rain lashed against the windows of the *Northern Star* like a handful of gravel, blurring the landscape into a smear of black and gray. Inside Car 4, the air was thick with the scent of stale coffee, wet wool, and the faint, metallic tang of anxiety.\n\nElias Thorne adjusted his glasses, his eyes fixed on the passenger across the aisle. The man was unremarkable in every way that mattered: a beige trench coat, a fedora pulled low, and a briefcase that looked heavier than it should. Elias had be"
+   },
+   "llama": "missing"
+  },
+  "long-013": {
+   "id": "long-013",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=195",
+    "text": "The transformation of a tree into a notebook is a fascinating industrial process that involves several key stages: harvesting, pulping, refining, sheet formation, and finishing. Here’s a step-by-step breakdown of how it happens:\n\n### 1. Harvesting and Logging\n- **Sourcing Trees:** Most paper is made from softwood trees (like pine or spruce) for strength, or hardwood trees (like birch, maple, or eucalyptus) for smoothness.\n- **Felling:** Trees are cut down using heavy machinery.\n- **Debranching:*"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=190",
+    "text": "The transformation of a tree into a notebook is a fascinating industrial process that involves several key stages: **harvesting, pulping, refining, sheet formation, drying, and finishing**. Here’s a step-by-step breakdown:\n\n### 1. Harvesting and Logging\n- **Sourcing**: Trees (typically softwoods like pine or spruce for strength, and hardwoods like birch or eucalyptus for smoothness) are cut down in managed forests.\n- **Debranching**: Branches are removed, leaving only the trunk.\n- **Debarking**:"
+   },
+   "llama": "missing"
+  },
+  "long-014": {
+   "id": "long-014",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=241",
+    "text": "Here is a classic fable featuring a fox and a crow, adapted with a clear moral.\n\n### The Fox and the Crow\n\nOne bright morning, a Crow flew down and perched on a high branch of an oak tree. In his beak, he held a large, shiny piece of cheese that he had just stolen from a farmer’s table. He was so proud of his find that he began to caw loudly, announcing to the world that he had secured a delicious breakfast.\n\nBelow, a hungry Fox was passing by. The smell of the cheese drifted down to him, and hi"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=240",
+    "text": "Here is a fable about a fox and a crow, featuring a clear moral.\n\n### The Fox and the Crow\n\nOne bright morning, a crow was perched high on a sturdy oak tree, proudly holding a large piece of cheese in its beak. The crow was in a wonderful mood, having finally secured a delicious breakfast.\n\nBelow, a hungry fox was passing by. He smelled the cheese and his eyes lit up. He knew he could not reach the tree, so he decided to use his wits instead of his claws.\n\nHe stopped and looked up at the crow, s"
+   },
+   "llama": "missing"
+  },
+  "long-015": {
+   "id": "long-015",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=209",
+    "text": "The silence of the Martian surface was not empty; it was heavy. It pressed against the thick, polycarbonate walls of the *Ares One* habitat, a physical weight that no amount of pressurized air could fully displace.\n\nCommander Elena Vance floated in the zero-gravity transition chamber, her heart monitor beeping a steady, rhythmic *thump-thump* that sounded obscenely loud in the quiet. Below her, through the reinforced viewport, the landscape of Jezero Crater stretched out in shades of rust and oc"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=217",
+    "text": "The silence of the Martian surface was not empty; it was heavy. It pressed against the thick, polycarbonate walls of the *Ares One* habitat, a physical weight that no amount of pressurized air could fully displace.\n\nCommander Elena Vance stood at the main airlock, her hand hovering over the release lever. Through the reinforced glass, the landscape was a study in desolation and beauty: a rust-colored expanse stretching to a horizon that curved too sharply, under a sky the color of bruised twilig"
+   },
+   "llama": "missing"
+  },
+  "long-016": {
+   "id": "long-016",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=235",
+    "text": "Imagine you are standing in a vast, dark forest at night. It is so dark that you cannot see your own hands. You are afraid, and you want to see the path ahead so you can walk safely.\n\nNow, imagine that hidden inside the ground beneath your feet, there is a river of invisible, flowing energy. This river is always moving, constantly rushing from one place to another, like water in a stream. This invisible flow is what we call **electricity**.\n\nBut this river is hidden. You can’t see it, touch it, "
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=236",
+    "text": "Imagine you are standing in a vast, dark forest at night. It is so dark that you cannot see your own hands. You are afraid, and you want to see the path ahead so you can walk safely.\n\nNow, imagine I hand you a small, glowing orb. Suddenly, the darkness around you retreats. You can see the trees, the ground, and the path. That orb is a **light bulb**.\n\nBut where does that light come from? It doesn’t just appear out of thin air. It comes from a hidden force that is always flowing through the world"
+   },
+   "llama": "missing"
+  },
+  "long-017": {
+   "id": "long-017",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=194",
+    "text": "A coral reef is often described as the \"rainforest of the sea,\" a vibrant, three-dimensional underwater city that thrives in warm, shallow tropical waters. It is not a single organism, but a complex ecosystem built by tiny animals called **coral polyps**. These polyps secrete hard calcium carbonate skeletons that, over centuries, form the massive, branching, brain-like, or plate-like structures we recognize as reefs.\n\n### The Structure and Beauty\nThe reef is a kaleidoscope of color and texture.\n"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=212",
+    "text": "A coral reef is often described as the \"rainforest of the sea,\" a vibrant, three-dimensional underwater city that thrives in warm, shallow tropical waters. It is not a single organism, but a complex ecosystem built by tiny animals called **coral polyps**. These polyps secrete hard calcium carbonate skeletons that, over centuries, form the massive, branching, brain-like, or plate-like structures we recognize as reefs.\n\n### The Structure and Environment\nReefs are typically found in clear, sunlit w"
+   },
+   "llama": "missing"
+  },
+  "long-018": {
+   "id": "long-018",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=0.99 ntok=200",
+    "text": "The air in the Athenaeum of Echoes did not smell of dust and decay, as libraries are supposed to. It smelled of ozone, wet ink, and the faint, metallic tang of electricity.\n\nElara adjusted her spectacles and walked down the central aisle, her footsteps muffled by the thick, velvet carpet. To the untrained eye, the Athenaeum looked like any other grand archive: towering shelves of mahogany, brass lamps casting warm pools of light, and rows upon rows of leather-bound volumes. But Elara knew the tr"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=0.97 ntok=217",
+    "text": "The air in the Athenaeum of Echoes did not smell of dust and decay, as libraries are supposed to. It smelled of ozone, wet ink, and the faint, metallic tang of electricity.\n\nElara adjusted her spectacles and walked down the central aisle, her footsteps muffled by the thick, velvet carpet. To the untrained eye, the Athenaeum looked like any other grand repository of knowledge: towering shelves of mahogany, brass lamps casting warm pools of light, and rows upon rows of leather-bound volumes. But E"
+   },
+   "llama": "missing"
+  },
+  "long-019": {
+   "id": "long-019",
+   "cat": "longgen",
+   "int4": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=155",
+    "text": "### Part 1: What is Photosynthesis?\n\n**Photosynthesis** is the biological process by which green plants, algae, and some bacteria convert light energy into chemical energy. It is the fundamental process that sustains life on Earth by producing the oxygen we breathe and the organic compounds (food) that form the base of the food chain.\n\n#### The Basic Equation\nThe overall chemical equation for photosynthesis is:\n\n$$6CO_2 + 6H_2O + \\text{Light Energy} \\rightarrow C_6H_{12}O_6 + 6O_2$$\n\nIn words:\n*"
+   },
+   "int8kv": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=155",
+    "text": "### Part 1: What is Photosynthesis?\n\n**Photosynthesis** is the biological process by which green plants, algae, and some bacteria convert light energy into chemical energy. It is the fundamental process that sustains life on Earth by producing the oxygen we breathe and the organic compounds (food) that form the base of the food chain.\n\n#### The Basic Equation\nThe overall chemical equation for photosynthesis is:\n\n$$6CO_2 + 6H_2O + \\text{Light Energy} \\rightarrow C_6H_{12}O_6 + 6O_2$$\n\nIn words:\n*"
+   },
+   "llama": "missing"
+  },
+  "retr-000": {
+   "id": "retr-000",
+   "cat": "retrieval",
+   "int4": "missing",
+   "int8kv": "missing",
+   "llama": "missing"
+  },
+  "retr-001": {
+   "id": "retr-001",
+   "cat": "retrieval",
+   "int4": "missing",
+   "int8kv": "missing",
+   "llama": "missing"
+  },
+  "retr-002": {
+   "id": "retr-002",
+   "cat": "retrieval",
+   "int4": "missing",
+   "int8kv": "missing",
+   "llama": "missing"
+  },
+  "retr-003": {
+   "id": "retr-003",
+   "cat": "retrieval",
+   "int4": "missing",
+   "int8kv": "missing",
+   "llama": "missing"
+  },
+  "retr-004": {
+   "id": "retr-004",
+   "cat": "retrieval",
+   "int4": "missing",
+   "int8kv": "missing",
+   "llama": "missing"
+  }
+ }
+}

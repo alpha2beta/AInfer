@@ -1,0 +1,29 @@
+{
+ "task": "T7.4-chunk-production-fullattn",
+ "date": "2026-09-12",
+ "harness": "tools/cmdlist/chunkattnreal_replay.cpp (ctest)",
+ "composition": "M=32 chunk at prefix P0=64, trunk layer 3 real weights: per-row norms + fp16 converts, 7 chunk GEMMs (DPAS INT4), per-row split/QK-norms, ChunkRope + ChunkKvAppend (NEW M-parallel kernels), ChunkAttn over BF16 prefix+chunk cache, o_proj + MLP, one list",
+ "new_kernels": [
+  "ChunkKvAppend (M*1024, disjoint slots)",
+  "ChunkRope (M*28, global pos)"
+ ],
+ "alignments": [
+  "ChunkAttn now BF16 KV (was float prototype; harness converted to qb pattern)",
+  "ChunkGemm partial-M guards (read+write) for MTP-verify M=2; launch ceil(M/32)"
+ ],
+ "harness_result": {
+  "device": "B60",
+  "layer": "full-attn chunked (real weights, layer 3)",
+  "chunk": 32,
+  "prefix": 64,
+  "runs": 2,
+  "replay_us": 33562.5,
+  "worst_rel": 0.000114,
+  "ref_tol": 0.001,
+  "guards_zero": true,
+  "reset_deterministic": true,
+  "chunkattnreal_ok": true
+ },
+ "debug": "first run failed on a harness-side guard bug (checked slot TC-1=95, which IS chunk slot m=31); re-scoped to prefix-slot integrity (bitwise)",
+ "verdict": "CHUNKATTNREAL-OK: worst-rel 1.14e-04, guards clean, deterministic, 32ms/chunk. Both layer classes proven chunked on real weights. Left: small-M verify primitive + loop integration."
+}

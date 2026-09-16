@@ -1,0 +1,21 @@
+{
+ "task": "T6.3-INT8-KV",
+ "date": "2026-09-12",
+ "design": "per-token symmetric INT8 K+V (dynamic row scales, uniform kernels, no calibration)",
+ "diagnostic": {
+  "tool": "tools/t63/diag_kvint8.py + kvcap.py (real K/V, 16 layers)",
+  "finding": "uniform per-token misses on random queries (4-7%%, K dominates via softmax amplification; finer groups don't help); peaked (realistic) regime ~5e-3 -> GO, e2e arbitrates",
+  "isolation": "K-only 4.25e-02, V-only 7.4e-03, K-per-channel 4.25e-02 (axes don't matter, granularity doesn't matter)"
+ },
+ "kernels": {
+  "KvAppendI8": "1 WI/head, row max-abs + round-half-away quant (matches Quantize kernel bit-exact)",
+  "AttnCoreI8": "AttnCore clone, int8 rows decoded as convert*row-scale (exact)",
+  "harness": "tools/cmdlist/attni8_replay.cpp (ctest): bitwise slots/scales, worst 8.94e-07, deterministic"
+ },
+ "loop": {
+  "wiring": "decode_l0 AINFER_KV8=1: int8 heaps (halves 64K KV 4->2 GiB) + fp32 scale rows, 16 layers rewired",
+  "quality_gate": "53/53 top-1 vs BF16 references across all 6 corpus prompts (p0-p5 9/9 vs BF16 loop; p1 8/8 vs full-BF16 truth; short [369,279,248046] identical incl. top-5 order)",
+  "verdict": "PASS \u2014 INT8 KV preserves greedy trajectories exactly on the measured corpus"
+ },
+ "postmortem": "first integration diverged everywhere: KvAppendI8 launched with KVW=1024 (copied BF16 pattern) but kernel is WI-per-head -> heap overflow 256x trashing neighbor slots. Caught by top-5 triage (20%% global logit shrink + reshuffle = systematic, not flip noise). Fixed launch=4 + in-kernel bounds guard (wrong counts now fail safe)."
+}

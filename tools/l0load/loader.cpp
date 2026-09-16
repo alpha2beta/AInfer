@@ -80,8 +80,26 @@ int main(int argc, char **argv) {
   uint64_t n;
   f.read((char *)&n, 8);
   uint64_t table_off = rd64(f);
-  (void)ver;
   (void)flags;
+  // T2.2: version gate (§11 — validation before allocation). Only v1 exists.
+  if (ver != 1) {
+    std::fprintf(stderr, "unsupported version %u\n", ver);
+    return 2;
+  }
+  // File size gates every span below (trailing 32 B SHA excluded, matching
+  // the Python validator and decode_l0's fsize-32 convention).
+  f.seekg(0, std::ios::end);
+  uint64_t fsize = (uint64_t)f.tellg();
+  f.clear();
+  if (table_off > fsize || 5 * 32 > fsize - table_off) {
+    std::fprintf(stderr, "section table out of range\n");
+    return 2;
+  }
+  // The directory cannot exceed the file: bounds n BEFORE entries(n).
+  if (n > fsize / 192 + 1) {
+    std::fprintf(stderr, "tensor count out of range\n");
+    return 2;
+  }
   // section 5 = tensor dir
   f.seekg((std::streamoff)(table_off + 4 * 32));
   f.seekg(4 + 8 + 8, std::ios::cur); // sid, off, bytes
@@ -101,6 +119,10 @@ int main(int argc, char **argv) {
   }
   if (dir_bytes != n * 192) {
     std::fprintf(stderr, "dir size mismatch\n");
+    return 2;
+  }
+  if (dir_off > fsize || dir_bytes > fsize - 32 - dir_off) {
+    std::fprintf(stderr, "dir span out of range\n");
     return 2;
   }
   std::vector<Entry> entries(n);
@@ -137,6 +159,16 @@ int main(int argc, char **argv) {
     (void)lt;
     (void)st;
     (void)group;
+    // T2.2: span-gate every tensor BEFORE any device allocation (§11).
+    // A hostile d_off/d_bytes previously reached arena sizing unchecked.
+    if (e.d_bytes == 0 || e.d_off > fsize || e.d_bytes > fsize - 32 - e.d_off) {
+      std::fprintf(stderr, "payload span out of range: %s\n", e.name);
+      return 2;
+    }
+    if (e.sc_bytes && (e.sc_off > fsize || e.sc_bytes > fsize - 32 - e.sc_off)) {
+      std::fprintf(stderr, "scale span out of range: %s\n", e.name);
+      return 2;
+    }
   }
   // verify dir CRC over raw bytes
   {

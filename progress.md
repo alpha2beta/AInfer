@@ -9,11 +9,11 @@
 
 ## 0. Meta
 
-- Last updated: 2026-09-10
+- Last updated: 2026-09-15
 - Updated by: assistant
-- Current focus: T6.1 profile-driven optimization of the adopted loop (Phase 5 complete 6/6, gate closed; stress 5/5 green)
-- Overall health: Green
-- Headline: Model pinned (Qwen3.8-27B@1d4bf0f, SafeTensors mirror validated); MTP confirmed; text-only v1, vision deferred
+- Current focus: no open engineering scope (all closed/deferred with triggers); perf follow-ups queued
+- Overall health: Green (Stamp 12: 45/45 CTest; T7.4 closed 5/5 needle; T7.2 re-deferred with numbers)
+- Headline: Stamp 12 45/45 (1122 s); MTP revisit: prompt-lookup dead (alpha~=0), MTP-head 2.5x-at-64K-only → re-defer; e2e 126 intact
 
 ### Verification Stamp
 
@@ -230,42 +230,174 @@
 > optional. Power/thermal telemetry remains unavailable on this box, so the
 > T6.4 report's energy entries stay explicitly empty.
 
+### Verification Stamp 10
+
+> ✅ **CHECKED — 2026-09-12 (post-Stamp-9 performance/feature-wave audit)**
+>
+> Audited everything added since Stamp 9: T2.2 closure (C++ loader hardening
+> + `l0negatives` 8/8 ctest + full-file recheck 866/866 on a quiet box),
+> T1.5 box-native quality (pilot 8/8, batch **47/48** top-1 across all 6
+> corpus prompts, sole miss a 0.4%-margin near-tie reorder within an
+> identical candidate set; llama SYCL cross-checks sane on all 5 batch
+> prompts), MTP (pooled alpha 0.624/93; draft slice MTPDRAFT-OK on real
+> weights, 6.4 ms, token exact; verify architecturally deferred with two
+> recorded impossibility results — single-position ratio ≤ 1.0 and small-M
+> DPAS efficiency), T6.3 closure (fusions declined by the measured rule;
+> per-token INT8-KV: diagnostic → kernels → harness → `AINFER_KV8=1` loop,
+> 53/53 vs BF16 references; found+fixed a 256x heap overflow from a copied
+> launch-count pattern — new standing rule: WI-per-head kernels get bounds
+> guards), T7.4 64K mechanics (loop at MAXCTX=65544 token-identical to
+> small sizing; device-side cache fill; RoPE-at-max vs HF; far-slot KV
+> bitwise; 4K scan correct) and real-weight chunk production for BOTH
+> layer classes (linear 4.52e-05, full-attn 1.14e-04, guards + determinism,
+> new ChunkRope/ChunkKvAppend kernels; ChunkGemm partial-M; ChunkAttn
+> promoted float→BF16), the vectorization round (ChunkSsmRecur 64x,
+> AttnCore micro-opts, hybrid GEMM-form: QK-DPAS + Ctrl-softmax + WV-DPAS +
+> ResAddF combine at 3.85 ms @4K, HYBRID-OK 2.19e-04), and X1/X2 closure
+> (two-tier gate defined and exercised: fast 33/33 ≈7.5 min, full suite
+> ~17 min; plan §13 and AGENTS drift corrected).
+>
+> Rebuilt from a visible configure and ran the complete B60 suite: **41/41
+> CTest passed** (1026.53 s). All 62 tool-side `report*.json` parse clean;
+> one pre-existing JSON artifact issue found and documented: `tools/http/
+> report_t73.json` carries two concatenated objects (a preamble+report
+> duplication from 2026-09-10, pre-dating this audit window) — parsed with
+> a raw_decode split; flagged for a follow-up merge fix, not an evidence
+> failure.
+>
+> Status-row corrections applied before stamping: the dashboard and phase
+> tables had drifted from tasks.md (Phase 4 done-by-supersession, T2.2/
+> T3.6/T6.3/X1/X2 closures, duplicate T6.2 row removed, "needs 64 GB host"
+> blockers replaced by the 2026-09-11 platform rule). Quality-tracking
+> table populated with the 47/48 result. `report_hybrid.json` extended with
+> the honest loop-integration status: the hybrid path is wired and
+> env-gated but **NOT quality-cleared** — on real data the L3 core stage
+> is elementwise wrong (device scores match CPU dots to 6.7e-02, but the
+> pre-gate WV output is structurally off: head-0 maxabs 0.80 vs 0.069,
+> mixed-sign elementwise mismatch from d=0) while every synthetic harness
+> passes; the bisection harnesses were reverted to their canonical form
+> after diagnosis and the TEMP-DIAG dump removed from decode_l0 (evidence
+> preserved in the report). The default loop remains untouched and
+> certified (41/41 with the hybrid code present but env-off).
+>
+> This stamp does **not** certify the hybrid attention path (explicitly
+> experimental and uncleared on real data), T7.4 production completion
+> (tiled rewrite + hybrid resolution remain), T1.4 full-model logits, or
+> the deferred MTP build.
+
+### Verification Stamp 11
+
+> ✅ **CHECKED — 2026-09-13 (post-Stamp-10 chunked-prefill / T3.7 close-out)**
+>
+> Audited everything added since Stamp 10: hybrid loop-verdict (OOB B-tile
+> N-guard; e2e 70-tok both reach `126<|im_end|>`; attn med +25% at decode T
+> → DEFER, GEMM-form redirected to prefill), T1.4 logits batch CLOSED
+> (6/6 prompts, INT4-vs-BF16 53/60, full `[T,V]` `.pt`), chunk GEMM-form
+> attention (ChunkQkGemm / ChunkSoftmaxRow / ChunkWvGemm: synthetic
+> CHUNKQKWV-OK 2.43e-04, real-weight CHUNKQKWVREAL-OK 1.68e-04, M=256
+> 2.21e-04), 64-layer orchestration CHUNK64-OK (1583 ms, bitwise, worst
+> 1.38e-02 accum-fitted), two-chunk CHUNK64MC-OK (A 1582 + B 1586 ms,
+> continuity + bitwise, worst 1.71e-02) + HANDOFF SLOT-OK (layer-3 Kn
+> snapshot == cache slots 32..63 bitwise), prefill arbitration 32/32
+> CLEAN on real ids, 64K needle corpus (5×65024), T3.7 CLOSED (all kernel
+> classes proven; production integration T7.4-owned). Four toolchain
+> traps recorded (`docs/toolchain.md`): arg-strip, NULL fill-pattern,
+> shared-buffer address-capture, in_proj_z V6-row mis-binning.
+>
+> Rebuilt the `b60` preset (oneAPI `setvars.sh` sourced — first ctest
+> attempt failed 14 SYCL targets on `libsycl.so.9` without it) and ran
+> the complete hardware suite: **45/45 CTest passed** (1126.91 s). Four
+> new tests since Stamp 10: `chunkqkwv_replay` 0.07 s, `chunkqkwvreal_replay`
+> 36.31 s, `chunk64real_replay` 19.42 s, `chunk64mc_replay` 48.18 s.
+> 67 tool-side `report*.json`: 66 parse clean; `tools/http/report_t73.json`
+> still carries a trailing `}` (Stamp 10 concatenated-objects family;
+> first object parses, leftover 1 byte) — not an evidence failure.
+> 44/44 `build-b60` ctest reports parse clean.
+>
+> Status-row corrections applied before stamping: T4.1/T4.4 progress-table
+> rows still showed `[~]` despite tasks.md `[x]` and Phase 4 5/5
+> done-by-supersession (Stamp 10 finding, not applied then). X1 fast-gate
+> exclusion list extended for the three new heavy tests. Phase 1 gate
+> note updated (T1.4 closed; T1.5 remains the only Phase-1 partial).
+>
+> This stamp does **not** certify T7.4 production completion (chunk
+> driver + cache import + 64K needle eval remain), hybrid as the default
+> decode path (deferred by measurement, env-gated), or the deferred MTP
+> build.
+
+### Verification Stamp 12
+
+> ✅ **CHECKED — 2026-09-15 (T7.4 production integration + 64K needle 5/5)**
+>
+> Audited everything added since Stamp 11: chunk64mc M/N generalization
+> (`CHUNK_M`/`CHUNK_N`, ctest contract intact) + stream mode
+> (`CHUNK_STREAM`, 64 live lists, stream≡validation bitwise) + resident
+> weights (upload-once, ctest bitwise identical, 3x faster) + decode-layout
+> state (bitwise); M=256/N=2 (8.65 s/chunk, T=512 ref 3.48e-03, SLOT-OK)
+> and N=8/M=256 + T=2048 ref CHUNK64MC-OK (1.42e-03, SLOT-OK; worst-rel
+> shrinks with scale); file-handoff path (dump + `--import-caches` +
+> `--ids-file` + question + `AINFER_STEPLOG` + stray-positional guard) with
+> VOID-9/9 postmortem and real-import verdict (2/9 then 0.00-margin
+> near-tie reroute); 64K needle eval **5/5 HIT** (v0 739521, v1 184963,
+> v2 502817, v3 926438, v4 317654 — each exact code + EOS in 8 tokens);
+> one transient device loss mid-campaign (CHECK hardened to `exit(1)`).
+> T7.4 CLOSED (all gates met; single-binary merge left as perf follow-up).
+>
+> Rebuilt the `b60` preset from a visible configure and ran the complete
+> hardware suite: **45/45 CTest passed** (1122.41 s). No new tests since
+> Stamp 11 (same 45). 71 tool-side `report*.json`: 70 parse
+> clean (`report_needle.json`, `report_prefill_arb.json`,
+> `report_handoff.json`, `report_chunk64mc_m256.json`,
+> `report_chunk64mc_n8.json` new); `tools/http/report_t73.json` still
+> carries the trailing `}` — pre-existing, not an evidence failure.
+> e2e 70-token rerun on the current `decode_l0` binary: 58 tokens,
+> has126=True, trajectory matches the certified pattern (import/question/
+> steplog/guard edits leave the default path untouched).
+>
+> Status-row corrections applied before stamping: T7.4 progress-table row
+> and Phase 7 dashboard updated to closed; T7.4 task status `[x]`.
+>
+> This stamp does **not** certify the deferred MTP build, hybrid as the
+> default decode path (deferred by measurement, env-gated), or the
+> single-binary prefill→decode merge (perf follow-up, file handoff is
+> the certified production path).
+
 ## 1. Dashboard
 
 | Phase | Scope | Done / Total | Status |
 | ----- | ----- | ------------ | ------ |
 | 0 - Environment & Foundations | T0.1-T0.5 | 5 / 5 | `[x]` |
-| 1 - Model Spec & Reference | T1.1-T1.6 | 4 / 6 (+2 partial) | `[~]` |
-| 2 - Container & Exporter | T2.1-T2.6 | 5 / 6 (+1 partial) | `[~]` |
-| 3 - Kernel Microbenchmarks | T3.1-T3.9 | 7 / 9 (+2 partial) | `[~]` |
-| 4 - End-to-End Runtime | T4.1-T4.5 | 3 / 5 (+2 partial) | `[~]` |
+| 1 - Model Spec & Reference | T1.1-T1.6 | 5 / 6 (+1 partial) | `[~]` |
+| 2 - Container & Exporter | T2.1-T2.6 | 6 / 6 | `[x]` |
+| 3 - Kernel Microbenchmarks | T3.1-T3.9 | 9 / 9 | `[x]` |
+| 4 - End-to-End Runtime | T4.1-T4.5 | 5 / 5 | `[x]` |
 | 5 - Static Scheduling & Memory | T5.1-T5.6 | 6 / 6 | `[x]` |
-| 6 - Performance Tuning | T6.1-T6.4 | 3 / 4 | `[~]` |
-| 7 - Optional Features | T7.1-T7.4 | 2 / 4 | `[~]` |
-| X - Cross-cutting | X1-X2 | 0 / 2 | `[ ]` |
+| 6 - Performance Tuning | T6.1-T6.4 | 4 / 4 | `[x]` |
+| 7 - Optional Features | T7.1-T7.4 | 3 / 4 (+1 deferred) | `[~]` |
+| X - Cross-cutting | X1-X2 | 2 / 2 | `[x]` |
 
 Next up:
 
-1. T6.1 (close-out) - optional small win: fuse KMax+Quantize into one launch to remove the last per-GEMV host sync pair (~5%); GEMV/tail micro-fusions rejected as sub-5%.
-2. T6.3 - the remaining actionable item is the quality arbiter (T1.5 corpus), which needs a 64 GB+ host; KV quantization gated behind it.
-3. T7.1 - configurable sampling (temperature/top-k/top-p) as the next feature, following the plan's greedy-first ordering.
+1. Perf follow-ups (not gates): single-binary prefill→decode merge, linear-list sharing across chunks, GEMM-form long-context decode.
+2. T7.2 reopen triggers (re-deferred 2026-09-15): production 64K decode traffic, chained-draft proof, 64K alpha confirmation.
+
+Current focus: no open engineering scope — all phases closed or deferred with recorded triggers.
 
 Blocked / waiting:
 
-- T1.4 logits/greedy, T1.5 metrics - need 64 GB+ machine with `qwen3_5` modeling code
-- (unblocked by move: T0.2/T0.3/T3.1/T1.6-alloc/T2.6 - B60 present)
+- None hardware-wise. T7.2 MTP verify re-deferred 2026-09-15 (prompt-lookup dead by measurement alpha~=0; MTP-head ~2.5x prize at 64K only, needs traffic + chained-draft proof + 64K alpha).
 
 ## 2. Phase Gates
 
 | Gate | Depends on | Status | Date | Evidence / Notes |
 | ---- | ---------- | ------ | ---- | ---------------- |
 | Phase 0: device identified, kernel runs, env reproducible | T0.1-T0.5 | `[x]` | 2026-09-07 | Toolchain pinned, probe/smoke/bench/loader all run on B60, reference baseline stored |
-| Phase 1: assumptions replaced, model fits with margin | T1.1-T1.6 | `[ ]` | YYYY-MM-DD |  |
-| Phase 2: model loads reproducibly, tensors verifiable | T2.1-T2.6 | `[ ]` | YYYY-MM-DD |  |
-| Phase 3: operators pass tests, roofline benchmarks exist | T3.1-T3.9 | `[ ]` | YYYY-MM-DD |  |
-| Phase 4: accepted outputs, stable repeated runs | T4.1-T4.5 | `[ ]` | YYYY-MM-DD |  |
+| Phase 1: assumptions replaced, model fits with margin | T1.1-T1.6 | `[~]` | 2026-09-13 | T1.6 proven; T1.4 logits batch CLOSED (53/60); T1.5 remains the only Phase-1 partial |
+| Phase 2: model loads reproducibly, tensors verifiable | T2.1-T2.6 | `[x]` | 2026-09-12 | 866/866 CRC + negatives 8/8 + full recheck green |
+| Phase 3: operators pass tests, roofline benchmarks exist | T3.1-T3.9 | `[x]` | 2026-09-13 | T3.7 closed (all kernel classes proven); all operators have verified kernels + roofline data |
+| Phase 4: accepted outputs, stable repeated runs | T4.1-T4.5 | `[x]` | 2026-09-10 | e2e 6/6; T4.1/T4.4 superseded by adopted loop |
 | Phase 5: no alloc or cmd-list construction in steady state | T5.1-T5.6 | `[x]` | 2026-09-10 | decode_l0: 66 recorded lists, zero per-token construction/allocation (T5.1-T5.3); control-only mutation (T5.4); 4 B token return (T5.5); stress 5/5 (T5.6) |
-| Phase 6: stable perf, explained by profiles, quality kept | T6.1-T6.4 | `[ ]` | YYYY-MM-DD |  |
+| Phase 6: stable perf, explained by profiles, quality kept | T6.1-T6.4 | `[x]` | 2026-09-12 | T6.1/T6.2/T6.4 done 2026-09-10; T6.3 fusions+INT8-KV closed 2026-09-12 |
 
 ## 3. Phase 0 — Environment and Foundations
 
@@ -284,8 +416,8 @@ Blocked / waiting:
 | T1.1 | Pin exact model and tokenizer revision | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `models/Qwen3.8-27B` (18/18 shards, headers valid); rev `1d4bf0f` | Gate A |
 | T1.2 | Generate architecture manifest | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `models/Qwen3.8-27B/manifest.json` v1.0; 1199 tensors, 100% index coverage, 14 sha256 | Deps: T1.1 |
 | T1.3 | Confirm or drop MTP/speculative heads | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `mtp_num_hidden_layers`=1, no dedicated embeddings | Gates T7.2 (existence unblocked) |
-| T1.4 | Capture numerical reference outputs | `[~]` | assistant | 2026-09-07 |  | `reference/`: operator fixtures, real-weight MLP-L0, 1199-tensor stats, tokenizer report; logits/greedy blocked (no full-model run on this PC) | Deps: T1.1; Gate D |
-| T1.5 | Capture quality baseline | `[~]` | assistant | 2026-09-07 |  | `reference/corpus_t15.json` committed (6 prompts + ids); metric run blocked | Deps: T1.1 |
+| T1.4 | Capture numerical reference outputs | `[x]` | assistant | 2026-09-07 | 2026-09-13 | block HF refs + 6-prompt logits batch (53/60 INT4 top-1, full [T,V] BF16 .pt per prompt) | Deps: T1.1; Gate D; re-scoped box-native 2026-09-11 |
+| T1.5 | Capture quality baseline | `[~]` | assistant | 2026-09-07 |  | pilot 8/8 + batch 39/40 = 47/48 top-1 all 6 prompts (`report_pilot.json`, `report_batch.json`) | Deps: T1.1; re-scoped box-native 2026-09-11 |
 | T1.6 | Compute and verify memory budget | `[x]` | assistant | 2026-09-07 | 2026-09-07 | Budget FITS + proven: 14.5/0.39 GiB arenas allocated on B60 (T2.6) | Deps: T1.2, T0.2; Gate C |
 
 Key pins (T1.1 done 2026-09-07):
@@ -301,7 +433,7 @@ Key pins (T1.1 done 2026-09-07):
 | Task | Title | Status | Owner | Started | Finished | Evidence | Notes |
 | ---- | ----- | ------ | ----- | ------- | -------- | -------- | ----- |
 | T2.1 | Define `.binfer` container format | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `docs/binfer_spec.md` v1.0; 866-entry dir, reject rules = T2.2 hooks | Deps: T1.2 |
-| T2.2 | Implement strict container loader | `[~]` | assistant | 2026-09-07 |  | Python ref: real file VALID, 6/6 negatives pass; C++ port pending | Deps: T2.1 |
+| T2.2 | Implement strict container loader | `[x]` | assistant | 2026-09-07 | 2026-09-12 | C++ loader + `l0negatives` 8/8 ctest; span/version gates pre-alloc; full recheck 866/866 | Deps: T2.1 |
 | T2.3 | Implement deterministic INT4 quantizer | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `.binfer` 15,978,603,616 B, sha `5ef77c12…`, 505 tensors, worst err 0.1053 | Deps: T1.4, T2.1 |
 | T2.4 | Tensor packing and layout (baseline) | `[x]` | assistant | 2026-09-07 | 2026-09-07 | layout-0 tensor round-trip + loader CRC; old 0.00171 MLP claim superseded | Deps: T2.3 |
 | T2.5 | Conversion report | `[x]` | assistant | 2026-09-07 | 2026-09-07 | `conversion_report.json` (866 tensors, worst-10, sha) | Deps: T2.3 |
@@ -316,8 +448,8 @@ Key pins (T1.1 done 2026-09-07):
 | T3.3 | Select INT4 layout/swizzle from data | `[x]` | assistant | 2026-09-08 | 2026-09-08 | layout-0 selected (limiter is ALU, not layout); UR4 + DPAS-broadcast rejected | Deps: T3.2 |
 | T3.4 | Prefill linear kernels (tiled GEMM) | `[x]` | assistant | 2026-09-08 | 2026-09-08 | DPAS GEMM correct (1e-6); MT4 2x to 4.3 TFLOPS; DPAS-engagement queued for T6.1 | Deps: T3.1, T2.4 |
 | T3.5 | RMSNorm and residual ops | `[x]` | assistant | 2026-09-08 | 2026-09-08 | plain+fused exact (1e-7); fused saves a pass; 456/387 GB/s | Deps: T3.1 |
-| T3.6 | RoPE and KV writes | `[~]` | assistant | 2026-09-08 |  | RoPE max 2.38e-07; KV boundary/max-context + explicit fused-write kernel pending | Deps: T3.5, T1.2 |
-| T3.7 | Attention kernels (prefill + decode) | `[~]` | assistant | 2026-09-08 |  | decode GQA e2e 1.28e-06; SSM decode proven (conv 1.75e-10, recurrent 2.98e-10); 48h vectorize + prefill-tiled + KV-quant pending | Deps: T3.6 |
+| T3.6 | RoPE and KV writes | `[x]` | assistant | 2026-09-08 | 2026-09-11 | RoPE 2.38e-07 + at-max vs HF + far-slot bitwise (`report_64k.json`); INT8/BF16 KV writers proven | Deps: T3.5, T1.2 |
+| T3.7 | Attention kernels (prefill + decode) | `[x]` | assistant | 2026-09-08 | 2026-09-13 | all kernel classes proven (scan + GEMM chunk, 64-layer orch, arb 32/32); production integration T7.4-owned | Deps: T3.6 |
 | T3.8 | MLP and elementwise fusion | `[x]` | assistant | 2026-09-08 | 2026-09-08 | silu-mul fused 4x; 12-variant ablation: keep sym-g128, arbiter is e2e quality | Deps: T3.2, T3.5 |
 | T3.9 | Sampling primitives (argmax) | `[x]` | assistant | 2026-09-08 | 2026-09-08 | 5/5 fixtures PASS; 4-byte host xfer; first-max ties | Deps: T3.1 |
 
@@ -325,10 +457,10 @@ Key pins (T1.1 done 2026-09-07):
 
 | Task | Title | Status | Owner | Started | Finished | Evidence | Notes |
 | ---- | ----- | ------ | ----- | ------- | -------- | -------- | ----- |
-| T4.1 | Assemble single transformer block | `[~]` | assistant | 2026-09-08 |  | CPU wiring exact (0.00) both types vs HF decoder; device INT4 wiring pending | Deps: T3.2, T3.5-T3.8 |
+| T4.1 | Assemble single transformer block | `[x]` | assistant | 2026-09-08 | 2026-09-10 | CPU wiring exact (0.00); device superseded by T4.2 + recorded layer ports | Deps: T3.2, T3.5-T3.8 |
 | T4.2 | Assemble full forward pass | `[x]` | assistant | 2026-09-08 | 2026-09-08 | device loop VALIDATED: top-4 == BF16 in order, per-layer 1-2% vs HF; coherent gen + EOS | Deps: T4.1, T2.6 |
 | T4.3 | Integrate tokenizer | `[x]` | assistant | 2026-09-08 | 2026-09-08 | 14/14 exact vs HF; 33 specials + template parity | Deps: T1.1 |
-| T4.4 | CLI generation loop | `[~]` | assistant | 2026-09-08 |  | loop proven vs reference (determinism, stopping, timings); native backend pending T4.2 | Deps: T4.2, T4.3, T3.9 |
+| T4.4 | CLI generation loop | `[x]` | assistant | 2026-09-08 | 2026-09-10 | reference loop + native backend via T5.3 loop adoption | Deps: T4.2, T4.3, T3.9 |
 | T4.5 | End-to-end correctness tests | `[x]` | assistant | 2026-09-08 | 2026-09-09 | 6/6 (`report_t45.json`): matched-template 126 == llama, edges, determinism, negatives | Deps: T4.4 |
 
 ## 8. Phase 5 — Static Scheduling and Memory Optimization
@@ -348,8 +480,7 @@ Key pins (T1.1 done 2026-09-07):
 | ---- | ----- | ------ | ----- | ------- | -------- | -------- | ----- |
 | T6.1 | Profile-driven bottleneck optimization | `[x]` | assistant | 2026-09-10 | 2026-09-10 | 0.424 -> 0.068 s/token via SSM+norm opts; GEMV wall documented | Deps: T5.6 |
 | T6.2 | Decode/prefill sweep tuning | `[x]` | assistant | 2026-09-10 | 2026-09-10 | linear flat 1.03 ms (SSM O(1)); attn 1.01->3.17 ms with T; 14.7 t/s at parity with llama baseline | Deps: T6.1 |
-| T6.2 | Decode/prefill sweep tuning | `[ ]` |  | YYYY-MM-DD | YYYY-MM-DD |  | Deps: T6.1 |
-| T6.3 | Justified fusions and KV quantization | `[~]` | assistant | 2026-09-09 |  | per-group-128 acts implemented+validated (2.2x err cut); MAXCTX/OOB root-caused under this task; fusions+KV-quant remain | Deps: T6.1, T1.5 |
+| T6.3 | Justified fusions and KV quantization | `[x]` | assistant | 2026-09-09 | 2026-09-12 | fusions declined (T6.1 rule); INT8-KV done: `report_kvint8.json`, ATTNI8-OK, loop 53/53 | Deps: T6.1, T1.5 (box-native) |
 | T6.4 | Reproducible benchmark report | `[x]` | assistant | 2026-09-10 | 2026-09-10 | `tools/bench/report_t64.json` + Metrics Log; staged targets judged (3/5) | Deps: T6.2 |
 
 ## 10. Phase 7 — Optional Features
@@ -357,16 +488,16 @@ Key pins (T1.1 done 2026-09-07):
 | Task | Title | Status | Owner | Started | Finished | Evidence | Notes |
 | ---- | ----- | ------ | ----- | ------- | -------- | -------- | ----- |
 | T7.1 | Configurable sampling | `[x]` | assistant | 2026-09-10 | 2026-09-10 | 14/14 sampler tests + wired flags; seed-determinism proven, greedy default kept | Deps: T4.4 |
-| T7.2 | MTP / speculative verification | `[ ]` |  | YYYY-MM-DD | YYYY-MM-DD |  | Deps: T1.3 (done — 1 layer), T4.2; gated on acceptance measurements |
+| T7.2 | MTP / speculative verification | `[~]` | assistant | 2026-09-10 |  | alpha 0.624/93; draft 6.4ms; revisit 2026-09-15: prompt-lookup alpha~=0 (dead), MTP-head ~2.5x at 64K only — re-deferred with triggers (`report_mtp_revisit.json`) | Deps: T1.3, T4.2 |
 | T7.3 | OpenAI-compatible HTTP daemon | `[x]` | assistant | 2026-09-10 | 2026-09-10 | real SSE streaming verified (join == full); determinism + error paths; single-flight | Deps: T4.4, T6.4 |
-| T7.4 | Extended contexts / batching | `[~]` | assistant | 2026-09-10 |  | scoped: 64K contexts; batching + sliding-window dropped; blockers = BF16 KV + chunked prefill | Deps: T5.1, T6.2; separately scoped |
+| T7.4 | Extended contexts / batching | `[x]` | assistant | 2026-09-10 | 2026-09-15 | production driver + file handoff + needle 5/5 HIT (`report_needle.json`); single-binary merge = perf follow-up | Deps: T5.1, T6.2 |
 
 ## 11. Cross-Cutting Tracks
 
 | Task | Title | Status | Owner | Started | Finished | Evidence | Notes |
 | ---- | ----- | ------ | ----- | ------- | -------- | -------- | ----- |
-| X1 | Continuous verification suite | `[ ]` |  | YYYY-MM-DD | YYYY-MM-DD |  | Deps: T1.4 |
-| X2 | Documentation and reproducibility | `[ ]` |  | YYYY-MM-DD | YYYY-MM-DD |  | Deps: T0.1 |
+| X1 | Continuous verification suite | `[x]` | assistant | 2026-09-12 | 2026-09-13 | two-tier gate: fast excludes 8 heavy tests; full 45/45 (1127 s, Stamp 11) | Deps: T1.4 |
+| X2 | Documentation and reproducibility | `[x]` | assistant | 2026-09-12 | 2026-09-12 | plan/AGENTS audited 2026-09-12; toolchain.md carries standing quarantines | Deps: T0.1 |
 
 ## 12. Metrics Log
 
@@ -381,7 +512,7 @@ Quality tracking (T1.5, T6.3):
 
 | Date | Corpus / Metric | Reference score | Current score | Delta | Notes |
 | ---- | --------------- | --------------- | ------------- | ----- | ----- |
-| YYYY-MM-DD |  |  |  |  |  |
+| 2026-09-12 | 6-prompt greedy top-1 (streamed-CPU BF16 truth vs recorded loop) | BF16 trajectories | 47/48 top-1; top-5 sets 3-5/5/step | -1 (p2 0.4%-margin near-tie reorder) | `tools/t15/report_batch.json`; INT8-KV variant also 53/53 (`report_kvint8.json`) |
 
 ## 13. Decisions
 
@@ -408,7 +539,13 @@ Newest first. One line per meaningful status change.
 
 | Date | Change |
 | ---- | ------ |
-| 2026-09-11 | OPT3 vectorize DONE: ChunkSsmRecur 64x, AttnCore 6-10x, ChunkAttn 15x; extractor esimd-shadow trap + BF16-convert trap caught by harnesses. 33/33 CTest, stress 5/5 (cpu-wait re-instrumented, TOP5=0 real). 126 survives; short flips at known near-tie. Next: KV-blocking + list fusion. |
+| 2026-09-13 | Verification Stamp 11: post-Stamp-10 chunked-prefill / T3.7 close-out — 45/45 CTest (1127 s), 66/67 reports parse (t73 trailing `}`), T4.1/T4.4 table drift fixed, X1 exclusions extended. Does not certify T7.4 production completion, hybrid as default, or MTP. |
+| 2026-09-12 | Verification Stamp 10: post-Stamp-9 wave audit — 41/41 CTest (1026 s), 62 reports parse, dashboard/tables synced, hybrid integration honestly marked uncleared. Does not certify hybrid path, T7.4 completion, T1.4 logits, or deferred MTP build. |
+| 2026-09-12 | Hybrid attention DONE (synthetic): QK+WV DPAS + softmax vs identical ref, 5.3→3.85 ms @4K with vector softmax + K-split; 64K recalibrated ≈5 t/s (softmax floor). GQA-/16-/stale-binary/double-offset postmortems recorded. |
+| 2026-09-12 | X1/X2 closed: two-tier gate (fast 33/33 in 7.5min, full ~15min); plan/AGENTS drift fixed; l0load full-file recheck passed (866/866). T2.2 fully shut. |
+| 2026-09-12 | T6.3 INT8-KV DONE: per-token symmetric, ATTNI8-OK, loop 53/53 vs BF16 refs (64K KV 4→2 GiB). Found+fixed 256x heap overflow (launch-count/bounds-guard lesson). MTP verify: single-position impossible, small-M chunk uneconomical — MTP deferred architecturally (batching). |
+| 2026-09-11 | T2.2 closed: C++ loader hardened (version + span gates pre-alloc) + 8/8 negatives ctest. Full-file recheck deferred to quiet box (OOM under torch batch). T4.1/T4.4 marked done (superseded by adopted loop). T1.5 batch (5 prompts) + MTP confirmatory + llama cross-checks launched in background. |
+| 2026-09-11 | OPT3 extended: micro-opts (fold-tree + vector exp) add 1.6-2.9x; short trajectory restored to [369,279,248046]. KV-blocking measured and declined (traffic 2% of time); tiled rewrite queued. Next: list fusion. |
 | 2026-09-11 | T1.5 pilot PASS: streamed-CPU BF16 greedy vs loop INT4 agree top-1 8/8, top-5 sets 4-5/5 ("To solve 84 * "); llama cross-check correct toward 126. First end-to-end quality number; pipeline box-native (~25 min/prompt), batch of 5 left. |
 | 2026-09-11 | PLATFORM RULE: no 64 GB+ host coming — all "needs bigger machine" framings dropped. T1.4/T1.5 re-scoped to box-native (streamed-CPU BF16 greedy = truth, loop = system, llama SYCL = cross-check); T6.3/T7.2 gates and T7.4 quality reframed the same way. |
 | 2026-09-11 | T7.4 64K validated: real loop at MAXCTX=65544 token-identical to small sizing; device-fill zero-init; RoPE-at-max vs HF, far-slot KV bitwise, AttnCore correct to 4K. Left: production hardening (vectorize) + quality vs box-native T1.5 corpus. |
@@ -480,4 +617,27 @@ Newest first. One line per meaningful status change.
 | 2026-09-07 | T1.6 calc done: `memory_budget.json` v1.0 — scenario A total ~17.28 GiB, margin ~6.7 GiB, FITS 24 GB; L0 validation pending B60. |
 | 2026-09-07 | T1.2 done: `models/Qwen3.8-27B/manifest.json` v1.0 (1199 tensors, full index coverage, tensor bytes = index total 51.75 GiB). |
 | 2026-09-07 | Pinned Qwen3.8-27B@1d4bf0f (T1.1 done, T1.3 MTP confirmed, T1.2 in progress); plan/tasks updated for hybrid arch, text-only v1, hybrid memory formula; GGUF demoted to baseline-only. |
+| 2026-09-13 | T7.4 hybrid loop-verdict: OOB B-tile guard fix (non-monotonic crash signature resolved, all MAXCTX clean); e2e 70-tok 59-vs-58 both reach 126 (25-step identical, step-25 near-tie reroute); profile attn med 1.195 vs 0.959 ms (+25%) → DEFER for decode, GEMM-form redirected to chunked prefill. Report/tasks/dashboard updated. |
+| 2026-09-13 | T7.4 chunk-GEMM attention: ChunkQkGemm/ChunkSoftmaxRow/ChunkWvGemm + synthetic CHUNKQKWV-OK (2.43e-04) + real-weight CHUNKQKWVREAL-OK (1.68e-04, guards + determinism) + M=256 scaling (2.21e-04, 64K prefill ~43 min). Arg-strip toolchain lesson recorded. |
+| 2026-09-13 | T1.4 CLOSED: logits batch all 6 prompts (fwd_batch_t14.py, ~57 min background): INT4-vs-BF16 top-1 53/60, full [T,V] BF16 logits .pt per prompt + fwd_T14_batch.json. Divergences mid/late positions (P1 pos 3-4 earliest); margins open. Phase 1 now 5/6. |
+| 2026-09-13 | T7.4 64-layer orchestration on device: M=32/P=0 chunk through 64 real-weight layers, 64 recorded lists, 1583 ms, FINITE, BITWISE determinism 3/3 identical. Shared-buffer + fill-pattern traps fixed (toolchain.md). Float-ref CHUNK64-OK (worst 1.38e-02 accum-fitted, mean 1.5e-04). |
+| 2026-09-13 | T7.4 multi-chunk on device first try: 128 lists, A 1581.7 + B 1585.7 ms with carried state, FINITE, continuity proven, BITWISE. T=64 ref CHUNK64MC-OK (worst 1.71e-02, mean 1.46e-04) + HANDOFF SLOT-OK (chunk appends land in decode slot addressing, bitwise). |
+| 2026-09-13 | Prefill arbitration 32/32 CLEAN (real-id chunk-B + BF16 head vs INT4 chain; 0 misses) + 64K needle corpus (5x65024, round-trip verified) + production integration spec recorded. T3.7 CLOSED (all kernel classes proven; integration T7.4-owned). Phase 3 now 9/9. Stamp HELD per instruction. |
+| 2026-09-13 | HANDOFF path built (dump + --import-caches + --ids-file + question + AINFER_STEPLOG) but first 9/9 claim RETRACTED as VOID (flag misparse, both runs loop-decoded). Real import verified: banner + step-63 start, 2/9 then 0.00-margin near-tie reroute (documented class). Production path: stream + resident (3x) + decode-layout (bitwise) + M=256/N=2 + N=8 + T=2048 ref CHUNK64MC-OK (1.42e-03). 64K needle v2 prefill running (254x256 stream). |
+| 2026-09-13 | 64K NEEDLE v2 HIT: 254x256 stream prefill (~80 min, 11.9->26.8 s/chunk O(W) growth) + import + question -> exactly "502817" + EOS (8 tokens). First 64K retrieval end-to-end. Earlier 42-min silence was USB contention (ref streaming shards), not compute; decode at 65K ~2 s/step. |
+| 2026-09-14 | Needle 5/5 chain launched (`tools/t74/needle_chain.sh`: variants 0/1/3/4 embed done; prefill->import-decode->check each, dumps cleaned between; ~5.5 h). |
+| 2026-09-14 | Needle chain v1 postmortem: v0 prefill OK but dumps died on full tmpfs (4.4 GB > 3.1 GB free -> short write rc=1); v1 prefill SIGKILLed rc=137 (cause undetermined, likely OOM/tmpfs pressure); chain raced on silently (no guards). Fixed: dumps -> /mnt/usb, fail-fast guards, per-variant cleanup. Redoing 0/1/3/4 hardened (v2 chain running). Lessons: pgrep -f self-matches (verify via /proc scan); buffered stdout lies about pace. |
+| 2026-09-14 | Needle v0 HIT (depth 0%, code 739521, 8 tokens): hardened chain works end-to-end (prefill ~82 min + decode + check + cleanup). 2/5 depths HIT (v0, v2). Variants 1/3/4 running (~4 h). |
+| 2026-09-14 | Needle v1 HIT (depth 25%, code 184963, 8 tokens). 3/5 depths HIT (v0, v1, v2). Variants 3/4 running. |
+| 2026-09-15 | Needle v3 HIT (depth 75%, code 926438, 8 tokens) after clean 254/254 rerun (zero L0 errors — device loss was transient). 4/5 depths HIT. Variant 4 (100% depth) running. |
+| 2026-09-15 | Needle v4 HIT (depth 100%, code 317654, 8 tokens). 5/5 depths HIT — T7.4 quality gate passed (`tools/t74/report_needle.json`). T7.4 CLOSED. |
+| 2026-09-15 | Verification Stamp 12: production-integration audit — 45/45 CTest (1122 s), 70/71 reports parse (t73 pre-existing), e2e 58 tokens has126 intact, T7.4 closed. Does not certify MTP, hybrid-as-default, or single-binary merge. |
+| 2026-09-15 | Needle v3 device-loss postmortem: first fence-sync failure ~chunk 177, then every L0 call failed; exec-lambda `return 1` continued the run instead of aborting (19h cascade+spin at 100% CPU). Fixed CHECK to `exit(1)` + rebuilt; GPU healthy in fresh process (CHUNKQKWV-OK 2.43e-04). Fail-fast chain guard worked (PREFILL FAILED, no silent skip). Relaunched v3/v4. |
+| 2026-09-15 | T7.2 MTP revisit: prompt-lookup drafts alpha 0/65 on repetitive continuation vs loop truth (draftable <=2/65; 95% upper ~0.046 << 0.6 gate) — DEAD at every context length. MTP-head (alpha 0.624 stands): verify model C(8,65K)~1.7s (1.09 fixed measured + 0.57 attention slope) vs 8x1.65s sequential → E=2.62, ~2.5x prize AT 64K ONLY (short-context 0.24x loss). RE-DEFERRED with triggers (64K traffic + chained-draft proof + 64K alpha); `tools/t72/report_mtp_revisit.json`. No open engineering scope remains. |
+| 2026-09-15 | Single-binary merge DONE (`decode_l0 --prefill-chunks`): shared-arenas chunk prefill + loop in one process; bitwise vs harness, default e2e intact, 64K needle v2 in-process HIT (`502817`+EOS, `tools/t74/report_merge.json`). Recommended production path. |
+| 2026-09-16 | Verification Stamp 13: full `ctest --preset b60` post-merge 45/45 green (1133.8 s), 0 failed. Merge change certified regression-free. |
+| 2026-09-16 | T8.1 DONE: `STATUS.md` created (supported config, runtime paths, quality/perf snapshots, experimental/deferred, known issues, Stamp 13); Phase 8 (T8.1–T8.11) added to `tasks.md`, T8.7 recorded done. |
+| 2026-09-16 | T8.2 DONE: fixed `tools/http/report_t73.json` (extra `}`) — 91/91 strict-parse; new ctest `reports_json` (0.08 s, FAST tier) via `tools/validate_reports.py`; suite now 46 tests. Gate A bullet 1 met. |
+| 2026-09-16 | T8.3 DONE: `reference/weight_stats_v2.json` (v1 kept) — 136/136 anomalies classified under documented peer robust-z rule (61 architectural keep_bf16, 64 vision rejected, 11 quant-sensitive; 0 suspected corruption). |
+| 2026-09-16 | T8.4 DONE: tokenizer parity 27/27 (fixed real StrictUndefined gap for assistant-without-tool_calls) + pinned `golden_t44.json` GOLDEN-OK 25/25 + ctest `tokenizer_golden`; suite now 47 tests. Manifest sha256 verified for all 5 tokenizer assets; crc32.txt ruled out as content gate. |
 | YYYY-MM-DD | Initialized `progress.md` from `tasks.md`; all tasks pending. |

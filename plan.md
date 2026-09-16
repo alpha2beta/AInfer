@@ -433,8 +433,8 @@ Exit criteria: performance is stable, explained by profiles, and does not compro
 ## 13. Immediate Next Actions
 
 1. ~~Confirm and pin the exact Qwen model and tokenizer revisions.~~ DONE 2026-09-07.
-2. Generate the architecture manifest file and exact hybrid memory budget (T1.2/T1.6).
-3. Pin the Intel software stack and run the Level Zero/ESIMD capability probe.
-4. Capture reference logits, greedy outputs, and quality samples against the pinned SafeTensors.
-5. Measure sustainable bandwidth and dispatch overhead on the B60.
-6. Use those results to select the first INT4 layout and decode GEMV design.
+2. ~~Generate the architecture manifest file and exact hybrid memory budget (T1.2/T1.6).~~ DONE 2026-09-07.
+3. ~~Pin the Intel software stack and run the Level Zero/ESIMD capability probe.~~ DONE 2026-09-07 (T0.1-T0.3).
+4. ~~Capture reference logits, greedy outputs, and quality samples against the pinned SafeTensors.~~ DONE box-native 2026-09-11/12 (T1.4/T1.5: streamed-CPU BF16 greedy vs loop, 47/48 top-1; no bigger host per platform rule).
+5. ~~Measure sustainable bandwidth and dispatch overhead on the B60.~~ DONE 2026-09-07 (T3.1: ~437 GB/s roof).
+6. ~~Use those results to select the first INT4 layout and decode GEMV design.~~ DONE 2026-09-08 (T3.2/T3.3: layout-0, dp4a-i8).

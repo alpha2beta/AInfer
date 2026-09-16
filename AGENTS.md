@@ -53,6 +53,12 @@ vision encoder **deferred**). Target HW is Intel Arc Pro B60 (`8086:e211`, Battl
 - `reference/` — operator fixtures, real-weight MLP-L0, 1199-tensor stats, tokenizer finding
   (chat markup needs added-token registration from `tokenizer_config.json`), staged T1.4/T1.5
   prompts. Do not regenerate casually (full pass streams 55 GB).
+- `tools/cmdlist/` — all device kernels (`kernels.cpp`) + SPIR-V extraction
+  (`extract_spv.py`: content-selected modules, ESIMD images preferred) + replay
+  harnesses, one per kernel/layer class (`ctest --preset b60`).
+- `tools/decode/decode_l0.cpp` — the native recorded-loop backend (66 lists;
+  env: `AINFER_MAXCTX` grow-only, `AINFER_TOP5=0` token-only, `AINFER_KV8=1`
+  INT8 KV, `AINFER_PROFILE=1`).
 - Generated artifacts live next to the model: `manifest.json`, `memory_budget.json`,
   `conversion_report.json`, `*.binfer`.
 
