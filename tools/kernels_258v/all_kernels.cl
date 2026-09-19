@@ -1393,6 +1393,48 @@ __kernel void argmax_stage2_ctrl(
     }
 }
 
+__kernel void argmax_stage2_ptr(
+    __global const float * restrict stage1_max_vals,
+    __global const uint * restrict stage1_max_indices,
+    __global int * restrict out_token,
+    uint num_groups
+) {
+    int tid = get_local_id(0);
+    __local float s_vals[256];
+    __local uint s_idxs[256];
+
+    float local_max = -1e30f;
+    uint local_idx = 0xFFFFFFFF;
+
+    for (uint i = tid; i < num_groups; i += 256) {
+        float v = stage1_max_vals[i];
+        uint idx = stage1_max_indices[i];
+        if (v > local_max || (v == local_max && idx < local_idx)) {
+            local_max = v;
+            local_idx = idx;
+        }
+    }
+
+    s_vals[tid] = local_max;
+    s_idxs[tid] = local_idx;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int s = 128; s > 0; s >>= 1) {
+        if (tid < s) {
+            if (s_vals[tid + s] > s_vals[tid] || (s_vals[tid + s] == s_vals[tid] && s_idxs[tid + s] < s_idxs[tid])) {
+                s_vals[tid] = s_vals[tid + s];
+                s_idxs[tid] = s_idxs[tid + s];
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (tid == 0) {
+        *out_token = (int)s_idxs[0];
+    }
+}
+
+
 __kernel void moe_gateup_all8_ctrl(
     __global float * restrict all_gu,         // [8, 1024] = [8192]
     __global const uchar * restrict w_bank,   // [256, 1024, K/2]
@@ -2566,6 +2608,22 @@ __kernel void resadd_batch(
     if (gid >= count) return;
     out[gid] = a[gid] + b[gid];
 }
+
+// Concat two vectors of length N into Out of length 2*N (MTP embedding + hidden fusion)
+__kernel void concat2(
+    __global float * restrict out,
+    __global const float * restrict a,
+    __global const float * restrict b,
+    int N
+) {
+    int gid = get_global_id(0);
+    if (gid < N) {
+        out[gid] = a[gid];
+    } else if (gid < 2 * N) {
+        out[gid] = b[gid - N];
+    }
+}
+
 
 
 

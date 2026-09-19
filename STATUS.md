@@ -1,6 +1,6 @@
 # AInfer — Current Status (release truth)
 
-> Single-source current state. Updated 2026-09-19 (Phase 8 Passed, Gate M7 Signed Off; 47/62 tasks done).
+> Single-source current state. Updated 2026-09-19 (Phase 8 Passed, Gate M7 Signed Off, T10.1 MTP Complete; 48/62 tasks done).
 > `progress.md` is the engineering log; this file is the release overview.
 > If they disagree, this file wins — fix the other one.
 
@@ -67,7 +67,7 @@
 
 | Feature | State | Reopening Criteria |
 |---|---|---|
-| Multi-Token Prediction (MTP) | **Deferred** | Checkpoint contains usable MTP weights AND verification cost is justified by measured speedup on target contexts |
+| Multi-Token Prediction (MTP) | ✅ **Implemented & Evaluated (T10.1)** | Verified on Arc 140V: 19 MTP weights in pinned `.binfer`, dedicated 2 MiB KV cache, 3.256 ms draft latency (10.9% of trunk), pooled alpha = 67.50%, projected speedup 1.44x, bit-exact determinism (`tools/mtp/report_mtp_258v.json`) |
 | Vision Encoder | **Deferred** | Text-only v1 runtime stabilized; explicit multi-modal release scheduled |
 | Continuous Batching | **Dropped** | Batch size 1 explicit by design contract |
 | File-Based Cache Handoff | **Diagnostic only** | Production path is strictly unified in-memory prefill $\to$ decode |
@@ -99,6 +99,9 @@
 **Chunked Batched Prefill Optimization Stamp (2026-09-19):** Engineered 18 dedicated batched OpenCL SPIR-V kernels (`int4_gemm_prefill`, `deltanet_recurrent_batch`, `gqa_attn_prefill_batch`, `moe_gateup_all8_batch`, etc.), chunked Level Zero command list recording (`cmd_prefill_chunk_[B]` and `cmd_prefill_tail_[B]`), and zero-allocation workspace arena sub-allocation. Identified and resolved root cause of DeltaNet numerical recurrence divergence in `gate_prep_batch` (missing outer `exp(gate)` exponential decay). Standardized benchmark harness (`run_benchmark_t71.py`, `report_bench_t71.json`) confirms prefill throughput doubled from **39.32 tok/s to 78.92 tok/s** (+101% speedup), scaling up to **89.31 tok/s** at $B=32$ (2.27x speedup, `report_prefill_scaling.json`). Warm TTFT for 21 tokens halved from **534.04 ms down to 266.17 ms** (-50.2%). Prefill throughput gap to llama.cpp Vulkan closed to **92.6% parity** (87.62 tok/s vs 94.59 tok/s @ $P=64$). 100% bit-exact golden parity sequence (`[148431, 62497, 148287, 198, ...]`), 0 KB runtime heap growth, and 18.03 GiB static unified memory commitment preserved. Comparative benchmark (`report_llama_comparison.json`) updated with sustained decode 34.34 tok/s (1.17x faster than llama.cpp Vulkan) and prefill 78.92 tok/s.
  
 **Hardware DPAS Systolic GEMM & Long-Prompt Verification Stamp (2026-09-19):** Audited and adopted Intel Xe2 native DPAS matrix multiplication (`intel_sub_group_f16_f16_matrix_mad_k16`) into primary runtime pipeline (`tools/kernels_258v/all_kernels.cl`), closing task T1.4 (`[x]`). Implemented long-prompt multi-chunk verification suite (T5.7), proving 100% bit-exact parity across chunk boundaries at P=128 (4 chunks) and P=256 (8 chunks). Re-benchmarked runtime: standard prefill increased to **88.49 tok/s** (scaling to **89.73 tok/s** at B=32), warm TTFT reduced to **237.33 ms** (55.6% total reduction from baseline), and sustained decode increased to **35.54 tok/s** (**+21.2% faster than llama.cpp Vulkan 29.33 tok/s**). Verified persistent HTTP daemon with fixed SSE streaming EOF close and client mid-stream disconnect handling.
+ 
+**MTP Speculative Decoding Implementation & Verification Stamp (2026-09-19):** Implemented and evaluated Multi-Token Prediction (MTP) speculative drafting on Intel Arc 140V (Xe2, Lunar Lake 258V), closing task T10.1 (`[x]`). Confirmed all 19 MTP weights present in `.binfer` (10 INT4-g128 mats, 9 BF16 norms/router weights converted to FP32 at startup). Constructed single recorded Level Zero command list (`cmd_draft`) with zero runtime allocations and 2 MiB dedicated KV cache. Resolved MoE router argument bindings and synchronized reset state. Measured on-device performance across 5 diverse domains (`tools/mtp/bench_mtp_258v`): median draft latency is **3.256 ms** (10.9% of trunk decode), pooled empirical acceptance rate is **67.50%** (up to 87.5% on logic prompts), projected speculative speedup is **1.44x**, and reset determinism is **100% bit-exact** (`tools/mtp/report_mtp_258v.json`).
+
 
 
 

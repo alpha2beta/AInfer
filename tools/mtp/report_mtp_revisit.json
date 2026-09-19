@@ -1,0 +1,30 @@
+{
+  "device": "B60",
+  "task": "T7.2-MTP-revisit",
+  "date": "2026-09-15",
+  "question": "Does the landed 64K line (chunked prefill production, 5/5 needle) reopen either speculative path: MTP-head drafts or prompt-lookup drafts?",
+  "inputs_measured": {
+    "decode_65k": "1.65 s/token (needle steplog, scan-attention O(T)); short-context 0.07-0.10 s/token",
+    "mtp_head_alpha": "0.624 pooled (24/41 + 34/52), stands; draft cost 6.4 ms/token (MTPDRAFT-OK)",
+    "chunk_verify_cost": {
+      "M8_W256": "1.094 s (stream, fixed-dominated; flat 1093.7-1095.7 ms/chunk W=8..256)",
+      "M32_W64": "1.58 s",
+      "M256_W512": "8.65 s",
+      "M256_W65K": "26.8 s",
+      "W_slope": "0.281 ms/col at 6144 rows (45.7 ns/score); principled linear extrapolation for GEMM+streaming-softmax",
+      "model_C_verify_8_65K": "~1.7 s = 1.09 fixed (measured) + 0.57 attention (192 rows x 65K x 45.7ns)"
+    },
+    "prompt_lookup_alpha": "0/65 positions accepted (draftable <=2/65) on 2K repetitive-boilerplate continuation vs loop greedy truth (`tools/t72/pl_accept.py`, `report_pl_accept.json`); 95% upper ~0.046 << 0.6 gate. Model generates novel text, never copies — n-grams never fire."
+  },
+  "economics": {
+    "mtp_head_64K": "E(8, 0.624)=2.62 tokens/round; speedup = 2.62 x 1.65 / (1.7 + 0.05) ~= 2.5x. REVERSAL vs short-context (0.24x loss).",
+    "mtp_head_short": "still loses (verify 1.1 s vs 8 x 0.1 s) — any adoption is 64K-only mode.",
+    "prompt_lookup": "E~=1.0, speedup = C_dec/C_verify < 1 at every context length. DEAD (gate needs alpha >= 0.6)."
+  },
+  "residual_risks_mtp_path": [
+    "chained multi-step MTP drafting unproven (single draft proven; MTP-KV chaining not composed)",
+    "MTP alpha at 64K unmeasured (0.624 measured on short prompts; 80-min prefill per 64K alpha sample)",
+    "no 64K production decode traffic yet (needle eval is a benchmark, not a workload)"
+  ],
+  "verdict": "RE-DEFER with upgraded triggers (was: architecturally impossible; now: uneconomical until conditions met). Prompt-lookup is dead by measurement (alpha~=0). MTP-head shows a real ~2.5x prize AT 64K ONLY, but the build (verify lists + accept/reject + resample + chained drafting) is sizable with two unproven links and no production traffic to harvest. Triggers to reopen: (1) production 64K decode traffic, (2) chained-draft proof, (3) 64K alpha confirmation. Draft slice + chunk machinery stay reusable; no code changes made by this revisit (measurement + analysis only)."
+}

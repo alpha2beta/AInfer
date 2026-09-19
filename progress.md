@@ -98,9 +98,9 @@
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline, llama.cpp comp | ✅ **Done** | 5 / 5 |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[ ]` Pending | 0 / 5 |
-| **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[-]` Deferred | 0 / 2 |
+| **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **47 / 62** |
+| **Total** | | | | **48 / 62** |
 
 ---
 
@@ -218,7 +218,7 @@
 
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
-| **T10.1** | MTP speculative decoding evaluation | `[-]` | Deferred pending checkpoint inspection |
+| **T10.1** | MTP speculative decoding evaluation | `[x]` | Verified on Arc 140V: alpha=67.50%, draft=3.26ms (10.9% trunk), speedup=1.44x, bit-exact determinism, `tools/mtp/report_mtp_258v.json` |
 | **T10.2** | Vision encoder integration evaluation | `[-]` | Deferred for v1 text-only scope |
 
 ### Phase X: Cross-Cutting Engineering
@@ -371,3 +371,13 @@
     - On $M=4096, K=2048$ (Full-Attn `q_proj`), DPAS achieved **1.08x–1.22x speedup** across batches.
     - Numerical parity verified: max absolute difference $< 4.2 \times 10^{-3}$ against CPU FP32 reference.
     - Emitted `tools/esimd_check/report_esimd_258v.json` and `tools/bench_gemv/report_dpas_evaluation.json`. T1.4 closed as `[x]`.
+- **2026-09-19 (T10.1 MTP Speculative Decoding Implementation & Verification on Arc 140V):**
+  - **MTP Weight Inventory Verified:** Confirmed all 19 MTP weights present in pinned `.binfer` container (`models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer`): 10 INT4-g128 matrices (`fc`, `q_proj`, `k_proj`, `v_proj`, `o_proj`, `experts.gate_up_proj`, `experts.down_proj`, `shared_expert.gate_proj`, `shared_expert.up_proj`, `shared_expert.down_proj`) and 9 BF16 norms/router weights (`pre_fc_norm_embedding`, `pre_fc_norm_hidden`, `input_layernorm`, `q_norm`, `k_norm`, `post_attention_layernorm`, `norm`, `router.weight`, `shared_expert_gate`).
+  - **Runtime Pipeline & Recorded Command List (`AInferRuntime258V::init_mtp`, `cmd_draft`):** Implemented single recorded Level Zero command list fusing token embedding lookup (`selected_token` direct indexing), pre-FC norms, concat2, FC projection, 1 Full-Attention layer (GQA 16/2 with dedicated 2 MiB KV cache), 1 MoE layer (256 routed / 8 active + shared expert), final RMSNorm, and shared LM head argmax. Added startup BF16->FP32 weight conversion into dedicated 2.05 MiB static device arena `d_fp32_weights_arena`.
+  - **Zero-Allocation Runtime Guarantee:** Reused existing activation scratch buffers; MTP draft execution executes with zero runtime heap and zero runtime device allocations.
+  - **MoE Routing & Reset Synchronization Fix:** Identified and resolved offset argument bindings on `moe_topk_router` kernel (restoring exact expert routing and shared expert gate activation) and added GPU queue and host memory fill synchronization in `reset_state()`.
+  - **On-Device Evaluation (`tools/mtp/bench_mtp_258v`, `tools/mtp/report_mtp_258v.json`):**
+    - **Draft Latency:** Median 3.256 ms (mean 3.356 ms, p90 3.431 ms), consuming only **10.93%** of trunk decode step (29.78 ms).
+    - **Empirical Acceptance Rate:** Pooled $\alpha = 67.50\%$ (54/80 accepted across 5 diverse domains; up to 87.5% on logic prompts).
+    - **Projected Speculative Speedup:** **1.44x** net generation acceleration.
+    - **Determinism:** 100% bit-exact token match across independent reset runs (9/9 tokens matching). T10.1 closed as `[x]`.

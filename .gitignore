@@ -64,3 +64,5 @@ tools/kernels_258v/test_elementwise
 tools/kernels_258v/test_layer_block
 tools/router/shootout
 tools/router/test_router
+tools/mtp/bench_mtp_258v
+tools/mtp/debug_mtp

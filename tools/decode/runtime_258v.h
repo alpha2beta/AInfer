@@ -148,6 +148,58 @@ struct LayerBinding {
   void *sh_down_s;
 };
 
+// MTP Layer Binding & State (T10.1)
+struct MtpBinding {
+  void *pre_fc_norm_emb_w = nullptr;
+  void *pre_fc_norm_hid_w = nullptr;
+  void *fc_w = nullptr;
+  void *fc_s = nullptr;
+
+  void *in_norm_w = nullptr;
+  void *q_proj_w = nullptr;
+  void *q_proj_s = nullptr;
+  void *k_proj_w = nullptr;
+  void *k_proj_s = nullptr;
+  void *v_proj_w = nullptr;
+  void *v_proj_s = nullptr;
+  void *o_proj_w = nullptr;
+  void *o_proj_s = nullptr;
+  void *q_norm_w = nullptr;
+  void *k_norm_w = nullptr;
+
+  void *post_norm_w = nullptr;
+  void *router_w = nullptr;
+  void *shared_gate_w = nullptr;
+  void *exp_gu_w = nullptr;
+  void *exp_gu_s = nullptr;
+  void *exp_dn_w = nullptr;
+  void *exp_dn_s = nullptr;
+  void *sh_gate_w = nullptr;
+  void *sh_gate_s = nullptr;
+  void *sh_up_w = nullptr;
+  void *sh_up_s = nullptr;
+  void *sh_down_w = nullptr;
+  void *sh_down_s = nullptr;
+
+  void *norm_w = nullptr;
+
+  void *k_cache = nullptr; // [2, max_ctx, 256] BF16
+  void *v_cache = nullptr; // [2, max_ctx, 256] BF16
+
+  float *d_e_raw = nullptr;    // [2048]
+  float *d_e_norm = nullptr;   // [2048]
+  float *d_h_norm = nullptr;   // [2048]
+  float *d_x_cat = nullptr;    // [4096]
+  float *d_fc_out = nullptr;   // [2048] FC projection output
+  float *d_x = nullptr;        // [2048]
+  int *d_draft_token = nullptr;// [1] output draft token
+  void *d_fp32_weights_arena = nullptr; // [537088 floats = ~2.05 MiB] converted BF16->FP32 weights
+
+  ze_command_list_handle_t cmd_draft = nullptr;
+  bool initialized = false;
+};
+
+
 // Diagnostic Cache Header (T5.5)
 struct DiagnosticCacheHeader {
   char magic[16];          // "AINFER_CACHE_V1\0"
@@ -210,6 +262,11 @@ public:
     if (!dev_) return false;
     return (zeDeviceGetStatus(dev_) == ZE_RESULT_SUCCESS);
   }
+
+  // T10.1: Multi-Token Prediction (MTP) Speculative Drafting
+  bool init_mtp();
+  bool mtp_draft_step(int *out_draft_token, double *out_latency_us = nullptr);
+  bool has_mtp() const { return mtp_.initialized; }
 
 private:
   static uint32_t crc32_compute(uint32_t crc, const uint8_t *p, size_t n) {
@@ -423,6 +480,11 @@ private:
 
   ze_command_list_handle_t get_or_record_prefill_chunk_list(int B);
   ze_command_list_handle_t get_or_record_prefill_tail_list(int B);
+
+  // MTP Runtime State & Kernels (T10.1)
+  MtpBinding mtp_{};
+  ze_kernel_handle_t k_concat2_ = nullptr;
+  ze_kernel_handle_t k_argmax2_mtp_ = nullptr;
 };
 
 } // namespace ainfer

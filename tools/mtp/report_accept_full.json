@@ -1,0 +1,372 @@
+{
+ "protocol": "MTP(embed[t],h[t])->t+1 vs trunk argmax",
+ "samples": 52,
+ "accepted": 34,
+ "alpha": 0.6538461538461539,
+ "detail": [
+  {
+   "prompt": 0,
+   "pos": 1,
+   "draft": 369,
+   "truth": 369,
+   "agree": true
+  },
+  {
+   "prompt": 0,
+   "pos": 2,
+   "draft": 369,
+   "truth": 369,
+   "agree": true
+  },
+  {
+   "prompt": 0,
+   "pos": 3,
+   "draft": 279,
+   "truth": 279,
+   "agree": true
+  },
+  {
+   "prompt": 0,
+   "pos": 4,
+   "draft": 6975,
+   "truth": 279,
+   "agree": false
+  },
+  {
+   "prompt": 0,
+   "pos": 5,
+   "draft": 349,
+   "truth": 22162,
+   "agree": false
+  },
+  {
+   "prompt": 0,
+   "pos": 6,
+   "draft": 11,
+   "truth": 3498,
+   "agree": false
+  },
+  {
+   "prompt": 1,
+   "pos": 1,
+   "draft": 369,
+   "truth": 369,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 2,
+   "draft": 428,
+   "truth": 279,
+   "agree": false
+  },
+  {
+   "prompt": 1,
+   "pos": 3,
+   "draft": 16,
+   "truth": 16,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 4,
+   "draft": 15,
+   "truth": 20,
+   "agree": false
+  },
+  {
+   "prompt": 1,
+   "pos": 5,
+   "draft": 15,
+   "truth": 15,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 6,
+   "draft": 16,
+   "truth": 220,
+   "agree": false
+  },
+  {
+   "prompt": 1,
+   "pos": 7,
+   "draft": 16,
+   "truth": 16,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 8,
+   "draft": 30,
+   "truth": 30,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 9,
+   "draft": 220,
+   "truth": 220,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 10,
+   "draft": 16,
+   "truth": 16,
+   "agree": true
+  },
+  {
+   "prompt": 1,
+   "pos": 11,
+   "draft": 30,
+   "truth": 30,
+   "agree": true
+  },
+  {
+   "prompt": 2,
+   "pos": 1,
+   "draft": 728,
+   "truth": 728,
+   "agree": true
+  },
+  {
+   "prompt": 2,
+   "pos": 2,
+   "draft": 264,
+   "truth": 883,
+   "agree": false
+  },
+  {
+   "prompt": 2,
+   "pos": 3,
+   "draft": 5567,
+   "truth": 6821,
+   "agree": false
+  },
+  {
+   "prompt": 2,
+   "pos": 4,
+   "draft": 2029,
+   "truth": 2029,
+   "agree": true
+  },
+  {
+   "prompt": 2,
+   "pos": 5,
+   "draft": 883,
+   "truth": 883,
+   "agree": true
+  },
+  {
+   "prompt": 2,
+   "pos": 6,
+   "draft": 279,
+   "truth": 279,
+   "agree": true
+  },
+  {
+   "prompt": 2,
+   "pos": 7,
+   "draft": 82,
+   "truth": 3712,
+   "agree": false
+  },
+  {
+   "prompt": 2,
+   "pos": 8,
+   "draft": 13,
+   "truth": 13,
+   "agree": true
+  },
+  {
+   "prompt": 3,
+   "pos": 1,
+   "draft": 19382,
+   "truth": 20139,
+   "agree": false
+  },
+  {
+   "prompt": 3,
+   "pos": 2,
+   "draft": 279,
+   "truth": 279,
+   "agree": true
+  },
+  {
+   "prompt": 3,
+   "pos": 3,
+   "draft": 23470,
+   "truth": 1157,
+   "agree": false
+  },
+  {
+   "prompt": 3,
+   "pos": 4,
+   "draft": 303,
+   "truth": 303,
+   "agree": true
+  },
+  {
+   "prompt": 3,
+   "pos": 5,
+   "draft": 4145,
+   "truth": 264,
+   "agree": false
+  },
+  {
+   "prompt": 3,
+   "pos": 6,
+   "draft": 3665,
+   "truth": 3665,
+   "agree": true
+  },
+  {
+   "prompt": 3,
+   "pos": 7,
+   "draft": 271,
+   "truth": 13,
+   "agree": false
+  },
+  {
+   "prompt": 4,
+   "pos": 1,
+   "draft": 264,
+   "truth": 264,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 2,
+   "draft": 2716,
+   "truth": 2716,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 3,
+   "draft": 5148,
+   "truth": 709,
+   "agree": false
+  },
+  {
+   "prompt": 4,
+   "pos": 4,
+   "draft": 421,
+   "truth": 421,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 5,
+   "draft": 4829,
+   "truth": 4829,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 6,
+   "draft": 287,
+   "truth": 287,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 7,
+   "draft": 264,
+   "truth": 264,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 8,
+   "draft": 886,
+   "truth": 886,
+   "agree": true
+  },
+  {
+   "prompt": 4,
+   "pos": 9,
+   "draft": 13,
+   "truth": 13,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 1,
+   "draft": 5437,
+   "truth": 5437,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 2,
+   "draft": 537,
+   "truth": 537,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 3,
+   "draft": 411,
+   "truth": 25,
+   "agree": false
+  },
+  {
+   "prompt": 5,
+   "pos": 4,
+   "draft": 8999,
+   "truth": 2614,
+   "agree": false
+  },
+  {
+   "prompt": 5,
+   "pos": 5,
+   "draft": 314,
+   "truth": 314,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 6,
+   "draft": 279,
+   "truth": 279,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 7,
+   "draft": 3255,
+   "truth": 5522,
+   "agree": false
+  },
+  {
+   "prompt": 5,
+   "pos": 8,
+   "draft": 11183,
+   "truth": 11183,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 9,
+   "draft": 22557,
+   "truth": 22557,
+   "agree": true
+  },
+  {
+   "prompt": 5,
+   "pos": 10,
+   "draft": 303,
+   "truth": 271,
+   "agree": false
+  },
+  {
+   "prompt": 5,
+   "pos": 11,
+   "draft": 220,
+   "truth": 220,
+   "agree": true
+  }
+ ]
+}
