@@ -70,6 +70,7 @@ int main(int argc, char **argv) {
   const char *spvdir = nullptr;
   const char *impdir = nullptr; // T7.4 cache import: prefill state dir
   int preChunks = 0;            // T7.4 in-process prefill: N 256-tok chunks
+  bool opt_mtp = (std::getenv("AINFER_MTP") != nullptr && std::getenv("AINFER_MTP")[0] == '1');
   std::vector<const char *> pos;
   for (int i = 1; i < argc; ++i) {
     if (std::strncmp(argv[i], "--ids=", 6) == 0) {
@@ -103,6 +104,8 @@ int main(int argc, char **argv) {
       preChunks = atoi(argv[i] + 17);
     } else if (std::strcmp(argv[i], "--prefill-chunks") == 0 && i + 1 < argc) {
       preChunks = atoi(argv[++i]); // space-separated form also works
+    } else if (std::strcmp(argv[i], "--mtp") == 0) {
+      opt_mtp = true;
     } else if (std::strncmp(argv[i], "--ids-file=", 11) == 0) {
       FILE *ff = std::fopen(argv[i] + 11, "r");
       if (!ff) {
@@ -133,7 +136,7 @@ int main(int argc, char **argv) {
   if (pos.size() < 4 || !spvdir) {
     std::fprintf(stderr, "usage: decode_l0 <model> <P> <G> <spvdir> [report] "
                          "[--ids=..] [--ids-file=..] [--max-new=..] "
-                         "[--import-caches=..] [--prefill-chunks=N]\n");
+                         "[--import-caches=..] [--prefill-chunks=N] [--mtp]\n");
     return 2;
   }
   if (pos.size() > 5) {
@@ -453,6 +456,221 @@ int main(int argc, char **argv) {
                                         (size_t)48 * NH * D * D * 4, nullptr,
                                         0, nullptr));
   }
+  // T7.2 MTP draft engine (gated behind --mtp or AINFER_MTP=1)
+  void *dPreE = nullptr, *dPreH = nullptr, *dMInN = nullptr, *dMPostN = nullptr,
+       *dMNorm = nullptr, *dMQNW = nullptr, *dMKNW = nullptr;
+  void *dDraftE = nullptr, *dDraftEn = nullptr, *dDraftHn = nullptr,
+       *dDraftIn = nullptr, *dDraftX = nullptr, *dDraftLogits = nullptr,
+       *dDraftOutT = nullptr, *dCtrlDraft = nullptr;
+  void *dMKc = nullptr, *dMVc = nullptr;
+
+  // Dual-token verification buffers (T7.2 speculative decode)
+  void *dCtrl0 = nullptr, *dCtrl1 = nullptr;
+  void *dX0 = nullptr, *dX1 = nullptr;
+  void *dH0 = nullptr, *dH1 = nullptr;
+  void *dTmp0 = nullptr, *dTmp1 = nullptr;
+  void *dMix0 = nullptr, *dMix1 = nullptr;
+  void *dQKV0 = nullptr, *dQKV1 = nullptr;
+  void *dMx0 = nullptr, *dMx1 = nullptr;
+  void *dZ0 = nullptr, *dZ1 = nullptr;
+  void *dQ48_0 = nullptr, *dQ48_1 = nullptr;
+  void *dK48_0 = nullptr, *dK48_1 = nullptr;
+  void *dV48_0 = nullptr, *dV48_1 = nullptr;
+  void *dAtt0 = nullptr, *dAtt1 = nullptr;
+  void *dQ16_0 = nullptr, *dQ16_1 = nullptr;
+  void *dK16_0 = nullptr, *dK16_1 = nullptr;
+  void *dV16_0 = nullptr, *dV16_1 = nullptr;
+  void *dKn0 = nullptr, *dKn1 = nullptr;
+  void *dQn0 = nullptr, *dQn1 = nullptr;
+  void *dGate0 = nullptr, *dGate1 = nullptr;
+  void *dG17_0 = nullptr, *dG17_1 = nullptr;
+  void *dU17_0 = nullptr, *dU17_1 = nullptr;
+  void *dQ8_0 = nullptr, *dQ8_1 = nullptr;
+  void *dSq_0 = nullptr, *dSq_1 = nullptr;
+  void *dB0 = nullptr, *dB1 = nullptr;
+  void *dA0 = nullptr, *dA1 = nullptr;
+  void *dBt0 = nullptr, *dBt1 = nullptr;
+  void *dG48_0 = nullptr, *dG48_1 = nullptr;
+  void *dLogits0 = nullptr, *dLogits1 = nullptr;
+  void *dPV0 = nullptr, *dPV1 = nullptr;
+  void *dPI0 = nullptr, *dPI1 = nullptr;
+  void *dOutT0 = nullptr, *dOutT1 = nullptr;
+  void *dConvSpec = nullptr, *dSSpec = nullptr;
+  // Depth-2 triple lane (T7.2 chained drafts): mirrors the _0/_1 sets.
+  void *dCtrl2 = nullptr;
+  void *dX2 = nullptr;
+  void *dH2 = nullptr;
+  void *dTmp2 = nullptr;
+  void *dMix2 = nullptr;
+  void *dQKV2 = nullptr;
+  void *dMx2 = nullptr;
+  void *dZ2 = nullptr;
+  void *dQ48_2 = nullptr;
+  void *dK48_2 = nullptr;
+  void *dV48_2 = nullptr;
+  void *dAtt2 = nullptr;
+  void *dQ16_2 = nullptr;
+  void *dK16_2 = nullptr;
+  void *dV16_2 = nullptr;
+  void *dKn2 = nullptr;
+  void *dQn2 = nullptr;
+  void *dGate2 = nullptr;
+  void *dG17_2 = nullptr;
+  void *dU17_2 = nullptr;
+  void *dQ8_2 = nullptr;
+  void *dSq_2 = nullptr;
+  void *dB2 = nullptr;
+  void *dA2 = nullptr;
+  void *dBt2 = nullptr;
+  void *dG48_2 = nullptr;
+  void *dLogits2 = nullptr;
+  void *dPV2 = nullptr;
+  void *dPI2 = nullptr;
+  void *dOutT2 = nullptr;
+  // Depth-2 second specular level + chained-draft state (T7.2 chained).
+  void *dConvSpec2 = nullptr, *dSSpec2 = nullptr;
+  void *dChH = nullptr, *dCtrlDraft2 = nullptr;
+
+  if (opt_mtp) {
+    const uint8_t z = 0;
+    dPreE = alloc(H * 4);
+    dPreH = alloc(H * 4);
+    dMInN = alloc(H * 4);
+    dMPostN = alloc(H * 4);
+    dMNorm = alloc(H * 4);
+    dMQNW = alloc(256 * 4);
+    dMKNW = alloc(256 * 4);
+    load_small("mtp.pre_fc_norm_embedding.weight", dPreE, H);
+    load_small("mtp.pre_fc_norm_hidden.weight", dPreH, H);
+    load_small("mtp.layers.0.input_layernorm.weight", dMInN, H);
+    load_small("mtp.layers.0.post_attention_layernorm.weight", dMPostN, H);
+    load_small("mtp.norm.weight", dMNorm, H);
+    load_small("mtp.layers.0.self_attn.q_norm.weight", dMQNW, 256);
+    load_small("mtp.layers.0.self_attn.k_norm.weight", dMKNW, 256);
+
+    dDraftE = alloc(H * 4);
+    dDraftEn = alloc(H * 4);
+    dDraftHn = alloc(H * 4);
+    dDraftIn = alloc((size_t)10240 * 4);
+    dDraftX = alloc(H * 4);
+    dDraftLogits = alloc((size_t)V * 4);
+    dDraftOutT = alloc(4);
+    dCtrlDraft = alloc(sizeof(DecodeControl));
+    dMKc = alloc((size_t)MAXCTX * 4 * 256 * 2);
+    dMVc = alloc((size_t)MAXCTX * 4 * 256 * 2);
+    CHECK(zeCommandListAppendMemoryFill(up, dMKc, &z, 1,
+                                        (size_t)MAXCTX * 4 * 256 * 2,
+                                        nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryFill(up, dMVc, &z, 1,
+                                        (size_t)MAXCTX * 4 * 256 * 2,
+                                        nullptr, 0, nullptr));
+
+    dCtrl0 = alloc(sizeof(DecodeControl));
+    dCtrl1 = alloc(sizeof(DecodeControl));
+    dX0 = alloc(H * 4);
+    dX1 = alloc(H * 4);
+    dH0 = alloc(H * 4);
+    dH1 = alloc(H * 4);
+    dTmp0 = alloc(H * 4);
+    dTmp1 = alloc(H * 4);
+    dMix0 = alloc(H * 4);
+    dMix1 = alloc(H * 4);
+    dQKV0 = alloc(C * 4);
+    dQKV1 = alloc(C * 4);
+    dMx0 = alloc(C * 4);
+    dMx1 = alloc(C * 4);
+    dZ0 = alloc(V6 * 4);
+    dZ1 = alloc(V6 * 4);
+    dQ48_0 = alloc(V6 * 4);
+    dQ48_1 = alloc(V6 * 4);
+    dK48_0 = alloc(V6 * 4);
+    dK48_1 = alloc(V6 * 4);
+    dV48_0 = alloc(V6 * 4);
+    dV48_1 = alloc(V6 * 4);
+    dAtt0 = alloc(V6 * 4);
+    dAtt1 = alloc(V6 * 4);
+    dQ16_0 = alloc(QW * 4);
+    dQ16_1 = alloc(QW * 4);
+    dK16_0 = alloc(KVW * 4);
+    dK16_1 = alloc(KVW * 4);
+    dV16_0 = alloc(KVW * 4);
+    dV16_1 = alloc(KVW * 4);
+    dKn0 = alloc(KVW * 4);
+    dKn1 = alloc(KVW * 4);
+    dQn0 = alloc(QN * 4);
+    dQn1 = alloc(QN * 4);
+    dGate0 = alloc(QN * 4);
+    dGate1 = alloc(QN * 4);
+    dG17_0 = alloc(I * 4);
+    dG17_1 = alloc(I * 4);
+    dU17_0 = alloc(I * 4);
+    dU17_1 = alloc(I * 4);
+    dQ8_0 = alloc(I);
+    dQ8_1 = alloc(I);
+    dSq_0 = alloc(136 * 4);
+    dSq_1 = alloc(136 * 4);
+    dB0 = alloc(NH * 4);
+    dB1 = alloc(NH * 4);
+    dA0 = alloc(NH * 4);
+    dA1 = alloc(NH * 4);
+    dBt0 = alloc(NH * 4);
+    dBt1 = alloc(NH * 4);
+    dG48_0 = alloc(NH * 4);
+    dG48_1 = alloc(NH * 4);
+    dLogits0 = alloc((size_t)V * 4);
+    dLogits1 = alloc((size_t)V * 4);
+    dPV0 = alloc(64 * 4);
+    dPV1 = alloc(64 * 4);
+    dPI0 = alloc(64 * 4);
+    dPI1 = alloc(64 * 4);
+    dOutT0 = alloc(4);
+    dOutT1 = alloc(4);
+    dConvSpec = alloc((size_t)48 * C * 3 * 4);
+    dSSpec = alloc((size_t)48 * NH * D * D * 4);
+    CHECK(zeCommandListAppendMemoryFill(up, dConvSpec, &z, 1,
+                                        (size_t)48 * C * 3 * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryFill(up, dSSpec, &z, 1,
+                                        (size_t)48 * NH * D * D * 4, nullptr, 0, nullptr));
+    dCtrl2 = alloc(sizeof(DecodeControl));
+    dX2 = alloc(H * 4);
+    dH2 = alloc(H * 4);
+    dTmp2 = alloc(H * 4);
+    dMix2 = alloc(H * 4);
+    dQKV2 = alloc(C * 4);
+    dMx2 = alloc(C * 4);
+    dZ2 = alloc(V6 * 4);
+    dQ48_2 = alloc(V6 * 4);
+    dK48_2 = alloc(V6 * 4);
+    dV48_2 = alloc(V6 * 4);
+    dAtt2 = alloc(V6 * 4);
+    dQ16_2 = alloc(QW * 4);
+    dK16_2 = alloc(KVW * 4);
+    dV16_2 = alloc(KVW * 4);
+    dKn2 = alloc(KVW * 4);
+    dQn2 = alloc(QN * 4);
+    dGate2 = alloc(QN * 4);
+    dG17_2 = alloc(I * 4);
+    dU17_2 = alloc(I * 4);
+    dQ8_2 = alloc(I);
+    dSq_2 = alloc(136 * 4);
+    dB2 = alloc(NH * 4);
+    dA2 = alloc(NH * 4);
+    dBt2 = alloc(NH * 4);
+    dG48_2 = alloc(NH * 4);
+    dLogits2 = alloc((size_t)V * 4);
+    dPV2 = alloc(64 * 4);
+    dPI2 = alloc(64 * 4);
+    dOutT2 = alloc(4);
+    dConvSpec2 = alloc((size_t)48 * C * 3 * 4);
+    dSSpec2 = alloc((size_t)48 * NH * D * D * 4);
+    CHECK(zeCommandListAppendMemoryFill(up, dConvSpec2, &z, 1,
+                                        (size_t)48 * C * 3 * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryFill(up, dSSpec2, &z, 1,
+                                        (size_t)48 * NH * D * D * 4, nullptr, 0, nullptr));
+    dChH = alloc(H * 4);
+    dCtrlDraft2 = alloc(sizeof(DecodeControl));
+    std::fprintf(stderr, "[l0] MTP draft engine + 2-token verification: enabled\n");
+  }
   // T7.4 cache import (file handoff from chunk prefill): overwrites the
   // zeroed arenas with prefilled KV (BF16) + SSM state + final hidden.
   // Dump layout = decode layout at stride P (16 slots back-to-back);
@@ -575,6 +793,9 @@ int main(int argc, char **argv) {
       {"chunkqkgemm.spv", "_ZTS11ChunkQkGemm"},
       {"chunksoftmaxrow.spv", "_ZTS15ChunkSoftmaxRow"},
       {"chunkwvgemm.spv", "_ZTS11ChunkWvGemm"},
+      {"concat.spv", "_ZTS7Concat2"},
+      {"gemvm2.spv", "_ZTS10Int4GemvM2"},
+      {"gemvm3.spv", "_ZTS10Int4GemvM3"},
   };
   enum K {
     NORM,
@@ -613,6 +834,9 @@ int main(int argc, char **argv) {
     CQK,
     CSM,
     CWV,
+    CONCAT,
+    GEMVM2,
+    GEMVM3,
     NK
   };
   ze_kernel_handle_t kh[NK] = {nullptr};
@@ -718,6 +942,52 @@ int main(int argc, char **argv) {
     setarg(kh[QUANT], 0, sizeof(void *), &X);
     setarg(kh[QUANT], 1, sizeof(void *), &dSq);
     setarg(kh[QUANT], 2, sizeof(void *), &dQ8);
+    launch(R, kh[QUANT], nn);
+  };
+  auto gemvM2 = [&](Rec &R, const Entry *e, int M, int KK, void *Y0, void *Y1) {
+    const void *dP = (const uint8_t *)payArena + (e->d_off - pay_lo);
+    const void *dSc = (const char *)scArena + (e->sc_off - sc_lo);
+    setarg(kh[GEMVM2], 0, sizeof(void *), &Y0);
+    setarg(kh[GEMVM2], 1, sizeof(void *), &Y1);
+    setarg(kh[GEMVM2], 2, sizeof(void *), &dP);
+    setarg(kh[GEMVM2], 3, sizeof(void *), &dSc);
+    setarg(kh[GEMVM2], 4, sizeof(void *), &dQ8_0);
+    setarg(kh[GEMVM2], 5, sizeof(void *), &dSq_0);
+    setarg(kh[GEMVM2], 6, sizeof(void *), &dQ8_1);
+    setarg(kh[GEMVM2], 7, sizeof(void *), &dSq_1);
+    setarg(kh[GEMVM2], 8, sizeof(int), &KK);
+    launch(R, kh[GEMVM2], M);
+  };
+  // Depth-2 triple GEMV (T7.2 chained drafts): same single weight stream,
+  // third activation lane from the lane-2 quant buffers (xq2 into dQ8_2 /
+  // dSq_2 before each call, mirroring lanes 0/1).
+  auto gemvM3 = [&](Rec &R, const Entry *e, int M, int KK, void *Y0, void *Y1,
+                    void *Y2) {
+    const void *dP = (const uint8_t *)payArena + (e->d_off - pay_lo);
+    const void *dSc = (const char *)scArena + (e->sc_off - sc_lo);
+    setarg(kh[GEMVM3], 0, sizeof(void *), &Y0);
+    setarg(kh[GEMVM3], 1, sizeof(void *), &Y1);
+    setarg(kh[GEMVM3], 2, sizeof(void *), &Y2);
+    setarg(kh[GEMVM3], 3, sizeof(void *), &dP);
+    setarg(kh[GEMVM3], 4, sizeof(void *), &dSc);
+    setarg(kh[GEMVM3], 5, sizeof(void *), &dQ8_0);
+    setarg(kh[GEMVM3], 6, sizeof(void *), &dSq_0);
+    setarg(kh[GEMVM3], 7, sizeof(void *), &dQ8_1);
+    setarg(kh[GEMVM3], 8, sizeof(void *), &dSq_1);
+    setarg(kh[GEMVM3], 9, sizeof(void *), &dQ8_2);
+    setarg(kh[GEMVM3], 10, sizeof(void *), &dSq_2);
+    setarg(kh[GEMVM3], 11, sizeof(int), &KK);
+    launch(R, kh[GEMVM3], M);
+  };
+  auto xq2 = [&](Rec &R, void *X, int nn, void *dstQ8, void *dstSq) {
+    int gg = nn / 128;
+    setarg(kh[SCALES], 0, sizeof(void *), &X);
+    setarg(kh[SCALES], 1, sizeof(void *), &dstSq);
+    setarg(kh[SCALES], 2, sizeof(int), &gg);
+    launch(R, kh[SCALES], gg);
+    setarg(kh[QUANT], 0, sizeof(void *), &X);
+    setarg(kh[QUANT], 1, sizeof(void *), &dstSq);
+    setarg(kh[QUANT], 2, sizeof(void *), &dstQ8);
     launch(R, kh[QUANT], nn);
   };
   auto rnorm = [&](Rec &R, void *Y, void *X, void *W) {
@@ -1002,6 +1272,1027 @@ int main(int argc, char **argv) {
     CHECK(zeCommandListClose(tail.h));
   }
   std::fprintf(stderr, "[l0] recorded 64 layer lists + embed + tail\n");
+  // ---- record: MTP draft list (T7.2) ----
+  Rec mtpDraftR{nullptr};
+  if (opt_mtp) {
+    mtpDraftR.h = newList();
+    // 1. Embed draft token into dDraftE
+    setarg(kh[EMBED], 0, sizeof(void *), &dDraftE);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrlDraft);
+    launch(mtpDraftR, kh[EMBED], H);
+
+    // 2. Pre-FC norms
+    rnorm(mtpDraftR, dDraftEn, dDraftE, dPreE);
+    rnorm(mtpDraftR, dDraftHn, dX, dPreH);
+
+    // 3. Concat [dDraftEn, dDraftHn] -> dDraftIn (10240 floats)
+    int nnH = H;
+    setarg(kh[CONCAT], 0, sizeof(void *), &dDraftIn);
+    setarg(kh[CONCAT], 1, sizeof(void *), &dDraftEn);
+    setarg(kh[CONCAT], 2, sizeof(void *), &dDraftHn);
+    setarg(kh[CONCAT], 3, sizeof(int), &nnH);
+    launch(mtpDraftR, kh[CONCAT], 2 * H);
+
+    // 4. FC projection: 5120 x 10240
+    xq(mtpDraftR, dDraftIn, 10240);
+    gemvE(mtpDraftR, find("mtp.fc.weight"), H, 10240, dDraftX);
+
+    // 5. 1 full attention layer
+    rnorm(mtpDraftR, dH, dDraftX, dMInN);
+    xq(mtpDraftR, dH, H);
+    gemvE(mtpDraftR, find("mtp.layers.0.self_attn.q_proj.weight"), QW, H, dQ16);
+    gemvE(mtpDraftR, find("mtp.layers.0.self_attn.k_proj.weight"), KVW, H, dK16);
+    gemvE(mtpDraftR, find("mtp.layers.0.self_attn.v_proj.weight"), KVW, H, dV16);
+    setarg(kh[SPLIT], 0, sizeof(void *), &dQ16);
+    setarg(kh[SPLIT], 1, sizeof(void *), &dQn);
+    setarg(kh[SPLIT], 2, sizeof(void *), &dGate);
+    launch(mtpDraftR, kh[SPLIT], QN);
+    setarg(kh[BNORM], 0, sizeof(void *), &dQn);
+    setarg(kh[BNORM], 1, sizeof(void *), &dQn);
+    setarg(kh[BNORM], 2, sizeof(void *), &dMQNW);
+    setarg(kh[BNORM], 3, sizeof(int), &n256);
+    launch(mtpDraftR, kh[BNORM], 24);
+    setarg(kh[BNORM], 0, sizeof(void *), &dKn);
+    setarg(kh[BNORM], 1, sizeof(void *), &dK16);
+    setarg(kh[BNORM], 2, sizeof(void *), &dMKNW);
+    setarg(kh[BNORM], 3, sizeof(int), &n256);
+    launch(mtpDraftR, kh[BNORM], 4);
+    setarg(kh[ROPE], 0, sizeof(void *), &dQn);
+    setarg(kh[ROPE], 1, sizeof(void *), &dKn);
+    setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+    setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+    setarg(kh[ROPE], 4, sizeof(void *), &dCtrlDraft);
+    launch(mtpDraftR, kh[ROPE], 28);
+    setarg(kh[KV], 0, sizeof(void *), &dMKc);
+    setarg(kh[KV], 1, sizeof(void *), &dMVc);
+    setarg(kh[KV], 2, sizeof(void *), &dKn);
+    setarg(kh[KV], 3, sizeof(void *), &dV16);
+    setarg(kh[KV], 4, sizeof(void *), &dCtrlDraft);
+    setarg(kh[KV], 5, sizeof(int), &tmax);
+    launch(mtpDraftR, kh[KV], KVW);
+    setarg(kh[ATTN], 0, sizeof(void *), &dAtt);
+    setarg(kh[ATTN], 1, sizeof(void *), &dQn);
+    setarg(kh[ATTN], 2, sizeof(void *), &dMKc);
+    setarg(kh[ATTN], 3, sizeof(void *), &dMVc);
+    setarg(kh[ATTN], 4, sizeof(void *), &dGate);
+    setarg(kh[ATTN], 5, sizeof(void *), &dCtrlDraft);
+    setarg(kh[ATTN], 6, sizeof(int), &tmax);
+    setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+    launch(mtpDraftR, kh[ATTN], 24);
+    xq(mtpDraftR, dAtt, QN);
+    gemvE(mtpDraftR, find("mtp.layers.0.self_attn.o_proj.weight"), H, QN, dMix);
+    res(mtpDraftR, dTmp, dDraftX, dMix);
+    rnorm(mtpDraftR, dH, dTmp, dMPostN);
+    xq(mtpDraftR, dH, H);
+    gemvE(mtpDraftR, find("mtp.layers.0.mlp.gate_proj.weight"), I, H, dG17);
+    gemvE(mtpDraftR, find("mtp.layers.0.mlp.up_proj.weight"), I, H, dU17);
+    setarg(kh[SILU], 0, sizeof(void *), &dG17);
+    setarg(kh[SILU], 1, sizeof(void *), &dU17);
+    setarg(kh[SILU], 2, sizeof(void *), &dG17);
+    launch(mtpDraftR, kh[SILU], I);
+    xq(mtpDraftR, dG17, I);
+    gemvE(mtpDraftR, find("mtp.layers.0.mlp.down_proj.weight"), H, I, dMix);
+    res(mtpDraftR, dDraftX, dTmp, dMix);
+
+    // 6. MTP final norm + lm_head + argmax
+    rnorm(mtpDraftR, dH, dDraftX, dMNorm);
+    xq(mtpDraftR, dH, H);
+    gemvE(mtpDraftR, find("lm_head.weight"), V, H, dDraftLogits);
+    setarg(kh[ARG1], 0, sizeof(void *), &dDraftLogits);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(mtpDraftR, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI);
+    setarg(kh[ARG2], 2, sizeof(void *), &dDraftOutT);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(mtpDraftR, kh[ARG2], 1);
+    CHECK(zeCommandListClose(mtpDraftR.h));
+    std::fprintf(stderr, "[l0] recorded MTP draft list\n");
+  }
+
+  // ---- record: dual-token verification lists (T7.2 speculative decode) ----
+  Rec embM2{nullptr};
+  std::vector<Rec> layersM2;
+  Rec tailM2{nullptr};
+  Rec commitSpecR{nullptr};
+  if (opt_mtp) {
+    embM2.h = newList();
+    setarg(kh[EMBED], 0, sizeof(void *), &dX0);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrl0);
+    launch(embM2, kh[EMBED], H);
+    setarg(kh[EMBED], 0, sizeof(void *), &dX1);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrl1);
+    launch(embM2, kh[EMBED], H);
+    CHECK(zeCommandListClose(embM2.h));
+
+    for (int L = 0; L < 64; ++L) {
+      Rec R{newList()};
+      void *inN = (char *)dInN + (size_t)L * H * 4;
+      void *postN = (char *)dPostN + (size_t)L * H * 4;
+      rnorm(R, dH0, dX0, inN);
+      rnorm(R, dH1, dX1, inN);
+      xq2(R, dH0, H, dQ8_0, dSq_0);
+      xq2(R, dH1, H, dQ8_1, dSq_1);
+      if (is_full(L)) {
+        int slot = L / 4;
+        gemvM2(R, find(nm(L, "self_attn.q_proj.weight")), QW, H, dQ16_0, dQ16_1);
+        gemvM2(R, find(nm(L, "self_attn.k_proj.weight")), KVW, H, dK16_0, dK16_1);
+        gemvM2(R, find(nm(L, "self_attn.v_proj.weight")), KVW, H, dV16_0, dV16_1);
+        // Token 0 split & bnorm
+        setarg(kh[SPLIT], 0, sizeof(void *), &dQ16_0);
+        setarg(kh[SPLIT], 1, sizeof(void *), &dQn0);
+        setarg(kh[SPLIT], 2, sizeof(void *), &dGate0);
+        launch(R, kh[SPLIT], QN);
+        // Token 1 split & bnorm
+        setarg(kh[SPLIT], 0, sizeof(void *), &dQ16_1);
+        setarg(kh[SPLIT], 1, sizeof(void *), &dQn1);
+        setarg(kh[SPLIT], 2, sizeof(void *), &dGate1);
+        launch(R, kh[SPLIT], QN);
+
+        void *qnW = (char *)dQNW + (size_t)slot * 256 * 4;
+        void *knW = (char *)dKNW + (size_t)slot * 256 * 4;
+        setarg(kh[BNORM], 0, sizeof(void *), &dQn0);
+        setarg(kh[BNORM], 1, sizeof(void *), &dQn0);
+        setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 24);
+        setarg(kh[BNORM], 0, sizeof(void *), &dKn0);
+        setarg(kh[BNORM], 1, sizeof(void *), &dK16_0);
+        setarg(kh[BNORM], 2, sizeof(void *), &knW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 4);
+
+        setarg(kh[BNORM], 0, sizeof(void *), &dQn1);
+        setarg(kh[BNORM], 1, sizeof(void *), &dQn1);
+        setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 24);
+        setarg(kh[BNORM], 0, sizeof(void *), &dKn1);
+        setarg(kh[BNORM], 1, sizeof(void *), &dK16_1);
+        setarg(kh[BNORM], 2, sizeof(void *), &knW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 4);
+
+        // RoPE
+        setarg(kh[ROPE], 0, sizeof(void *), &dQn0);
+        setarg(kh[ROPE], 1, sizeof(void *), &dKn0);
+        setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+        setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+        setarg(kh[ROPE], 4, sizeof(void *), &dCtrl0);
+        launch(R, kh[ROPE], 28);
+
+        setarg(kh[ROPE], 0, sizeof(void *), &dQn1);
+        setarg(kh[ROPE], 1, sizeof(void *), &dKn1);
+        setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+        setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+        setarg(kh[ROPE], 4, sizeof(void *), &dCtrl1);
+        launch(R, kh[ROPE], 28);
+
+        if (kv8) {
+          void *kcS = (char *)dKc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+          void *vcS = (char *)dVc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+          void *ksS = (char *)dKscl + ((size_t)slot * MAXCTX) * 4 * 4;
+          void *vsS = (char *)dVscl + ((size_t)slot * MAXCTX) * 4 * 4;
+          // Token 0 KV append + AttnCore
+          setarg(kh[KV8], 0, sizeof(void *), &kcS);
+          setarg(kh[KV8], 1, sizeof(void *), &vcS);
+          setarg(kh[KV8], 2, sizeof(void *), &ksS);
+          setarg(kh[KV8], 3, sizeof(void *), &vsS);
+          setarg(kh[KV8], 4, sizeof(void *), &dKn0);
+          setarg(kh[KV8], 5, sizeof(void *), &dV16_0);
+          setarg(kh[KV8], 6, sizeof(void *), &dCtrl0);
+          setarg(kh[KV8], 7, sizeof(int), &tmax);
+          launch(R, kh[KV8], 4);
+          setarg(kh[ATTN8], 0, sizeof(void *), &dAtt0);
+          setarg(kh[ATTN8], 1, sizeof(void *), &dQn0);
+          setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+          setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+          setarg(kh[ATTN8], 6, sizeof(void *), &dGate0);
+          setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl0);
+          setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+          setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+          launch(R, kh[ATTN8], 24);
+
+          // Token 1 KV append + AttnCore
+          setarg(kh[KV8], 0, sizeof(void *), &kcS);
+          setarg(kh[KV8], 1, sizeof(void *), &vcS);
+          setarg(kh[KV8], 2, sizeof(void *), &ksS);
+          setarg(kh[KV8], 3, sizeof(void *), &vsS);
+          setarg(kh[KV8], 4, sizeof(void *), &dKn1);
+          setarg(kh[KV8], 5, sizeof(void *), &dV16_1);
+          setarg(kh[KV8], 6, sizeof(void *), &dCtrl1);
+          setarg(kh[KV8], 7, sizeof(int), &tmax);
+          launch(R, kh[KV8], 4);
+          setarg(kh[ATTN8], 0, sizeof(void *), &dAtt1);
+          setarg(kh[ATTN8], 1, sizeof(void *), &dQn1);
+          setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+          setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+          setarg(kh[ATTN8], 6, sizeof(void *), &dGate1);
+          setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl1);
+          setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+          setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+          launch(R, kh[ATTN8], 24);
+        } else {
+          void *kcS = (char *)dKc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          void *vcS = (char *)dVc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          // Token 0 KV append + AttnCore
+          setarg(kh[KV], 0, sizeof(void *), &kcS);
+          setarg(kh[KV], 1, sizeof(void *), &vcS);
+          setarg(kh[KV], 2, sizeof(void *), &dKn0);
+          setarg(kh[KV], 3, sizeof(void *), &dV16_0);
+          setarg(kh[KV], 4, sizeof(void *), &dCtrl0);
+          setarg(kh[KV], 5, sizeof(int), &tmax);
+          launch(R, kh[KV], KVW);
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt0);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn0);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate0);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl0);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+
+          // Token 1 KV append + AttnCore
+          setarg(kh[KV], 0, sizeof(void *), &kcS);
+          setarg(kh[KV], 1, sizeof(void *), &vcS);
+          setarg(kh[KV], 2, sizeof(void *), &dKn1);
+          setarg(kh[KV], 3, sizeof(void *), &dV16_1);
+          setarg(kh[KV], 4, sizeof(void *), &dCtrl1);
+          setarg(kh[KV], 5, sizeof(int), &tmax);
+          launch(R, kh[KV], KVW);
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt1);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn1);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate1);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl1);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+        }
+        xq2(R, dAtt0, V6, dQ8_0, dSq_0);
+        xq2(R, dAtt1, V6, dQ8_1, dSq_1);
+        gemvM2(R, find(nm(L, "self_attn.o_proj.weight")), H, V6, dMix0, dMix1);
+      } else {
+        int sl = L - (L + 1) / 4;
+        gemvM2(R, find(nm(L, "linear_attn.in_proj_qkv.weight")), C, H, dQKV0, dQKV1);
+        gemvM2(R, find(nm(L, "linear_attn.in_proj_z.weight")), V6, H, dZ0, dZ1);
+        gemvM2(R, find(nm(L, "linear_attn.in_proj_b.weight")), NH, H, dB0, dB1);
+        gemvM2(R, find(nm(L, "linear_attn.in_proj_a.weight")), NH, H, dA0, dA1);
+
+        void *csS = (char *)dConv + (size_t)sl * C * 3 * 4;
+        void *cwS = (char *)dConvW + (size_t)sl * C * 4 * 4;
+        void *sS = (char *)dS + (size_t)sl * NH * D * D * 4;
+        void *alS = (char *)dAL + (size_t)sl * 48 * 4;
+        void *dtS = (char *)dDT + (size_t)sl * 48 * 4;
+        void *ngS = (char *)dLinN + (size_t)sl * 128 * 4;
+        void *csSpec = (char *)dConvSpec + (size_t)sl * C * 3 * 4;
+        void *sSpec = (char *)dSSpec + (size_t)sl * NH * D * D * 4;
+        int dd = D;
+
+        // Token 0: mutates primary state csS, sS
+        setarg(kh[CONV], 0, sizeof(void *), &dMx0);
+        setarg(kh[CONV], 1, sizeof(void *), &dQKV0);
+        setarg(kh[CONV], 2, sizeof(void *), &csS);
+        setarg(kh[CONV], 3, sizeof(void *), &cwS);
+        launch(R, kh[CONV], C);
+        setarg(kh[SPLIT2], 0, sizeof(void *), &dMx0);
+        setarg(kh[SPLIT2], 1, sizeof(void *), &dQ48_0);
+        setarg(kh[SPLIT2], 2, sizeof(void *), &dK48_0);
+        setarg(kh[SPLIT2], 3, sizeof(void *), &dV48_0);
+        launch(R, kh[SPLIT2], V6);
+        setarg(kh[L2], 0, sizeof(void *), &dQ48_0);
+        setarg(kh[L2], 1, sizeof(void *), &dK48_0);
+        launch(R, kh[L2], 96);
+        setarg(kh[BETA], 0, sizeof(void *), &dBt0);
+        setarg(kh[BETA], 1, sizeof(void *), &dG48_0);
+        setarg(kh[BETA], 2, sizeof(void *), &dB0);
+        setarg(kh[BETA], 3, sizeof(void *), &dA0);
+        setarg(kh[BETA], 4, sizeof(void *), &alS);
+        setarg(kh[BETA], 5, sizeof(void *), &dtS);
+        launch(R, kh[BETA], NH);
+        setarg(kh[RECUR], 0, sizeof(void *), &dMx0);
+        setarg(kh[RECUR], 1, sizeof(void *), &dQ48_0);
+        setarg(kh[RECUR], 2, sizeof(void *), &dK48_0);
+        setarg(kh[RECUR], 3, sizeof(void *), &dV48_0);
+        setarg(kh[RECUR], 4, sizeof(void *), &sS);
+        setarg(kh[RECUR], 5, sizeof(void *), &dBt0);
+        setarg(kh[RECUR], 6, sizeof(void *), &dG48_0);
+        setarg(kh[RECUR], 7, sizeof(int), &dd);
+        launch(R, kh[RECUR], NH);
+        setarg(kh[RMSI], 0, sizeof(void *), &dBt0);
+        setarg(kh[RMSI], 1, sizeof(void *), &dMx0);
+        launch(R, kh[RMSI], NH);
+        setarg(kh[GATE], 0, sizeof(void *), &dAtt0);
+        setarg(kh[GATE], 1, sizeof(void *), &dMx0);
+        setarg(kh[GATE], 2, sizeof(void *), &dZ0);
+        setarg(kh[GATE], 3, sizeof(void *), &ngS);
+        setarg(kh[GATE], 4, sizeof(void *), &dBt0);
+        launch(R, kh[GATE], V6);
+
+        // Copy primary state (updated by Token 0) into specular state
+        CHECK(zeCommandListAppendMemoryCopy(R.h, csSpec, csS, (size_t)C * 3 * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendMemoryCopy(R.h, sSpec, sS, (size_t)NH * D * D * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendBarrier(R.h, nullptr, 0, nullptr));
+
+        // Token 1: mutates specular state csSpec, sSpec
+        setarg(kh[CONV], 0, sizeof(void *), &dMx1);
+        setarg(kh[CONV], 1, sizeof(void *), &dQKV1);
+        setarg(kh[CONV], 2, sizeof(void *), &csSpec);
+        setarg(kh[CONV], 3, sizeof(void *), &cwS);
+        launch(R, kh[CONV], C);
+        setarg(kh[SPLIT2], 0, sizeof(void *), &dMx1);
+        setarg(kh[SPLIT2], 1, sizeof(void *), &dQ48_1);
+        setarg(kh[SPLIT2], 2, sizeof(void *), &dK48_1);
+        setarg(kh[SPLIT2], 3, sizeof(void *), &dV48_1);
+        launch(R, kh[SPLIT2], V6);
+        setarg(kh[L2], 0, sizeof(void *), &dQ48_1);
+        setarg(kh[L2], 1, sizeof(void *), &dK48_1);
+        launch(R, kh[L2], 96);
+        setarg(kh[BETA], 0, sizeof(void *), &dBt1);
+        setarg(kh[BETA], 1, sizeof(void *), &dG48_1);
+        setarg(kh[BETA], 2, sizeof(void *), &dB1);
+        setarg(kh[BETA], 3, sizeof(void *), &dA1);
+        setarg(kh[BETA], 4, sizeof(void *), &alS);
+        setarg(kh[BETA], 5, sizeof(void *), &dtS);
+        launch(R, kh[BETA], NH);
+        setarg(kh[RECUR], 0, sizeof(void *), &dMx1);
+        setarg(kh[RECUR], 1, sizeof(void *), &dQ48_1);
+        setarg(kh[RECUR], 2, sizeof(void *), &dK48_1);
+        setarg(kh[RECUR], 3, sizeof(void *), &dV48_1);
+        setarg(kh[RECUR], 4, sizeof(void *), &sSpec);
+        setarg(kh[RECUR], 5, sizeof(void *), &dBt1);
+        setarg(kh[RECUR], 6, sizeof(void *), &dG48_1);
+        setarg(kh[RECUR], 7, sizeof(int), &dd);
+        launch(R, kh[RECUR], NH);
+        setarg(kh[RMSI], 0, sizeof(void *), &dBt1);
+        setarg(kh[RMSI], 1, sizeof(void *), &dMx1);
+        launch(R, kh[RMSI], NH);
+        setarg(kh[GATE], 0, sizeof(void *), &dAtt1);
+        setarg(kh[GATE], 1, sizeof(void *), &dMx1);
+        setarg(kh[GATE], 2, sizeof(void *), &dZ1);
+        setarg(kh[GATE], 3, sizeof(void *), &ngS);
+        setarg(kh[GATE], 4, sizeof(void *), &dBt1);
+        launch(R, kh[GATE], V6);
+
+        xq2(R, dAtt0, V6, dQ8_0, dSq_0);
+        xq2(R, dAtt1, V6, dQ8_1, dSq_1);
+        gemvM2(R, find(nm(L, "linear_attn.out_proj.weight")), H, V6, dMix0, dMix1);
+      }
+      res(R, dTmp0, dX0, dMix0);
+      res(R, dTmp1, dX1, dMix1);
+      rnorm(R, dH0, dTmp0, postN);
+      rnorm(R, dH1, dTmp1, postN);
+      xq2(R, dH0, H, dQ8_0, dSq_0);
+      xq2(R, dH1, H, dQ8_1, dSq_1);
+      gemvM2(R, find(nm(L, "mlp.gate_proj.weight")), I, H, dG17_0, dG17_1);
+      gemvM2(R, find(nm(L, "mlp.up_proj.weight")), I, H, dU17_0, dU17_1);
+      setarg(kh[SILU], 0, sizeof(void *), &dG17_0);
+      setarg(kh[SILU], 1, sizeof(void *), &dU17_0);
+      setarg(kh[SILU], 2, sizeof(void *), &dG17_0);
+      launch(R, kh[SILU], I);
+      setarg(kh[SILU], 0, sizeof(void *), &dG17_1);
+      setarg(kh[SILU], 1, sizeof(void *), &dU17_1);
+      setarg(kh[SILU], 2, sizeof(void *), &dG17_1);
+      launch(R, kh[SILU], I);
+      xq2(R, dG17_0, I, dQ8_0, dSq_0);
+      xq2(R, dG17_1, I, dQ8_1, dSq_1);
+      gemvM2(R, find(nm(L, "mlp.down_proj.weight")), H, I, dMix0, dMix1);
+      res(R, dX0, dTmp0, dMix0);
+      res(R, dX1, dTmp1, dMix1);
+      CHECK(zeCommandListClose(R.h));
+      layersM2.push_back(R);
+    }
+
+    // Tail for dual-token verification
+    tailM2.h = newList();
+    rnorm(tailM2, dH0, dX0, dFinN);
+    rnorm(tailM2, dH1, dX1, dFinN);
+    xq2(tailM2, dH0, H, dQ8_0, dSq_0);
+    xq2(tailM2, dH1, H, dQ8_1, dSq_1);
+    gemvM2(tailM2, find("lm_head.weight"), V, H, dLogits0, dLogits1);
+
+    // Argmax token 0
+    setarg(kh[ARG1], 0, sizeof(void *), &dLogits0);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV0);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI0);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(tailM2, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV0);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI0);
+    setarg(kh[ARG2], 2, sizeof(void *), &dOutT0);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(tailM2, kh[ARG2], 1);
+
+    // Argmax token 1
+    setarg(kh[ARG1], 0, sizeof(void *), &dLogits1);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV1);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI1);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(tailM2, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV1);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI1);
+    setarg(kh[ARG2], 2, sizeof(void *), &dOutT1);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(tailM2, kh[ARG2], 1);
+    CHECK(zeCommandListClose(tailM2.h));
+
+    // Commit specular state list
+    commitSpecR.h = newList();
+    CHECK(zeCommandListAppendMemoryCopy(commitSpecR.h, dConv, dConvSpec,
+                                        (size_t)48 * C * 3 * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryCopy(commitSpecR.h, dS, dSSpec,
+                                        (size_t)48 * NH * D * D * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListClose(commitSpecR.h));
+    std::fprintf(stderr, "[l0] recorded 64 dual-verification layer lists + embedM2 + tailM2 + commitSpec\n");
+  }
+
+  // ---- record: triple-token verification lists (T7.2 chained drafts) ----
+  // Structural mirror of the M2 block with a third lane (_2 suffix). Lane 2
+  // appends full-attention KV into the PRIMARY slots (slot-indexed: a
+  // rejected draft's slots are overwritten by the next round, exactly like
+  // lane 1) and mutates the SECOND specular level for linear layers
+  // (spec2 = copy of spec1 post-lane-1, then lane-2 update).
+  Rec embM3{nullptr};
+  std::vector<Rec> layersM3;
+  Rec tailM3{nullptr};
+  Rec commitSpec2R{nullptr};
+  Rec mtpDraft2R{nullptr};
+  if (opt_mtp) {
+    embM3.h = newList();
+    setarg(kh[EMBED], 0, sizeof(void *), &dX0);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrl0);
+    launch(embM3, kh[EMBED], H);
+    setarg(kh[EMBED], 0, sizeof(void *), &dX1);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrl1);
+    launch(embM3, kh[EMBED], H);
+    setarg(kh[EMBED], 0, sizeof(void *), &dX2);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrl2);
+    launch(embM3, kh[EMBED], H);
+    CHECK(zeCommandListClose(embM3.h));
+
+    for (int L = 0; L < 64; ++L) {
+      Rec R{newList()};
+      void *inN = (char *)dInN + (size_t)L * H * 4;
+      void *postN = (char *)dPostN + (size_t)L * H * 4;
+      rnorm(R, dH0, dX0, inN);
+      rnorm(R, dH1, dX1, inN);
+      rnorm(R, dH2, dX2, inN);
+      xq2(R, dH0, H, dQ8_0, dSq_0);
+      xq2(R, dH1, H, dQ8_1, dSq_1);
+      xq2(R, dH2, H, dQ8_2, dSq_2);
+      if (is_full(L)) {
+        int slot = L / 4;
+        gemvM3(R, find(nm(L, "self_attn.q_proj.weight")), QW, H, dQ16_0, dQ16_1, dQ16_2);
+        gemvM3(R, find(nm(L, "self_attn.k_proj.weight")), KVW, H, dK16_0, dK16_1, dK16_2);
+        gemvM3(R, find(nm(L, "self_attn.v_proj.weight")), KVW, H, dV16_0, dV16_1, dV16_2);
+        setarg(kh[SPLIT], 0, sizeof(void *), &dQ16_0);
+        setarg(kh[SPLIT], 1, sizeof(void *), &dQn0);
+        setarg(kh[SPLIT], 2, sizeof(void *), &dGate0);
+        launch(R, kh[SPLIT], QN);
+        setarg(kh[SPLIT], 0, sizeof(void *), &dQ16_1);
+        setarg(kh[SPLIT], 1, sizeof(void *), &dQn1);
+        setarg(kh[SPLIT], 2, sizeof(void *), &dGate1);
+        launch(R, kh[SPLIT], QN);
+        setarg(kh[SPLIT], 0, sizeof(void *), &dQ16_2);
+        setarg(kh[SPLIT], 1, sizeof(void *), &dQn2);
+        setarg(kh[SPLIT], 2, sizeof(void *), &dGate2);
+        launch(R, kh[SPLIT], QN);
+
+        void *qnW = (char *)dQNW + (size_t)slot * 256 * 4;
+        void *knW = (char *)dKNW + (size_t)slot * 256 * 4;
+        setarg(kh[BNORM], 0, sizeof(void *), &dQn0);
+        setarg(kh[BNORM], 1, sizeof(void *), &dQn0);
+        setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 24);
+        setarg(kh[BNORM], 0, sizeof(void *), &dKn0);
+        setarg(kh[BNORM], 1, sizeof(void *), &dK16_0);
+        setarg(kh[BNORM], 2, sizeof(void *), &knW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 4);
+        setarg(kh[BNORM], 0, sizeof(void *), &dQn1);
+        setarg(kh[BNORM], 1, sizeof(void *), &dQn1);
+        setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 24);
+        setarg(kh[BNORM], 0, sizeof(void *), &dKn1);
+        setarg(kh[BNORM], 1, sizeof(void *), &dK16_1);
+        setarg(kh[BNORM], 2, sizeof(void *), &knW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 4);
+        setarg(kh[BNORM], 0, sizeof(void *), &dQn2);
+        setarg(kh[BNORM], 1, sizeof(void *), &dQn2);
+        setarg(kh[BNORM], 2, sizeof(void *), &qnW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 24);
+        setarg(kh[BNORM], 0, sizeof(void *), &dKn2);
+        setarg(kh[BNORM], 1, sizeof(void *), &dK16_2);
+        setarg(kh[BNORM], 2, sizeof(void *), &knW);
+        setarg(kh[BNORM], 3, sizeof(int), &n256);
+        launch(R, kh[BNORM], 4);
+
+        setarg(kh[ROPE], 0, sizeof(void *), &dQn0);
+        setarg(kh[ROPE], 1, sizeof(void *), &dKn0);
+        setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+        setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+        setarg(kh[ROPE], 4, sizeof(void *), &dCtrl0);
+        launch(R, kh[ROPE], 28);
+        setarg(kh[ROPE], 0, sizeof(void *), &dQn1);
+        setarg(kh[ROPE], 1, sizeof(void *), &dKn1);
+        setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+        setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+        setarg(kh[ROPE], 4, sizeof(void *), &dCtrl1);
+        launch(R, kh[ROPE], 28);
+        setarg(kh[ROPE], 0, sizeof(void *), &dQn2);
+        setarg(kh[ROPE], 1, sizeof(void *), &dKn2);
+        setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+        setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+        setarg(kh[ROPE], 4, sizeof(void *), &dCtrl2);
+        launch(R, kh[ROPE], 28);
+
+        if (kv8) {
+          void *kcS = (char *)dKc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+          void *vcS = (char *)dVc8 + ((size_t)slot * MAXCTX) * 4 * 256;
+          void *ksS = (char *)dKscl + ((size_t)slot * MAXCTX) * 4 * 4;
+          void *vsS = (char *)dVscl + ((size_t)slot * MAXCTX) * 4 * 4;
+          setarg(kh[KV8], 0, sizeof(void *), &kcS);
+          setarg(kh[KV8], 1, sizeof(void *), &vcS);
+          setarg(kh[KV8], 2, sizeof(void *), &ksS);
+          setarg(kh[KV8], 3, sizeof(void *), &vsS);
+          setarg(kh[KV8], 4, sizeof(void *), &dKn0);
+          setarg(kh[KV8], 5, sizeof(void *), &dV16_0);
+          setarg(kh[KV8], 6, sizeof(void *), &dCtrl0);
+          setarg(kh[KV8], 7, sizeof(int), &tmax);
+          launch(R, kh[KV8], 4);
+          setarg(kh[ATTN8], 0, sizeof(void *), &dAtt0);
+          setarg(kh[ATTN8], 1, sizeof(void *), &dQn0);
+          setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+          setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+          setarg(kh[ATTN8], 6, sizeof(void *), &dGate0);
+          setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl0);
+          setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+          setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+          launch(R, kh[ATTN8], 24);
+          setarg(kh[KV8], 0, sizeof(void *), &kcS);
+          setarg(kh[KV8], 1, sizeof(void *), &vcS);
+          setarg(kh[KV8], 2, sizeof(void *), &ksS);
+          setarg(kh[KV8], 3, sizeof(void *), &vsS);
+          setarg(kh[KV8], 4, sizeof(void *), &dKn1);
+          setarg(kh[KV8], 5, sizeof(void *), &dV16_1);
+          setarg(kh[KV8], 6, sizeof(void *), &dCtrl1);
+          setarg(kh[KV8], 7, sizeof(int), &tmax);
+          launch(R, kh[KV8], 4);
+          setarg(kh[ATTN8], 0, sizeof(void *), &dAtt1);
+          setarg(kh[ATTN8], 1, sizeof(void *), &dQn1);
+          setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+          setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+          setarg(kh[ATTN8], 6, sizeof(void *), &dGate1);
+          setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl1);
+          setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+          setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+          launch(R, kh[ATTN8], 24);
+          setarg(kh[KV8], 0, sizeof(void *), &kcS);
+          setarg(kh[KV8], 1, sizeof(void *), &vcS);
+          setarg(kh[KV8], 2, sizeof(void *), &ksS);
+          setarg(kh[KV8], 3, sizeof(void *), &vsS);
+          setarg(kh[KV8], 4, sizeof(void *), &dKn2);
+          setarg(kh[KV8], 5, sizeof(void *), &dV16_2);
+          setarg(kh[KV8], 6, sizeof(void *), &dCtrl2);
+          setarg(kh[KV8], 7, sizeof(int), &tmax);
+          launch(R, kh[KV8], 4);
+          setarg(kh[ATTN8], 0, sizeof(void *), &dAtt2);
+          setarg(kh[ATTN8], 1, sizeof(void *), &dQn2);
+          setarg(kh[ATTN8], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN8], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN8], 4, sizeof(void *), &ksS);
+          setarg(kh[ATTN8], 5, sizeof(void *), &vsS);
+          setarg(kh[ATTN8], 6, sizeof(void *), &dGate2);
+          setarg(kh[ATTN8], 7, sizeof(void *), &dCtrl2);
+          setarg(kh[ATTN8], 8, sizeof(int), &tmax);
+          setarg(kh[ATTN8], 9, sizeof(void *), &dWts);
+          launch(R, kh[ATTN8], 24);
+        } else {
+          void *kcS = (char *)dKc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          void *vcS = (char *)dVc + ((size_t)slot * MAXCTX) * 4 * 256 * 2;
+          setarg(kh[KV], 0, sizeof(void *), &kcS);
+          setarg(kh[KV], 1, sizeof(void *), &vcS);
+          setarg(kh[KV], 2, sizeof(void *), &dKn0);
+          setarg(kh[KV], 3, sizeof(void *), &dV16_0);
+          setarg(kh[KV], 4, sizeof(void *), &dCtrl0);
+          setarg(kh[KV], 5, sizeof(int), &tmax);
+          launch(R, kh[KV], KVW);
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt0);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn0);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate0);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl0);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+          setarg(kh[KV], 0, sizeof(void *), &kcS);
+          setarg(kh[KV], 1, sizeof(void *), &vcS);
+          setarg(kh[KV], 2, sizeof(void *), &dKn1);
+          setarg(kh[KV], 3, sizeof(void *), &dV16_1);
+          setarg(kh[KV], 4, sizeof(void *), &dCtrl1);
+          setarg(kh[KV], 5, sizeof(int), &tmax);
+          launch(R, kh[KV], KVW);
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt1);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn1);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate1);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl1);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+          setarg(kh[KV], 0, sizeof(void *), &kcS);
+          setarg(kh[KV], 1, sizeof(void *), &vcS);
+          setarg(kh[KV], 2, sizeof(void *), &dKn2);
+          setarg(kh[KV], 3, sizeof(void *), &dV16_2);
+          setarg(kh[KV], 4, sizeof(void *), &dCtrl2);
+          setarg(kh[KV], 5, sizeof(int), &tmax);
+          launch(R, kh[KV], KVW);
+          setarg(kh[ATTN], 0, sizeof(void *), &dAtt2);
+          setarg(kh[ATTN], 1, sizeof(void *), &dQn2);
+          setarg(kh[ATTN], 2, sizeof(void *), &kcS);
+          setarg(kh[ATTN], 3, sizeof(void *), &vcS);
+          setarg(kh[ATTN], 4, sizeof(void *), &dGate2);
+          setarg(kh[ATTN], 5, sizeof(void *), &dCtrl2);
+          setarg(kh[ATTN], 6, sizeof(int), &tmax);
+          setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+          launch(R, kh[ATTN], 24);
+        }
+        xq2(R, dAtt0, V6, dQ8_0, dSq_0);
+        xq2(R, dAtt1, V6, dQ8_1, dSq_1);
+        xq2(R, dAtt2, V6, dQ8_2, dSq_2);
+        gemvM3(R, find(nm(L, "self_attn.o_proj.weight")), H, V6, dMix0, dMix1, dMix2);
+      } else {
+        int sl = L - (L + 1) / 4;
+        gemvM3(R, find(nm(L, "linear_attn.in_proj_qkv.weight")), C, H, dQKV0, dQKV1, dQKV2);
+        gemvM3(R, find(nm(L, "linear_attn.in_proj_z.weight")), V6, H, dZ0, dZ1, dZ2);
+        gemvM3(R, find(nm(L, "linear_attn.in_proj_b.weight")), NH, H, dB0, dB1, dB2);
+        gemvM3(R, find(nm(L, "linear_attn.in_proj_a.weight")), NH, H, dA0, dA1, dA2);
+
+        void *csS = (char *)dConv + (size_t)sl * C * 3 * 4;
+        void *cwS = (char *)dConvW + (size_t)sl * C * 4 * 4;
+        void *sS = (char *)dS + (size_t)sl * NH * D * D * 4;
+        void *alS = (char *)dAL + (size_t)sl * 48 * 4;
+        void *dtS = (char *)dDT + (size_t)sl * 48 * 4;
+        void *ngS = (char *)dLinN + (size_t)sl * 128 * 4;
+        void *csSpec = (char *)dConvSpec + (size_t)sl * C * 3 * 4;
+        void *sSpec = (char *)dSSpec + (size_t)sl * NH * D * D * 4;
+        void *csSpec2 = (char *)dConvSpec2 + (size_t)sl * C * 3 * 4;
+        void *sSpec2 = (char *)dSSpec2 + (size_t)sl * NH * D * D * 4;
+        int dd = D;
+
+        // Token 0: mutates primary state csS, sS
+        setarg(kh[CONV], 0, sizeof(void *), &dMx0);
+        setarg(kh[CONV], 1, sizeof(void *), &dQKV0);
+        setarg(kh[CONV], 2, sizeof(void *), &csS);
+        setarg(kh[CONV], 3, sizeof(void *), &cwS);
+        launch(R, kh[CONV], C);
+        setarg(kh[SPLIT2], 0, sizeof(void *), &dMx0);
+        setarg(kh[SPLIT2], 1, sizeof(void *), &dQ48_0);
+        setarg(kh[SPLIT2], 2, sizeof(void *), &dK48_0);
+        setarg(kh[SPLIT2], 3, sizeof(void *), &dV48_0);
+        launch(R, kh[SPLIT2], V6);
+        setarg(kh[L2], 0, sizeof(void *), &dQ48_0);
+        setarg(kh[L2], 1, sizeof(void *), &dK48_0);
+        launch(R, kh[L2], 96);
+        setarg(kh[BETA], 0, sizeof(void *), &dBt0);
+        setarg(kh[BETA], 1, sizeof(void *), &dG48_0);
+        setarg(kh[BETA], 2, sizeof(void *), &dB0);
+        setarg(kh[BETA], 3, sizeof(void *), &dA0);
+        setarg(kh[BETA], 4, sizeof(void *), &alS);
+        setarg(kh[BETA], 5, sizeof(void *), &dtS);
+        launch(R, kh[BETA], NH);
+        setarg(kh[RECUR], 0, sizeof(void *), &dMx0);
+        setarg(kh[RECUR], 1, sizeof(void *), &dQ48_0);
+        setarg(kh[RECUR], 2, sizeof(void *), &dK48_0);
+        setarg(kh[RECUR], 3, sizeof(void *), &dV48_0);
+        setarg(kh[RECUR], 4, sizeof(void *), &sS);
+        setarg(kh[RECUR], 5, sizeof(void *), &dBt0);
+        setarg(kh[RECUR], 6, sizeof(void *), &dG48_0);
+        setarg(kh[RECUR], 7, sizeof(int), &dd);
+        launch(R, kh[RECUR], NH);
+        setarg(kh[RMSI], 0, sizeof(void *), &dBt0);
+        setarg(kh[RMSI], 1, sizeof(void *), &dMx0);
+        launch(R, kh[RMSI], NH);
+        setarg(kh[GATE], 0, sizeof(void *), &dAtt0);
+        setarg(kh[GATE], 1, sizeof(void *), &dMx0);
+        setarg(kh[GATE], 2, sizeof(void *), &dZ0);
+        setarg(kh[GATE], 3, sizeof(void *), &ngS);
+        setarg(kh[GATE], 4, sizeof(void *), &dBt0);
+        launch(R, kh[GATE], V6);
+
+        // Copy primary state (updated by Token 0) into specular state
+        CHECK(zeCommandListAppendMemoryCopy(R.h, csSpec, csS, (size_t)C * 3 * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendMemoryCopy(R.h, sSpec, sS, (size_t)NH * D * D * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendBarrier(R.h, nullptr, 0, nullptr));
+
+        // Token 1: mutates specular state csSpec, sSpec
+        setarg(kh[CONV], 0, sizeof(void *), &dMx1);
+        setarg(kh[CONV], 1, sizeof(void *), &dQKV1);
+        setarg(kh[CONV], 2, sizeof(void *), &csSpec);
+        setarg(kh[CONV], 3, sizeof(void *), &cwS);
+        launch(R, kh[CONV], C);
+        setarg(kh[SPLIT2], 0, sizeof(void *), &dMx1);
+        setarg(kh[SPLIT2], 1, sizeof(void *), &dQ48_1);
+        setarg(kh[SPLIT2], 2, sizeof(void *), &dK48_1);
+        setarg(kh[SPLIT2], 3, sizeof(void *), &dV48_1);
+        launch(R, kh[SPLIT2], V6);
+        setarg(kh[L2], 0, sizeof(void *), &dQ48_1);
+        setarg(kh[L2], 1, sizeof(void *), &dK48_1);
+        launch(R, kh[L2], 96);
+        setarg(kh[BETA], 0, sizeof(void *), &dBt1);
+        setarg(kh[BETA], 1, sizeof(void *), &dG48_1);
+        setarg(kh[BETA], 2, sizeof(void *), &dB1);
+        setarg(kh[BETA], 3, sizeof(void *), &dA1);
+        setarg(kh[BETA], 4, sizeof(void *), &alS);
+        setarg(kh[BETA], 5, sizeof(void *), &dtS);
+        launch(R, kh[BETA], NH);
+        setarg(kh[RECUR], 0, sizeof(void *), &dMx1);
+        setarg(kh[RECUR], 1, sizeof(void *), &dQ48_1);
+        setarg(kh[RECUR], 2, sizeof(void *), &dK48_1);
+        setarg(kh[RECUR], 3, sizeof(void *), &dV48_1);
+        setarg(kh[RECUR], 4, sizeof(void *), &sSpec);
+        setarg(kh[RECUR], 5, sizeof(void *), &dBt1);
+        setarg(kh[RECUR], 6, sizeof(void *), &dG48_1);
+        setarg(kh[RECUR], 7, sizeof(int), &dd);
+        launch(R, kh[RECUR], NH);
+        setarg(kh[RMSI], 0, sizeof(void *), &dBt1);
+        setarg(kh[RMSI], 1, sizeof(void *), &dMx1);
+        launch(R, kh[RMSI], NH);
+        setarg(kh[GATE], 0, sizeof(void *), &dAtt1);
+        setarg(kh[GATE], 1, sizeof(void *), &dMx1);
+        setarg(kh[GATE], 2, sizeof(void *), &dZ1);
+        setarg(kh[GATE], 3, sizeof(void *), &ngS);
+        setarg(kh[GATE], 4, sizeof(void *), &dBt1);
+        launch(R, kh[GATE], V6);
+
+        // Copy specular state (updated by Token 1) into second level
+        CHECK(zeCommandListAppendMemoryCopy(R.h, csSpec2, csSpec, (size_t)C * 3 * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendMemoryCopy(R.h, sSpec2, sSpec, (size_t)NH * D * D * 4, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendBarrier(R.h, nullptr, 0, nullptr));
+
+        // Token 2: mutates second-level specular state csSpec2, sSpec2
+        setarg(kh[CONV], 0, sizeof(void *), &dMx2);
+        setarg(kh[CONV], 1, sizeof(void *), &dQKV2);
+        setarg(kh[CONV], 2, sizeof(void *), &csSpec2);
+        setarg(kh[CONV], 3, sizeof(void *), &cwS);
+        launch(R, kh[CONV], C);
+        setarg(kh[SPLIT2], 0, sizeof(void *), &dMx2);
+        setarg(kh[SPLIT2], 1, sizeof(void *), &dQ48_2);
+        setarg(kh[SPLIT2], 2, sizeof(void *), &dK48_2);
+        setarg(kh[SPLIT2], 3, sizeof(void *), &dV48_2);
+        launch(R, kh[SPLIT2], V6);
+        setarg(kh[L2], 0, sizeof(void *), &dQ48_2);
+        setarg(kh[L2], 1, sizeof(void *), &dK48_2);
+        launch(R, kh[L2], 96);
+        setarg(kh[BETA], 0, sizeof(void *), &dBt2);
+        setarg(kh[BETA], 1, sizeof(void *), &dG48_2);
+        setarg(kh[BETA], 2, sizeof(void *), &dB2);
+        setarg(kh[BETA], 3, sizeof(void *), &dA2);
+        setarg(kh[BETA], 4, sizeof(void *), &alS);
+        setarg(kh[BETA], 5, sizeof(void *), &dtS);
+        launch(R, kh[BETA], NH);
+        setarg(kh[RECUR], 0, sizeof(void *), &dMx2);
+        setarg(kh[RECUR], 1, sizeof(void *), &dQ48_2);
+        setarg(kh[RECUR], 2, sizeof(void *), &dK48_2);
+        setarg(kh[RECUR], 3, sizeof(void *), &dV48_2);
+        setarg(kh[RECUR], 4, sizeof(void *), &sSpec2);
+        setarg(kh[RECUR], 5, sizeof(void *), &dBt2);
+        setarg(kh[RECUR], 6, sizeof(void *), &dG48_2);
+        setarg(kh[RECUR], 7, sizeof(int), &dd);
+        launch(R, kh[RECUR], NH);
+        setarg(kh[RMSI], 0, sizeof(void *), &dBt2);
+        setarg(kh[RMSI], 1, sizeof(void *), &dMx2);
+        launch(R, kh[RMSI], NH);
+        setarg(kh[GATE], 0, sizeof(void *), &dAtt2);
+        setarg(kh[GATE], 1, sizeof(void *), &dMx2);
+        setarg(kh[GATE], 2, sizeof(void *), &dZ2);
+        setarg(kh[GATE], 3, sizeof(void *), &ngS);
+        setarg(kh[GATE], 4, sizeof(void *), &dBt2);
+        launch(R, kh[GATE], V6);
+
+        xq2(R, dAtt0, V6, dQ8_0, dSq_0);
+        xq2(R, dAtt1, V6, dQ8_1, dSq_1);
+        xq2(R, dAtt2, V6, dQ8_2, dSq_2);
+        gemvM3(R, find(nm(L, "linear_attn.out_proj.weight")), H, V6, dMix0, dMix1, dMix2);
+      }
+      res(R, dTmp0, dX0, dMix0);
+      res(R, dTmp1, dX1, dMix1);
+      res(R, dTmp2, dX2, dMix2);
+      rnorm(R, dH0, dTmp0, postN);
+      rnorm(R, dH1, dTmp1, postN);
+      rnorm(R, dH2, dTmp2, postN);
+      xq2(R, dH0, H, dQ8_0, dSq_0);
+      xq2(R, dH1, H, dQ8_1, dSq_1);
+      xq2(R, dH2, H, dQ8_2, dSq_2);
+      gemvM3(R, find(nm(L, "mlp.gate_proj.weight")), I, H, dG17_0, dG17_1, dG17_2);
+      gemvM3(R, find(nm(L, "mlp.up_proj.weight")), I, H, dU17_0, dU17_1, dU17_2);
+      setarg(kh[SILU], 0, sizeof(void *), &dG17_0);
+      setarg(kh[SILU], 1, sizeof(void *), &dU17_0);
+      setarg(kh[SILU], 2, sizeof(void *), &dG17_0);
+      launch(R, kh[SILU], I);
+      setarg(kh[SILU], 0, sizeof(void *), &dG17_1);
+      setarg(kh[SILU], 1, sizeof(void *), &dU17_1);
+      setarg(kh[SILU], 2, sizeof(void *), &dG17_1);
+      launch(R, kh[SILU], I);
+      setarg(kh[SILU], 0, sizeof(void *), &dG17_2);
+      setarg(kh[SILU], 1, sizeof(void *), &dU17_2);
+      setarg(kh[SILU], 2, sizeof(void *), &dG17_2);
+      launch(R, kh[SILU], I);
+      xq2(R, dG17_0, I, dQ8_0, dSq_0);
+      xq2(R, dG17_1, I, dQ8_1, dSq_1);
+      xq2(R, dG17_2, I, dQ8_2, dSq_2);
+      gemvM3(R, find(nm(L, "mlp.down_proj.weight")), H, I, dMix0, dMix1, dMix2);
+      res(R, dX0, dTmp0, dMix0);
+      res(R, dX1, dTmp1, dMix1);
+      res(R, dX2, dTmp2, dMix2);
+      CHECK(zeCommandListClose(R.h));
+      layersM3.push_back(R);
+    }
+
+    // Tail for triple-token verification
+    tailM3.h = newList();
+    rnorm(tailM3, dH0, dX0, dFinN);
+    rnorm(tailM3, dH1, dX1, dFinN);
+    rnorm(tailM3, dH2, dX2, dFinN);
+    xq2(tailM3, dH0, H, dQ8_0, dSq_0);
+    xq2(tailM3, dH1, H, dQ8_1, dSq_1);
+    xq2(tailM3, dH2, H, dQ8_2, dSq_2);
+    gemvM3(tailM3, find("lm_head.weight"), V, H, dLogits0, dLogits1, dLogits2);
+
+    // Argmax token 0
+    setarg(kh[ARG1], 0, sizeof(void *), &dLogits0);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV0);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI0);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV0);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI0);
+    setarg(kh[ARG2], 2, sizeof(void *), &dOutT0);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG2], 1);
+
+    // Argmax token 1
+    setarg(kh[ARG1], 0, sizeof(void *), &dLogits1);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV1);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI1);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV1);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI1);
+    setarg(kh[ARG2], 2, sizeof(void *), &dOutT1);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG2], 1);
+
+    // Argmax token 2
+    setarg(kh[ARG1], 0, sizeof(void *), &dLogits2);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV2);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI2);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV2);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI2);
+    setarg(kh[ARG2], 2, sizeof(void *), &dOutT2);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(tailM3, kh[ARG2], 1);
+    CHECK(zeCommandListClose(tailM3.h));
+
+    // Commit second-level specular state list (accept-2 path)
+    commitSpec2R.h = newList();
+    CHECK(zeCommandListAppendMemoryCopy(commitSpec2R.h, dConv, dConvSpec2,
+                                        (size_t)48 * C * 3 * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListAppendMemoryCopy(commitSpec2R.h, dS, dSSpec2,
+                                        (size_t)48 * NH * D * D * 4, nullptr, 0, nullptr));
+    CHECK(zeCommandListClose(commitSpec2R.h));
+
+    // Chained second draft list: re-applies the MTP module to (embed(d1),
+    // saved draft-1 hidden dChH). Reuses the draft buffers (d1 already read
+    // to host, dDraftX saved to dChH before exec). Own control dCtrlDraft2
+    // bound at record time for RoPE/KV/Attn (MTP KV is slot-indexed like
+    // trunk: a rejected d1's slot is overwritten by later appends).
+    mtpDraft2R.h = newList();
+    int nnH2 = H;
+    setarg(kh[EMBED], 0, sizeof(void *), &dDraftE);
+    setarg(kh[EMBED], 1, sizeof(void *), &embP);
+    setarg(kh[EMBED], 2, sizeof(void *), &dCtrlDraft2);
+    launch(mtpDraft2R, kh[EMBED], H);
+    rnorm(mtpDraft2R, dDraftEn, dDraftE, dPreE);
+    rnorm(mtpDraft2R, dDraftHn, dChH, dPreH);
+    setarg(kh[CONCAT], 0, sizeof(void *), &dDraftIn);
+    setarg(kh[CONCAT], 1, sizeof(void *), &dDraftEn);
+    setarg(kh[CONCAT], 2, sizeof(void *), &dDraftHn);
+    setarg(kh[CONCAT], 3, sizeof(int), &nnH2);
+    launch(mtpDraft2R, kh[CONCAT], 2 * H);
+    xq(mtpDraft2R, dDraftIn, 10240);
+    gemvE(mtpDraft2R, find("mtp.fc.weight"), H, 10240, dDraftX);
+    rnorm(mtpDraft2R, dH, dDraftX, dMInN);
+    xq(mtpDraft2R, dH, H);
+    gemvE(mtpDraft2R, find("mtp.layers.0.self_attn.q_proj.weight"), QW, H, dQ16);
+    gemvE(mtpDraft2R, find("mtp.layers.0.self_attn.k_proj.weight"), KVW, H, dK16);
+    gemvE(mtpDraft2R, find("mtp.layers.0.self_attn.v_proj.weight"), KVW, H, dV16);
+    setarg(kh[SPLIT], 0, sizeof(void *), &dQ16);
+    setarg(kh[SPLIT], 1, sizeof(void *), &dQn);
+    setarg(kh[SPLIT], 2, sizeof(void *), &dGate);
+    launch(mtpDraft2R, kh[SPLIT], QN);
+    setarg(kh[BNORM], 0, sizeof(void *), &dQn);
+    setarg(kh[BNORM], 1, sizeof(void *), &dQn);
+    setarg(kh[BNORM], 2, sizeof(void *), &dMQNW);
+    setarg(kh[BNORM], 3, sizeof(int), &n256);
+    launch(mtpDraft2R, kh[BNORM], 24);
+    setarg(kh[BNORM], 0, sizeof(void *), &dKn);
+    setarg(kh[BNORM], 1, sizeof(void *), &dK16);
+    setarg(kh[BNORM], 2, sizeof(void *), &dMKNW);
+    setarg(kh[BNORM], 3, sizeof(int), &n256);
+    launch(mtpDraft2R, kh[BNORM], 4);
+    setarg(kh[ROPE], 0, sizeof(void *), &dQn);
+    setarg(kh[ROPE], 1, sizeof(void *), &dKn);
+    setarg(kh[ROPE], 2, sizeof(void *), &dCos);
+    setarg(kh[ROPE], 3, sizeof(void *), &dSin);
+    setarg(kh[ROPE], 4, sizeof(void *), &dCtrlDraft2);
+    launch(mtpDraft2R, kh[ROPE], 28);
+    setarg(kh[KV], 0, sizeof(void *), &dMKc);
+    setarg(kh[KV], 1, sizeof(void *), &dMVc);
+    setarg(kh[KV], 2, sizeof(void *), &dKn);
+    setarg(kh[KV], 3, sizeof(void *), &dV16);
+    setarg(kh[KV], 4, sizeof(void *), &dCtrlDraft2);
+    setarg(kh[KV], 5, sizeof(int), &tmax);
+    launch(mtpDraft2R, kh[KV], KVW);
+    setarg(kh[ATTN], 0, sizeof(void *), &dAtt);
+    setarg(kh[ATTN], 1, sizeof(void *), &dQn);
+    setarg(kh[ATTN], 2, sizeof(void *), &dMKc);
+    setarg(kh[ATTN], 3, sizeof(void *), &dMVc);
+    setarg(kh[ATTN], 4, sizeof(void *), &dGate);
+    setarg(kh[ATTN], 5, sizeof(void *), &dCtrlDraft2);
+    setarg(kh[ATTN], 6, sizeof(int), &tmax);
+    setarg(kh[ATTN], 7, sizeof(void *), &dWts);
+    launch(mtpDraft2R, kh[ATTN], 24);
+    xq(mtpDraft2R, dAtt, QN);
+    gemvE(mtpDraft2R, find("mtp.layers.0.self_attn.o_proj.weight"), H, QN, dMix);
+    res(mtpDraft2R, dTmp, dDraftX, dMix);
+    rnorm(mtpDraft2R, dH, dTmp, dMPostN);
+    xq(mtpDraft2R, dH, H);
+    gemvE(mtpDraft2R, find("mtp.layers.0.mlp.gate_proj.weight"), I, H, dG17);
+    gemvE(mtpDraft2R, find("mtp.layers.0.mlp.up_proj.weight"), I, H, dU17);
+    setarg(kh[SILU], 0, sizeof(void *), &dG17);
+    setarg(kh[SILU], 1, sizeof(void *), &dU17);
+    setarg(kh[SILU], 2, sizeof(void *), &dG17);
+    launch(mtpDraft2R, kh[SILU], I);
+    xq(mtpDraft2R, dG17, I);
+    gemvE(mtpDraft2R, find("mtp.layers.0.mlp.down_proj.weight"), H, I, dMix);
+    res(mtpDraft2R, dDraftX, dTmp, dMix);
+    rnorm(mtpDraft2R, dH, dDraftX, dMNorm);
+    xq(mtpDraft2R, dH, H);
+    gemvE(mtpDraft2R, find("lm_head.weight"), V, H, dDraftLogits);
+    setarg(kh[ARG1], 0, sizeof(void *), &dDraftLogits);
+    setarg(kh[ARG1], 1, sizeof(void *), &dPV);
+    setarg(kh[ARG1], 2, sizeof(void *), &dPI);
+    setarg(kh[ARG1], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG1], 4, (size_t)256 * 4, nullptr);
+    launch(mtpDraft2R, kh[ARG1], 64);
+    setarg(kh[ARG2], 0, sizeof(void *), &dPV);
+    setarg(kh[ARG2], 1, sizeof(void *), &dPI);
+    setarg(kh[ARG2], 2, sizeof(void *), &dDraftOutT);
+    setarg(kh[ARG2], 3, (size_t)256 * 4, nullptr);
+    setarg(kh[ARG2], 4, (size_t)256 * 4, nullptr);
+    launch(mtpDraft2R, kh[ARG2], 1);
+    CHECK(zeCommandListClose(mtpDraft2R.h));
+    std::fprintf(stderr, "[l0] recorded 64 triple-verification layer lists + embedM3 + tailM3 + commitSpec2 + draft2\n");
+  }
 
   // ---- steady-state token loop: control updates + replays only ----
   // T6.1 profiling (env-gated, zero impact by default): every execute and
@@ -1124,6 +2415,7 @@ int main(int argc, char **argv) {
       for (int L = 0; L < 64; ++L) {
         bool full = (L % 4 == 3);
         int slot = L / 4, sl = L - (L + 1) / 4;
+        double tRec = prof ? now_ns() : 0;
         Rec R{newList()};
         void *dXi = (L % 2 == 0) ? dXa_ : dXb_;
         void *dXo = (L % 2 == 0) ? dXb_ : dXa_;
@@ -1375,7 +2667,13 @@ int main(int argc, char **argv) {
         CHECK(zeCommandQueueExecuteCommandLists(qq, 1, &R.h, fence));
         CHECK(zeFenceHostSynchronize(fence, UINT64_MAX));
         CHECK(zeFenceReset(fence));
-        prefill_ms += (now_ns() - t0) / 1e6;
+        double dtms = (now_ns() - t0) / 1e6;
+        prefill_ms += dtms;
+        if (prof)
+          buckets["prefill_rec"].push_back(t0 - tRec);
+        if (prof)
+          buckets[full ? "prefill_full" : "prefill_lin"].push_back(dtms *
+                                                                   1e6);
         if ((L & 15) == 0 || L == 63)
           std::fprintf(stderr, "[prefill] chunk %d layer %d recorded+run (%s)\n",
                        ch, L, full ? "full" : "linear");
@@ -1421,6 +2719,12 @@ int main(int argc, char **argv) {
   // slot and clobber the injected hidden). ids[impP..P-1] loop-decode as
   // the question when present; tail runs at P-1 as usual.
   const bool impTailOnly = impP > 0;
+  int pendingDraft = -1;
+  int mtpDraftTotal = 0, mtpDraftAccepted = 0;
+  int mtpChainedTotal = 0, mtpChainedAccepted = 0;
+  double tGenStart = 0;
+  double total_gen_ms = 0;
+  double gen_tok_per_sec = 0;
   // Unbuffered per-step trace for long runs (buffered stdout hides pace for
   // tens of minutes at 64K; lesson from the first needle attempt).
   const bool steplog = std::getenv("AINFER_STEPLOG") != nullptr;
@@ -1509,11 +2813,414 @@ int main(int argc, char **argv) {
       if (step >= P - 1 && step < P + G - 1)
         ids.push_back(tok);
       std::printf("step %d pos %d -> token %d\n", step, pos, tok);
+      if (step >= P - 1 && tGenStart == 0)
+        tGenStart = now_ns();
+      if (opt_mtp && step >= P - 1) {
+        if (tok == 248046 || tok == 248044 || (int)generated.size() >= G) {
+          stopped_eos = (tok == 248046 || tok == 248044);
+          break;
+        }
+        // Depth-2 chained drafts: d1 = MTP(confirmed), d2 = MTP(d1, h_mtp1).
+        // Helper: (re)draft both levels from a confirmed token + trunk hidden
+        // (trunk dX must hold hidden-after-confirmed; dChH saves draft-1
+        // hidden for the chained second evaluation).
+        int pendingDraft = -1, pendingDraft2 = -1;
+        bool need_d2 = false;
+        auto draft1only = [&](int conf_tok, int conf_pos) {
+          DecodeControl cd{conf_tok, conf_pos, conf_pos + 1, -1};
+          CHECK(zeCommandListAppendMemoryCopy(up, dCtrlDraft, &cd, sizeof(cd),
+                                              nullptr, 0, nullptr));
+          exec(mtpDraftR.h, "mtp_draft");
+          CHECK(zeCommandListAppendMemoryCopy(up, &pendingDraft, dDraftOutT, 4,
+                                              nullptr, 0, nullptr));
+        };
+        auto draft2chain = [&](int d1pos) {
+          // Chained part only: d1 pending for position d1pos (= conf_pos + 1
+          // of the draft-1 that produced it), dDraftX holds its hidden.
+          CHECK(zeCommandListAppendMemoryCopy(up, dChH, dDraftX, (size_t)H * 4,
+                                              nullptr, 0, nullptr));
+          DecodeControl cd2{pendingDraft, d1pos, d1pos + 1, -1};
+          CHECK(zeCommandListAppendMemoryCopy(up, dCtrlDraft2, &cd2, sizeof(cd2),
+                                              nullptr, 0, nullptr));
+          exec(mtpDraft2R.h, "mtp_draft2");
+          CHECK(zeCommandListAppendMemoryCopy(up, &pendingDraft2, dDraftOutT, 4,
+                                              nullptr, 0, nullptr));
+          need_d2 = false;
+        };
+        auto redraft = [&](int conf_tok, int conf_pos) {
+          draft1only(conf_tok, conf_pos);
+          draft2chain(conf_pos + 1);
+        };
+        // Depth policy: AINFER_MTP2=0 forces legacy depth-1 dual-token
+        // loop, =1 forces depth-2 triple loop; default (unset) is ADAPTIVE.
+        const char *mtp2e = std::getenv("AINFER_MTP2");
+        const int force_depth = (mtp2e && mtp2e[0] == '0') ? 2 : (mtp2e ? 3 : 0);
+        double trail_tok = 0, d1trail = 0;
+        int trail_n = 0, d1n = 0, since_probe = 0, probe_ivl = 8;
+        bool last_probe = false;
+        auto note_d1 = [&](bool acc) {
+          d1trail += acc ? 1.0 : 0.0;
+          d1n++;
+          if (d1n > 8) {
+            d1trail *= 0.5;
+            d1n = 4;
+          }
+        };
+        auto want_m3 = [&]() -> bool {
+          if (force_depth == 2)
+            return false;
+          if (force_depth == 3)
+            return true;
+          // Discovery is free: d1trail updates on EVERY round (M2 and M3),
+          // so seed it with cheap M2 rounds — no M3 warmup tax.
+          last_probe = false;
+          if (d1n < 4) {
+            if ((++since_probe % 4) == 0) {
+              last_probe = true;
+              return true;
+            }
+            return false;
+          }
+          double d1a = d1trail / d1n;
+          if (d1a < 0.8) {
+            if ((++since_probe % probe_ivl) == 0) {
+              last_probe = true;
+              return true;
+            }
+            return false;
+          }
+          if (trail_n >= 2) {
+            double rate_m3 = (trail_tok / trail_n) / 0.1168;
+            if (rate_m3 < 18.5) {
+              if ((++since_probe % probe_ivl) == 0) {
+                last_probe = true;
+                return true;
+              }
+              return false;
+            }
+          }
+          return true;
+        };
+        auto note_trail = [&](int sz0, bool chained_acc) {
+          trail_tok += (double)((int)generated.size() - sz0);
+          trail_n++;
+          if (trail_n > 12) {
+            trail_tok *= 0.5;
+            trail_n = 6;
+          }
+          if (last_probe) {
+            probe_ivl = chained_acc ? 8 : std::min(32, probe_ivl * 2);
+            last_probe = false;
+          }
+        };
+        int confirmed_tok = tok;
+        int cur_pos = pos + 1;
+        if (force_depth == 2) {
+          // Legacy depth-1 loop (M2 lists, single draft per round). NOTE:
+          // no local pendingDraft here — draft1only writes the shared outer
+          // one (a shadowed local once froze drafts at their first value).
+          draft1only(tok, pos);
+          while ((int)generated.size() <= G && cur_pos < MAXCTX - 1) {
+            int draft_tok = pendingDraft;
+            int pos0 = cur_pos;
+            int pos1 = cur_pos + 1;
+            DecodeControl c0{confirmed_tok, pos0, pos0 + 1, -1};
+            DecodeControl c1{draft_tok, pos1, pos1 + 1, -1};
+            CHECK(zeCommandListAppendMemoryCopy(up, dCtrl0, &c0, sizeof(c0), nullptr, 0, nullptr));
+            CHECK(zeCommandListAppendMemoryCopy(up, dCtrl1, &c1, sizeof(c1), nullptr, 0, nullptr));
+            exec(embM2.h, "embed_m2");
+            for (int L = 0; L < 64; ++L) {
+              exec(layersM2[L].h, is_full(L) ? "attn_m2" : "lin_m2");
+            }
+            exec(tailM2.h, "tail_m2");
+            int tok0 = -1, tok1 = -1;
+            CHECK(zeCommandListAppendMemoryCopy(up, &tok0, dOutT0, 4, nullptr, 0, nullptr));
+            CHECK(zeCommandListAppendMemoryCopy(up, &tok1, dOutT1, 4, nullptr, 0, nullptr));
+            mtpDraftTotal++;
+            bool acc2 = (tok0 == draft_tok);
+            note_d1(acc2);
+            if (acc2) {
+              mtpDraftAccepted++;
+              exec(commitSpecR.h, "commit_spec");
+              generated.push_back(tok0);
+              ids.push_back(tok0);
+              std::printf("step %d pos %d -> token %d [MTP draft accepted, alpha=%.3f (%d/%d)]\n",
+                          (int)ids.size() - 1, pos0, tok0,
+                          (float)mtpDraftAccepted / mtpDraftTotal,
+                          mtpDraftAccepted, mtpDraftTotal);
+              if (tok0 == 248046 || tok0 == 248044) {
+                stopped_eos = true;
+                break;
+              }
+              if ((int)generated.size() <= G) {
+                generated.push_back(tok1);
+                ids.push_back(tok1);
+                std::printf("step %d pos %d -> token %d [MTP verified]\n",
+                            (int)ids.size() - 1, pos1, tok1);
+                if (tok1 == 248046 || tok1 == 248044) {
+                  stopped_eos = true;
+                  break;
+                }
+                if ((int)generated.size() <= G && pos1 + 1 < MAXCTX) {
+                  CHECK(zeCommandListAppendMemoryCopy(up, dX, dX1, (size_t)H * 4, nullptr, 0, nullptr));
+                  draft1only(tok1, pos1);
+                  confirmed_tok = tok1;
+                  cur_pos = pos1 + 1;
+                } else {
+                  break;
+                }
+              } else {
+                break;
+              }
+            } else {
+              generated.push_back(tok0);
+              ids.push_back(tok0);
+              std::printf("step %d pos %d -> token %d [MTP draft %d REJECTED, alpha=%.3f (%d/%d)]\n",
+                          (int)ids.size() - 1, pos0, tok0, draft_tok,
+                          (float)mtpDraftAccepted / mtpDraftTotal,
+                          mtpDraftAccepted, mtpDraftTotal);
+              if (tok0 == 248046 || tok0 == 248044) {
+                stopped_eos = true;
+                break;
+              }
+              if ((int)generated.size() <= G && pos0 + 1 < MAXCTX) {
+                CHECK(zeCommandListAppendMemoryCopy(up, dX, dX0, (size_t)H * 4, nullptr, 0, nullptr));
+                draft1only(tok0, pos0);
+                confirmed_tok = tok0;
+                cur_pos = pos0 + 1;
+              } else {
+                break;
+              }
+            }
+          }
+        } else {
+        // Seed draft-1 only; draft-2 is computed on demand by the first
+        // M3 round (need_d2). Trunk dX holds hidden-after-tok.
+        draft1only(tok, pos);
+        need_d2 = true;
+        }
+
+        // G-counting matches the base loop (G+1 tokens when no EOS): base
+        // overshoots max-new by one, so the MTP guards use <= G (T7.2 fix
+        // for the 60-vs-61 stop bug). The M3/adaptive loop is skipped in
+        // force-M2 mode (its standalone loop above already ran).
+        while (force_depth != 2 && (int)generated.size() <= G &&
+               cur_pos < MAXCTX - 2) {
+          if (!want_m3()) {
+            // Adaptive M2 round: single draft verify via the M2 lists.
+            // pendingDraft is fresh (every round end re-drafts d1).
+            int draft_tok = pendingDraft;
+            int pos0 = cur_pos;
+            int pos1 = cur_pos + 1;
+            DecodeControl c0{confirmed_tok, pos0, pos0 + 1, -1};
+            DecodeControl c1{draft_tok, pos1, pos1 + 1, -1};
+            CHECK(zeCommandListAppendMemoryCopy(up, dCtrl0, &c0, sizeof(c0), nullptr, 0, nullptr));
+            CHECK(zeCommandListAppendMemoryCopy(up, dCtrl1, &c1, sizeof(c1), nullptr, 0, nullptr));
+            exec(embM2.h, "embed_m2");
+            for (int L = 0; L < 64; ++L) {
+              exec(layersM2[L].h, is_full(L) ? "attn_m2" : "lin_m2");
+            }
+            exec(tailM2.h, "tail_m2");
+            int tok0 = -1, tok1 = -1;
+            CHECK(zeCommandListAppendMemoryCopy(up, &tok0, dOutT0, 4, nullptr, 0, nullptr));
+            CHECK(zeCommandListAppendMemoryCopy(up, &tok1, dOutT1, 4, nullptr, 0, nullptr));
+            mtpDraftTotal++;
+            bool acc2 = (tok0 == draft_tok);
+            note_d1(acc2);
+            if (acc2) {
+              mtpDraftAccepted++;
+              exec(commitSpecR.h, "commit_spec");
+              generated.push_back(tok0);
+              ids.push_back(tok0);
+              std::printf("step %d pos %d -> token %d [MTP2 draft accepted, alpha=%.3f (%d/%d)]\n",
+                          (int)ids.size() - 1, pos0, tok0,
+                          (float)mtpDraftAccepted / mtpDraftTotal,
+                          mtpDraftAccepted, mtpDraftTotal);
+              if (tok0 == 248046 || tok0 == 248044) {
+                stopped_eos = true;
+                break;
+              }
+              if ((int)generated.size() <= G) {
+                generated.push_back(tok1);
+                ids.push_back(tok1);
+                std::printf("step %d pos %d -> token %d [MTP2 verified]\n",
+                            (int)ids.size() - 1, pos1, tok1);
+                if (tok1 == 248046 || tok1 == 248044) {
+                  stopped_eos = true;
+                  break;
+                }
+                if ((int)generated.size() <= G && pos1 + 1 < MAXCTX) {
+                  CHECK(zeCommandListAppendMemoryCopy(up, dX, dX1, (size_t)H * 4, nullptr, 0, nullptr));
+                  draft1only(tok1, pos1);
+                  need_d2 = true;
+                  confirmed_tok = tok1;
+                  cur_pos = pos1 + 1;
+                } else {
+                  break;
+                }
+              } else {
+                break;
+              }
+            } else {
+              generated.push_back(tok0);
+              ids.push_back(tok0);
+              std::printf("step %d pos %d -> token %d [MTP2 draft %d REJECTED, alpha=%.3f (%d/%d)]\n",
+                          (int)ids.size() - 1, pos0, tok0, draft_tok,
+                          (float)mtpDraftAccepted / mtpDraftTotal,
+                          mtpDraftAccepted, mtpDraftTotal);
+              if (tok0 == 248046 || tok0 == 248044) {
+                stopped_eos = true;
+                break;
+              }
+              if ((int)generated.size() <= G && pos0 + 1 < MAXCTX) {
+                CHECK(zeCommandListAppendMemoryCopy(up, dX, dX0, (size_t)H * 4, nullptr, 0, nullptr));
+                draft1only(tok0, pos0);
+                need_d2 = true;
+                confirmed_tok = tok0;
+                cur_pos = pos0 + 1;
+              } else {
+                break;
+              }
+            }
+            continue;
+          }
+          if (need_d2) {
+            // Previous round was M2 (only d1 fresh): run the chained part.
+            // d1 was drafted from (confirmed_tok, cur_pos - 1).
+            draft2chain(cur_pos);
+          }
+          int sz0 = (int)generated.size();
+          int draft_tok = pendingDraft;
+          int draft2_tok = pendingDraft2;
+          int pos0 = cur_pos;
+          int pos1 = cur_pos + 1;
+          int pos2 = cur_pos + 2;
+
+          DecodeControl c0{confirmed_tok, pos0, pos0 + 1, -1};
+          DecodeControl c1{draft_tok, pos1, pos1 + 1, -1};
+          DecodeControl c2{draft2_tok, pos2, pos2 + 1, -1};
+          CHECK(zeCommandListAppendMemoryCopy(up, dCtrl0, &c0, sizeof(c0), nullptr, 0, nullptr));
+          CHECK(zeCommandListAppendMemoryCopy(up, dCtrl1, &c1, sizeof(c1), nullptr, 0, nullptr));
+          CHECK(zeCommandListAppendMemoryCopy(up, dCtrl2, &c2, sizeof(c2), nullptr, 0, nullptr));
+
+          exec(embM3.h, "embed_m3");
+          for (int L = 0; L < 64; ++L) {
+            exec(layersM3[L].h, is_full(L) ? "attn_m3" : "lin_m3");
+          }
+          exec(tailM3.h, "tail_m3");
+
+          int tok0 = -1, tok1 = -1, tok2 = -1;
+          CHECK(zeCommandListAppendMemoryCopy(up, &tok0, dOutT0, 4, nullptr, 0, nullptr));
+          CHECK(zeCommandListAppendMemoryCopy(up, &tok1, dOutT1, 4, nullptr, 0, nullptr));
+          CHECK(zeCommandListAppendMemoryCopy(up, &tok2, dOutT2, 4, nullptr, 0, nullptr));
+
+          mtpDraftTotal++;
+          bool acc1 = (tok0 == draft_tok);
+          note_d1(acc1);
+          auto push_tok = [&](int t, int p, const char *tag) {
+            generated.push_back(t);
+            ids.push_back(t);
+            std::printf("step %d pos %d -> token %d [%s alpha=%.3f (%d/%d)]\n",
+                        (int)ids.size() - 1, p, t, tag,
+                        (float)mtpDraftAccepted / mtpDraftTotal,
+                        mtpDraftAccepted, mtpDraftTotal);
+          };
+          auto is_eos = [&](int t) { return t == 248046 || t == 248044; };
+          if (acc1) {
+            mtpDraftAccepted++;
+            mtpChainedTotal++;
+            if (tok1 == draft2_tok) {
+              // Accept-2: all three verified. Commit level-2 specular state.
+              mtpChainedAccepted++;
+              exec(commitSpec2R.h, "commit_spec2");
+              push_tok(tok0, pos0, "MTP draft accepted");
+              if (is_eos(tok0)) { stopped_eos = true; break; }
+              if ((int)generated.size() <= G) {
+                push_tok(tok1, pos1, "MTP chained accepted");
+                if (is_eos(tok1)) { stopped_eos = true; break; }
+                if ((int)generated.size() <= G) {
+                  push_tok(tok2, pos2, "MTP verified");
+                  if (is_eos(tok2)) { stopped_eos = true; break; }
+                  if ((int)generated.size() <= G && pos2 + 1 < MAXCTX - 1) {
+                    CHECK(zeCommandListAppendMemoryCopy(up, dX, dX2, (size_t)H * 4, nullptr, 0, nullptr));
+                    note_trail(sz0, true);
+                    redraft(tok2, pos2);
+                    confirmed_tok = tok2;
+                    cur_pos = pos2 + 1;
+                  } else {
+                    break;
+                  }
+                } else {
+                  break;
+                }
+              } else {
+                break;
+              }
+            } else {
+              // Accept-1: tok0, tok1 verified; d2 rejected. Commit level-1.
+              exec(commitSpecR.h, "commit_spec");
+              push_tok(tok0, pos0, "MTP draft accepted");
+              if (is_eos(tok0)) { stopped_eos = true; break; }
+              if ((int)generated.size() <= G) {
+                push_tok(tok1, pos1, "MTP chained REJECTED");
+                if (is_eos(tok1)) { stopped_eos = true; break; }
+                if ((int)generated.size() <= G && pos1 + 1 < MAXCTX - 1) {
+                  CHECK(zeCommandListAppendMemoryCopy(up, dX, dX1, (size_t)H * 4, nullptr, 0, nullptr));
+                  note_trail(sz0, false);
+                    redraft(tok1, pos1);
+                  confirmed_tok = tok1;
+                  cur_pos = pos1 + 1;
+                } else {
+                  break;
+                }
+              } else {
+                break;
+              }
+            }
+          } else {
+            // Accept-0 (reject): tok0 is verified true token; primary state
+            // already correct, no commit. tok1/tok2 discarded.
+            push_tok(tok0, pos0, "MTP draft REJECTED");
+            if (is_eos(tok0)) { stopped_eos = true; break; }
+            if ((int)generated.size() <= G && pos0 + 1 < MAXCTX - 1) {
+              CHECK(zeCommandListAppendMemoryCopy(up, dX, dX0, (size_t)H * 4, nullptr, 0, nullptr));
+              note_trail(sz0, false);
+              redraft(tok0, pos0);
+              confirmed_tok = tok0;
+              cur_pos = pos0 + 1;
+            } else {
+              break;
+            }
+          }
+        }
+        total_gen_ms = (now_ns() - tGenStart) / 1e6;
+        gen_tok_per_sec = (generated.size() > 0 && total_gen_ms > 0) ? (generated.size() / (total_gen_ms / 1000.0)) : 0.0;
+        std::printf("[MTP Speculative Decode] %zu tokens generated in %.1f ms = %.2f tok/s (%.2f ms/token)\n",
+                    generated.size(), total_gen_ms, gen_tok_per_sec,
+                    gen_tok_per_sec > 0 ? 1000.0 / gen_tok_per_sec : 0.0);
+        break;
+      }
       if (step >= P - 1 && (tok == 248046 || tok == 248044)) {
         stopped_eos = true;
         break;
       }
     }
+  }
+  if (!opt_mtp && tGenStart > 0) {
+    total_gen_ms = (now_ns() - tGenStart) / 1e6;
+    gen_tok_per_sec = (generated.size() > 0 && total_gen_ms > 0) ? (generated.size() / (total_gen_ms / 1000.0)) : 0.0;
+    std::printf("[Normal Decode] %zu tokens generated in %.1f ms = %.2f tok/s (%.2f ms/token)\n",
+                generated.size(), total_gen_ms, gen_tok_per_sec,
+                gen_tok_per_sec > 0 ? 1000.0 / gen_tok_per_sec : 0.0);
+  }
+  if (opt_mtp && mtpDraftTotal > 0) {
+    std::printf("[MTP summary] %d/%d accepted, alpha = %.3f",
+                mtpDraftAccepted, mtpDraftTotal,
+                (float)mtpDraftAccepted / mtpDraftTotal);
+    if (mtpChainedTotal > 0)
+      std::printf(" chained %d/%d = %.3f", mtpChainedAccepted, mtpChainedTotal,
+                  (float)mtpChainedAccepted / mtpChainedTotal);
+    std::printf("\n");
   }
 
   char sbuf[256];
@@ -1550,6 +3257,22 @@ int main(int argc, char **argv) {
     char pb[64];
     std::snprintf(pb, sizeof pb, ",\"prefill_ms\":%.1f", prefill_ms);
     json += pb;
+  }
+  if (opt_mtp) {
+    char mb[192];
+    std::snprintf(mb, sizeof mb,
+                  ",\"mtp\":{\"total\":%d,\"accepted\":%d,\"alpha\":%.4f,"
+                  "\"chained_total\":%d,\"chained_accepted\":%d}",
+                  mtpDraftTotal, mtpDraftAccepted,
+                  mtpDraftTotal > 0 ? (float)mtpDraftAccepted / mtpDraftTotal : 0.0f,
+                  mtpChainedTotal, mtpChainedAccepted);
+    json += mb;
+  }
+  if (total_gen_ms > 0) {
+    char db[128];
+    std::snprintf(db, sizeof db, ",\"decode_ms\":%.1f,\"decode_tok_per_sec\":%.2f",
+                  total_gen_ms, gen_tok_per_sec);
+    json += db;
   }
   json += "}";
   FILE *o = stdout;

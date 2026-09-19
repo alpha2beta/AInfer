@@ -26,7 +26,7 @@ find_program(SYCL_POST_LINK sycl-post-link
 if(NOT LLVM_SPIRV OR NOT SYCL_POST_LINK)
   message(FATAL_ERROR "llvm-spirv/sycl-post-link not found (needed for T5.3 SPIR-V)")
 endif()
-set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
+set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
 set(SPV_FILES "")
 foreach(m IN LISTS SPV_MODS)
   list(APPEND SPV_FILES ${CMAKE_CURRENT_BINARY_DIR}/${m}.spv)
@@ -343,6 +343,19 @@ add_test(NAME mtpdraft_replay
                           ${CMAKE_CURRENT_BINARY_DIR}/argmax2.spv
                           ${CMAKE_CURRENT_BINARY_DIR}/report_mtpdraft.json)
 set_tests_properties(mtpdraft_replay PROPERTIES TIMEOUT 1800)
+
+# T7.2 chained drafts: Int4GemvM3 triple-lane GEMV vs M2+M1, real weights.
+add_executable(gemvm3_replay gemvm3_replay.cpp)
+target_include_directories(gemvm3_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(gemvm3_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(gemvm3_replay spv_mods)
+add_test(NAME gemvm3_replay
+  COMMAND gemvm3_replay ${CMAKE_CURRENT_BINARY_DIR}/gemvm3.spv
+                        ${CMAKE_CURRENT_SOURCE_DIR}/../../models/Qwen3.8-27B/qwen3.8-27b-text-int4g128.binfer
+                        ${CMAKE_CURRENT_BINARY_DIR}/report_gemvm3.json)
+set_tests_properties(gemvm3_replay PROPERTIES TIMEOUT 1200)
 
 # T7.4 long-context scan: AttnCore at T=1K/2K/4K (same SPIR-V, 4K sizing).
 add_executable(attnfar_replay attnfar_replay.cpp)

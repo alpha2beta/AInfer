@@ -58,6 +58,8 @@ WANTED = {
     "_ZTS13ChunkSsmRecur": "chunkssmrecur.spv",
     "_ZTS9CvtF32F16": "cvtf32f16.spv",
     "_ZTS7Concat2": "concat.spv",
+    "_ZTS10Int4GemvM2": "gemvm2.spv",
+    "_ZTS10Int4GemvM3": "gemvm3.spv",
     "_ZTS10KvAppendI8": "kvappendi8.spv",
     "_ZTS10AttnCoreI8": "attni8.spv",
     "_ZTS9TiledAttn": "tiledattn.spv",
