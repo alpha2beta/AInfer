@@ -1,0 +1,21 @@
+{
+ "task": "T7.2-draft-slice",
+ "date": "2026-09-12",
+ "harness": "tools/cmdlist/mtpdraft_replay.cpp (ctest)",
+ "composition": "pre_fc norms + concat + fc(5120x10240 INT4) + full layer (own 1-slot BF16 KV, shared RoPE/Ctrl) + mtp.norm + lm_head(248320) + argmax, one recorded list, real weights (~0.9 GB spans)",
+ "new_kernel": "Concat2 (10 lines) + launch guard against dead-strip; _ZTS7Concat2 (name-length miscount caught at extract)",
+ "harness_result": {
+  "device": "B60",
+  "slice": "mtp-1 draft (real weights)",
+  "steps": 4,
+  "runs": 2,
+  "draft_us": 6417.08,
+  "worst_rel": 4.46e-08,
+  "ref_tol": 0.0001,
+  "draft_token": 74455,
+  "draft_ref": 74455,
+  "reset_deterministic": true,
+  "mtpdraft_ok": true
+ },
+ "verdict": "MTPDRAFT-OK: hidden 4.46e-08, token exact, top5 5/5, deterministic, 6.4 ms/draft. Verify pending chunk production."
+}
