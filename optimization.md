@@ -175,8 +175,16 @@ Controlled comparison run from `tools/bench_258v/run_llama_comparison_t75.py`:
   - **Recurrence v2 (`deltanet_recurrent_batch_v2`):** double-buffered 4-step batching (1 barrier per 4 steps vs 1 per step) plus 4-way split accumulators for the dot-product FMA chains, env-gated (`AINFER_RECR_V1=1`). Measured only ~9% on the kernel (5.27→4.9 ms): the barrier cut alone changed nothing (verified identical via `AINFER_RECR_V1=1` A/B), so the loop is bound by FMA-chain latency/occupancy, not barriers — a parallel-scan rewrite would be needed for a large win (deferred: complex, ~10–13% end-to-end prize).
 - **Impact:**
   - P=256 prefill: **299.04 → 318.31 tok/s** (+6.5%; 804.26 ms, 3.14 ms/tok), P=128: 274.76 → 286.31 tok/s.
+  - **Extended sweep 2026-09-19 (P=512/1024/2048):** P=512 (291.62 tok/s), P=1024 (254.88 tok/s), P=2048 (198.21 tok/s, 5.05 ms/tok). The curve peaks at P≈256 and declines after — later chunks pay growing causal-attention cost over longer KV, dragging the average down. An externally claimed 525 tok/s OpenVINO figure (no published prompt length or methodology) is unreachable anywhere on this curve; closing that gap, if real, needs cross-query KV reuse (FlashAttention-style blocking: each K/V block read once per query-block instead of once per query) rather than more per-query tuning.
   - Full Gate M4 suite (7/7) re-verified bit-exact with final code (attention v2 + recurrence v2 active).
   - Honest accounting: remaining prefill is ~memory-bound near the practical roofline (MoE + dense GEMMs ≈ 70%); further big wins need the recurrence parallel scan or higher achieved bandwidth, not more barrier-cutting.
+### Pillar 9: Prefill GEMM Doubled K-Slices (328 tok/s @P=441)
+- **Problem:** `int4_gemm_prefill` measured at ~1.3 TFLOPS (QKV 8.59 GFLOP in 6.844 ms at B=512) — single-digit % of Xe2 XMX peak. DPAS issue density, not launch overhead, is the bound (this measurement also killed the QKV+ZAB fusion idea: launch + X-reread savings estimated ~1%, deprioritized).
+- **Optimization:** new `int4_gemm_prefill_v2` processes 2 K-slices (32 K elements) per iteration: 4KB double-buffered SLM staging over slice-pairs, 8 back-to-back DPAS per barrier instead of 4, same scales reused across each even-aligned pair. Env-gated (`AINFER_GEMM_V1=1` restores v1).
+- **Impact:**
+  - P=441: 307.06 → **328.29 tok/s** (+6.9%, 1343.34 ms, 3.05 ms/tok); P=256 →335.52 (+5.7%), P=512 →328.39 (+6.2%), P=1024 →280.58 (+5.1%), P=2048 →207.78 (+2.4%).
+  - Running total at matched P=441: 294.80 → 328.29 (**+11.4%**); remaining gap to the claimed 525 tok/s is 1.6x.
+  - Full Gate M4 suite (7/7) re-verified bit-exact with GEMM v2 active.
 
 ---
 

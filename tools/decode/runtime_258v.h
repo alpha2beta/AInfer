@@ -422,7 +422,12 @@ private:
   std::vector<ze_command_list_handle_t> all_step_lists_; // embed + 40 layers + tail
 
   // Chunked Prefill Acceleration (T3.1 / T5.2)
-  static constexpr int MAX_PREFILL_CHUNK = 256;
+  // Raised 256 -> 512 (2026-09-19): larger chunks improve MoE expert
+  // grouping (16 vs 8 slots/expert avg) and DPAS tile fill; workspace
+  // arena sized accordingly (256 MiB). Chunk buffers + cmd caches scale
+  // automatically via this constant; overflow guard fires at init if fit
+  // is wrong.
+  static constexpr int MAX_PREFILL_CHUNK = 512;
 
   float *d_x_chunk_ = nullptr;            // [32, 2048]
   float *d_x_norm_chunk_ = nullptr;       // [32, 2048]

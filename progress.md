@@ -425,3 +425,17 @@
   - Extended `profile_prefill_breakdown` with a full-attention layer section (Layer 3 bindings) and pinned the control-buffer position to 0 for faithful books (prior attention figures were inflated ~3x by stale position state); cross-validated against standalone A/B harness (6.687 vs 6.665 ms at B=256).
   - `gqa_attn_prefill_batch_v2` (subgroup-shuffle reduction, forced SIMD16 after IGC silently picked SIMD32): 1.36–2.65x on the kernel, 1.68e-07 vs CPU. `deltanet_recurrent_batch_v2` (double-buffered 4-step + 4-way accumulators): ~9% on the kernel only — barriers were not the bound. Both env-gated (`AINFER_ATTN_V1` / `AINFER_RECR_V1`).
   - Rebuilt `bench_prefill`: P=256 reaches **318.31 tok/s** (804.26 ms, 3.14 ms/tok), +6.5% over 299.04. Full Gate M4 suite (7/7) re-verified bit-exact with final code. See `optimization.md` Pillar 8 for the full account including the deferred parallel-scan note.
+- **2026-09-19 (Extended prefill sweep to P=2048 — curve peaks at P=256):**
+  - Widened `bench_prefill` `test_lengths` to {8..2048}; `report_prefill_scaling.json` now records P=512 (291.62 tok/s, 1755.71 ms), P=1024 (254.88 tok/s, 4017.62 ms), P=2048 (198.21 tok/s, 10332.63 ms, 5.05 ms/tok).
+  - Throughput peaks at P≈256 (~309–318 tok/s) and declines after: later chunks attend over longer KV so per-chunk attention cost grows while MoE/DeltaNet stay flat. The externally claimed 525 tok/s OpenVINO figure is unreachable anywhere on our curve — flagged as unverifiable without their prompt length/methodology; the principled fix if pursued is cross-query KV reuse, not per-query tuning.
+- **2026-09-19 (Matched-P=441 OpenVINO comparison — 1.78x prefill gap confirmed):**
+  - External methodology received (Win11 26200, driver 101.8826, OV GenAI 2026.2.1, VLMPipeline greedy bench, 441-token prefill probe, 5 runs + 2 warmup). Built `tools/bench_258v/bench_p441.cpp` and measured our number at matched P=441: **294.80 tok/s** (1495.91 ms avg-of-5) vs their claimed 525 tok/s → 1.78x gap at matched prompt length, with decode at parity (35.0 vs 35.54).
+  - Read: prefill-only gap at decode parity implicates compute-kernel efficiency (DPAS utilization, occupancy, fusion), not memory bandwidth. Confounders noted: OS/driver stack, OV INT4 vs INT4-g128, single-table unverified source. Also note their TTFT (372 ms) cannot come from the 441-token probe (441/525 = 840 ms) — the table mixes metrics across runs.
+  - Candidate levers (T7.5 note): larger prefill chunks, QKV+ZAB GEMM fusion, bigger DPAS tiles.
+- **2026-09-19 (Lever 1 — larger prefill chunks: +2-6%, gap remains):**
+  - Raised `MAX_PREFILL_CHUNK` 256→512, workspace 128→256 MiB. P=441: 294.80→**307.06 tok/s** (+4.2%); P=512 →309.10 (+6.0%), P=1024 →266.87 (+4.7%), P=2048 →202.82 (+2.3%). M4 suite 7/7 bit-exact.
+  - Verdict: chunking contributes but cannot explain 1.7x — the OpenVINO gap (307 vs 525) needs GEMM fusion / DPAS tile work, not chunk sizing.
+- **2026-09-19 (Lever 3 first cut — GEMM v2 doubled K-slices: +5-6%):**
+  - Measured `int4_gemm_prefill` at ~1.3 TFLOPS (single-digit % of XMX peak) → DPAS density is the bound; QKV+ZAB fusion (~1% prize) deprioritized on the numbers.
+  - New `int4_gemm_prefill_v2` (2 K-slices/iteration, 8 back-to-back DPAS per barrier, env-gated `AINFER_GEMM_V1`): P=441 →**328.29 tok/s** (+6.9%); sweep P=256 →335.52, P=512 →328.39, P=1024 →280.58, P=2048 →207.78. M4 7/7 bit-exact.
+  - Running total at P=441: 294.80→328.29 (+11.4%); remaining gap to 525 is 1.6x. See `optimization.md` Pillar 9.

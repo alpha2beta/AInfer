@@ -9,16 +9,16 @@
     "scale_arena_bytes": 546467840,
     "kv_cache_arena_bytes": 41943040,
     "ssm_state_arena_bytes": 65863680,
-    "workspace_arena_bytes": 134217728,
-    "total_device_gb": 18.0514,
-    "available_headroom_gb": 13.9486,
+    "workspace_arena_bytes": 268435456,
+    "total_device_gb": 18.1764,
+    "available_headroom_gb": 13.8236,
     "rss_growth_kb": 0
   },
   "performance": {
-    "prefill_latency_ms": 136.136,
-    "prefill_ms_per_tok": 17.017,
-    "decode_latency_ms": 426.764,
-    "decode_tok_per_s": 35.1483
+    "prefill_latency_ms": 128.615,
+    "prefill_ms_per_tok": 16.0769,
+    "decode_latency_ms": 472.398,
+    "decode_tok_per_s": 31.7529
   },
   "tasks": {
     "T5.1": "PASS",

@@ -454,6 +454,185 @@ __kernel void int4_gemm_prefill(
 }
 
 // =========================================================================
+// 1c. INT4 Group-128 Batched Prefill GEMM v2: identical numerics to
+// int4_gemm_prefill, but each iteration processes 2 K-slices (32 K
+// elements) instead of 1, halving workgroup barriers per launch and
+// doubling DPAS issue density. Staging is double-buffered over pairs
+// (4KB SLM). Env-gated at runtime (v1 is the default fallback).
+// =========================================================================
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void int4_gemm_prefill_v2(
+    __global float * restrict Y,              // [B, M] row-major: Y[b * M + m]
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict X,        // [B, K] row-major: X[b * K + k]
+    int M,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_m = get_group_id(0);
+    int grp_b = get_group_id(1);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    int m_tile_idx = grp_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (grp_m * 128 >= M) return;
+
+    int m = m_base + lid;
+    int safe_m = (m < M) ? m : 0;
+    int num_groups = K / GROUP_SIZE;
+
+    __global const uchar *row_w = w_packed + (size_t)safe_m * (K / 2);
+    __global const ushort *row_s = w_scale + (size_t)safe_m * num_groups;
+
+    int b_base = grp_b * 32;
+    if (b_base >= B) return;
+
+    int cur_B0 = (B - b_base > 0) ? min(8, B - b_base) : 0;
+    int cur_B1 = (B - (b_base + 8) > 0) ? min(8, B - (b_base + 8)) : 0;
+    int cur_B2 = (B - (b_base + 16) > 0) ? min(8, B - (b_base + 16)) : 0;
+    int cur_B3 = (B - (b_base + 24) > 0) ? min(8, B - (b_base + 24)) : 0;
+
+    float8 acc0 = (float8)(0.0f);
+    float8 acc1 = (float8)(0.0f);
+    float8 acc2 = (float8)(0.0f);
+    float8 acc3 = (float8)(0.0f);
+
+    int tid = get_local_id(0); // 0..127
+    int tok_idx = tid / 4;      // 0..31
+    int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+    int b_curr = b_base + tok_idx;
+
+    __local half s_x[2][2][32][16]; // [buf][slice-in-pair][tok][k]
+
+    int total_steps = num_groups * 8; // (K / 128) * 8, always even
+    int total_pairs = total_steps / 2;
+
+    // Prologue: stage pair 0 (slices 0,1) into bufs[0]
+    #pragma unroll
+    for (int ps = 0; ps < 2; ++ps) {
+        float4 xv0 = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + ps * 16 + k_sub) : (float4)(0.0f);
+        s_x[0][ps][tok_idx][k_sub + 0] = (half)xv0.x;
+        s_x[0][ps][tok_idx][k_sub + 1] = (half)xv0.y;
+        s_x[0][ps][tok_idx][k_sub + 2] = (half)xv0.z;
+        s_x[0][ps][tok_idx][k_sub + 3] = (half)xv0.w;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int pr = 0; pr < total_pairs; ++pr) {
+        int cur_buf = pr & 1;
+        int next_buf = (pr + 1) & 1;
+
+        // Prefetch pair pr+1 into the idle buffer set (disjoint from the
+        // pair under compute, so no hazard without an extra barrier).
+        if (pr + 1 < total_pairs) {
+            #pragma unroll
+            for (int ps = 0; ps < 2; ++ps) {
+                int next_k = (pr * 2 + 2 + ps) * 16;
+                float4 xv_next = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + next_k + k_sub) : (float4)(0.0f);
+                s_x[next_buf][ps][tok_idx][k_sub + 0] = (half)xv_next.x;
+                s_x[next_buf][ps][tok_idx][k_sub + 1] = (half)xv_next.y;
+                s_x[next_buf][ps][tok_idx][k_sub + 2] = (half)xv_next.z;
+                s_x[next_buf][ps][tok_idx][k_sub + 3] = (half)xv_next.w;
+            }
+        }
+
+        // Compute both slices of pair pr (8 DPAS issue back-to-back).
+        #pragma unroll
+        for (int ps = 0; ps < 2; ++ps) {
+            int sl = pr * 2 + ps;
+            int g = sl / 8;
+
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
+
+            __global const uchar *w_ptr = row_w + (size_t)sl * 8;
+            uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+            half w_deq[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq[2 * i]     = (half)((float)n0) * s_half;
+                w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+            }
+
+            int8 b_mat;
+            __builtin_memcpy(&b_mat, w_deq, 32);
+
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B0) ((short *)&a_mat0)[bi] = as_short(s_x[cur_buf][ps][bi][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+            if (cur_B1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B1) ((short *)&a_mat1)[bi] = as_short(s_x[cur_buf][ps][8 + bi][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+            }
+
+            if (cur_B2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B2) ((short *)&a_mat2)[bi] = as_short(s_x[cur_buf][ps][16 + bi][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+            }
+
+            if (cur_B3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B3) ((short *)&a_mat3)[bi] = as_short(s_x[cur_buf][ps][24 + bi][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // Store outputs (identical to v1)
+    if (m < M) {
+        #pragma unroll
+        for (int bi = 0; bi < 8; ++bi) {
+            if (bi < cur_B0) Y[(size_t)(b_base + bi) * M + m] = ((float *)&acc0)[bi];
+        }
+        if (cur_B1 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B1) Y[(size_t)(b_base + 8 + bi) * M + m] = ((float *)&acc1)[bi];
+            }
+        }
+        if (cur_B2 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B2) Y[(size_t)(b_base + 16 + bi) * M + m] = ((float *)&acc2)[bi];
+            }
+        }
+        if (cur_B3 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B3) Y[(size_t)(b_base + 24 + bi) * M + m] = ((float *)&acc3)[bi];
+            }
+        }
+    }
+}
+
+// =========================================================================
+// 2. Deterministic MoE Top-8 Router
+// =========================================================================
+
+// =========================================================================
 // 2. Deterministic MoE Top-8 Router
 // =========================================================================
 __kernel void moe_topk_router(

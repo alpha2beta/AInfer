@@ -233,8 +233,9 @@ bool AInferRuntime258V::allocate_static_arenas() {
   ssm_state_bytes_ = total_ssm_recr_bytes + total_ssm_conv_bytes;
   CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_conv_bytes, 4096, dev_, &ssm_conv_arena_));
 
-  // 6. Activation Workspace Arena (~128 MiB)
-  workspace_bytes_ = 128ULL << 20; // 128 MiB
+  // 6. Activation Workspace Arena (256 MiB: chunk buffers scale with
+  // MAX_PREFILL_CHUNK = 512; ~190 MiB used, overflow guard below verifies)
+  workspace_bytes_ = 256ULL << 20; // 256 MiB
   CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, workspace_bytes_, 4096, dev_, &workspace_arena_));
 
   // 7. Pinned Host-Visible / Device Control Block (T5.4)
@@ -527,7 +528,11 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_lm_head_argmax1_ = get_k("int4_gemv_lm_head_argmax1");
 
   // Batch prefill kernels
-  k_gemm_prefill_ = get_k("int4_gemm_prefill");
+  // v2 processes 2 K-slices per iteration (halved barriers, denser DPAS);
+  // AINFER_GEMM_V1=1 restores the v1 kernel.
+  k_gemm_prefill_ = std::getenv("AINFER_GEMM_V1")
+                        ? get_k("int4_gemm_prefill")
+                        : get_k("int4_gemm_prefill_v2");
   k_embed_batch_ = get_k("embed_gather_batch");
   k_norm2048_batch_ = get_k("rmsnorm_2048_batch");
   k_conv_batch_ = get_k("conv1d_update_silu_batch");

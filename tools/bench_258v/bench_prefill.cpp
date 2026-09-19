@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   }
 
   std::vector<int> sample_tokens = {151644, 8948, 198, 2610, 525, 264, 10925, 151645};
-  std::vector<int> test_lengths = {8, 16, 32, 64, 128, 256};
+  std::vector<int> test_lengths = {8, 16, 32, 64, 128, 256, 512, 1024, 2048};
 
   std::printf("\n=================================================================\n");
   std::printf("--- AInfer Prefill Scaling Benchmark (Arc 140V Xe2) -------------\n");
