@@ -1,0 +1,9 @@
+{
+  "device": "Intel(R) Arc(TM) Graphics",
+  "active_experts": 8,
+  "strategy_1_host_readback_us": 76.81,
+  "strategy_2_recorded_fixed_us": 38.29,
+  "strategy_3_batched_device_driven_us": 4.84,
+  "speedup": 15.86,
+  "winning_strategy": "Batched Device-Driven Dispatch"
+}

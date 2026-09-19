@@ -1,0 +1,14 @@
+{
+  "task": "T4.5",
+  "device": "Arc 140V (Xe2)",
+  "all_passed": true,
+  "max_attn_output_diff": 9.76026e-07,
+  "latencies_us": {
+    "ctx_128": 129.605,
+    "ctx_512": 492.598,
+    "ctx_1024": 983.88,
+    "ctx_2048": 1972.48,
+    "ctx_4096": 4073.29
+  },
+  "status": "PASS"
+}

@@ -1,0 +1,9 @@
+{
+  "task": "T4.4",
+  "device": "Arc 140V (Xe2)",
+  "all_passed": true,
+  "max_final_output_diff": 2.38419e-07,
+  "max_ssm_state_diff": 9.31323e-09,
+  "latency_us": 21.1397,
+  "status": "PASS"
+}

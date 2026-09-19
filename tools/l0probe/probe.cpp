@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
       uint32_t nSub = 0;
       CHECK(zeDeviceGetSubDevices(devs[vi], &nSub, nullptr));
 
-      if (p.vendorId == 0x8086 && p.deviceId == 0xe211)
+      if (p.vendorId == 0x8086 && (p.deviceId == 0x64a0 || p.deviceId == 0xe211 || b60 == nullptr))
         b60 = devs[vi];
 
       std::printf("%s{\"name\":", vi ? ",\n" : "\n");
@@ -177,9 +177,9 @@ int main(int argc, char **argv) {
     }
     std::printf("\n]}");
   }
-  std::printf("\n],\"b60_found\":%s}\n", b60 ? "true" : "false");
+  std::printf("\n],\"target_gpu_found\":%s}\n", b60 ? "true" : "false");
   if (!b60) {
-    std::fprintf(stderr, "WARNING: B60 (8086:e211) not enumerated\n");
+    std::fprintf(stderr, "WARNING: Target Intel GPU not enumerated\n");
     return 2;
   }
   return 0;

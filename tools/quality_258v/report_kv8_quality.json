@@ -1,0 +1,74 @@
+{
+  "task": "T6.6",
+  "device": "Intel Arc 140V (Core Ultra 7 258V, Lunar Lake)",
+  "timestamp": "2026-09-18T19:50:00Z",
+  "topic": "INT8 KV Cache Quantization vs BF16 KV Baseline Qualification",
+  "architecture_context": {
+    "model": "symrex/Tiel-Coder-35B-A3B-Genesis-Hermes (Qwen3.5-MoE)",
+    "total_layers": 40,
+    "full_attention_layers": 10,
+    "linear_attention_layers": 30,
+    "linear_ssm_state_mib": 62.81,
+    "system_ram_gib": 32.0,
+    "allocable_l0_memory_gib": 30.69
+  },
+  "memory_comparison_matrix": {
+    "4K_context": {
+      "bf16_kv_mib": 80.0,
+      "int8_kv_mib": 40.0,
+      "ram_savings_mib": 40.0,
+      "ram_savings_pct_of_total": 0.12,
+      "headroom_bf16_gib": 13.94,
+      "headroom_int8_gib": 13.98
+    },
+    "16K_context": {
+      "bf16_kv_mib": 320.0,
+      "int8_kv_mib": 160.0,
+      "ram_savings_mib": 160.0,
+      "ram_savings_pct_of_total": 0.50,
+      "headroom_bf16_gib": 13.70,
+      "headroom_int8_gib": 13.86
+    },
+    "32K_context": {
+      "bf16_kv_mib": 640.0,
+      "int8_kv_mib": 320.0,
+      "ram_savings_mib": 320.0,
+      "ram_savings_pct_of_total": 1.00,
+      "headroom_bf16_gib": 13.38,
+      "headroom_int8_gib": 13.70
+    },
+    "64K_context": {
+      "bf16_kv_mib": 1280.0,
+      "int8_kv_mib": 640.0,
+      "ram_savings_mib": 640.0,
+      "ram_savings_pct_of_total": 2.00,
+      "headroom_bf16_gib": 12.76,
+      "headroom_int8_gib": 13.39
+    }
+  },
+  "quality_and_numerical_analysis": {
+    "bf16_kv_baseline": {
+      "numerical_error": 0.0,
+      "quality_corpus_pass_rate_pct": 93.5,
+      "retrieval_pass_rate_pct": 100.0,
+      "softmax_stability": "Exact FP16/BF16 dynamic range; zero underflow or clipping"
+    },
+    "int8_kv_quantization": {
+      "numerical_error_mae": 0.0074,
+      "softmax_amplification_risk": "Softmax exponential scaling amplifies small Key dot-product quantization errors, leading to 4-7% random query logit variance on complex long-context retrieval.",
+      "quality_corpus_pass_rate_pct": 92.0,
+      "retrieval_pass_rate_pct": 95.0
+    }
+  },
+  "qualification_decision": {
+    "default_production_format": "BF16_KV",
+    "rationale": [
+      "1. Memory Headroom Abundance: Because only 10 out of 40 layers carry KV cache (30 layers are DeltaNet SSM with fixed 62.8 MiB footprint), the full 32K context KV cache requires only 640 MiB in BF16.",
+      "2. Total committed memory at 32K context with BF16 KV is only 18.62 GiB, leaving 13.38 GB of free unified memory (far exceeding the 8.0 GB OS headroom safety requirement).",
+      "3. The memory savings of INT8 KV (320 MiB at 32K, 640 MiB at 64K) represents only 1-2% of system RAM, which does not justify the risk of softmax precision degradation.",
+      "4. BF16 KV achieves 100.0% retrieval accuracy on needle tests and 93.5% on the 200-case quality corpus.",
+      "5. BF16 KV is therefore qualified and confirmed as the permanent production default for Lunar Lake 258V. INT8 KV is retained as an optional diagnostic mode."
+    ],
+    "verdict": "QUALIFIED: BF16 KV confirmed as production default; INT8 KV retained as optional diagnostic."
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "task": "T7.3",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2 GPU)",
+  "memory_technology": "LPDDR5X-8533 (128-bit unified on-package memory)",
+  "timestamp": "2026-09-18T21:10:00Z",
+  "status": "PASSED",
+  "model_architecture": {
+    "total_layers": 40,
+    "deltanet_linear_layers": 30,
+    "full_attention_layers": 10,
+    "hidden_dimension": 2048,
+    "routed_experts_total": 256,
+    "active_experts_per_token": 8,
+    "shared_expert_active": true,
+    "active_parameters_per_token": 2238709760,
+    "active_parameters_billion": 2.239,
+    "flops_per_token_gflops": 4.477
+  },
+  "traffic_breakdown_per_token": {
+    "active_routed_weights_mb": 480.0,
+    "active_routed_scales_mb": 15.0,
+    "shared_expert_mb": 61.88,
+    "dense_attention_weights_mb": 46.41,
+    "dense_deltanet_weights_mb": 247.5,
+    "router_gate_weights_mb": 80.0,
+    "lm_head_weights_mb": 242.5,
+    "rmsnorm_weights_mb": 0.31,
+    "total_static_weights_mb": 1173.59,
+    "deltanet_ssm_state_mb": 120.0
+  },
+  "traffic_scaling_by_context": {
+    "64": {
+      "context_length": 64,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 655360,
+      "total_bytes_per_token": 1357086720,
+      "total_gib_per_token": 1.2639
+    },
+    "256": {
+      "context_length": 256,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 2621440,
+      "total_bytes_per_token": 1359052800,
+      "total_gib_per_token": 1.2657
+    },
+    "1024": {
+      "context_length": 1024,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 10485760,
+      "total_bytes_per_token": 1366917120,
+      "total_gib_per_token": 1.273
+    },
+    "4096": {
+      "context_length": 4096,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 41943040,
+      "total_bytes_per_token": 1398374400,
+      "total_gib_per_token": 1.3023
+    },
+    "16384": {
+      "context_length": 16384,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 167772160,
+      "total_bytes_per_token": 1524203520,
+      "total_gib_per_token": 1.4195
+    },
+    "32768": {
+      "context_length": 32768,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 335544320,
+      "total_bytes_per_token": 1691975680,
+      "total_gib_per_token": 1.5758
+    },
+    "65536": {
+      "context_length": 65536,
+      "static_weights_bytes": 1230602240,
+      "deltanet_state_bytes": 125829120,
+      "kv_cache_bytes": 671088640,
+      "total_bytes_per_token": 2027520000,
+      "total_gib_per_token": 1.8883
+    }
+  },
+  "roofline_analysis": {
+    "operational_intensity_flops_per_byte": 3.299,
+    "regime": "Strictly Memory-Bandwidth Bound (I < 10 FLOPs/byte)",
+    "theoretical_peak_bandwidth_gbs": 136.53,
+    "achievable_single_stream_bandwidth_gbs": 48.0,
+    "soc_total_achievable_bandwidth_gbs": 90.0,
+    "measured_decode_throughput_tok_per_s": 34.37,
+    "measured_active_bandwidth_gbs": 46.65,
+    "efficiency_vs_achievable_stream_bw_pct": 97.2,
+    "efficiency_vs_theoretical_peak_bw_pct": 34.2,
+    "compute_ceiling_tok_per_s": 2233.4,
+    "bandwidth_ceiling_tok_per_s": 35.4
+  }
+}

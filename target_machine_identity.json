@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AInfer Target Machine Identity (Probed & Verified)",
+  "machine_name": "MSI Lunar Lake Platform (Intel Core Ultra 7 258V)",
+  "subsystem_id": "1462:146c",
+  "processor": {
+    "model": "Intel(R) Core(TM) Ultra 7 258V",
+    "architecture": "x86_64",
+    "codename": "Lunar Lake",
+    "cores": 8,
+    "topology": "4 Lion Cove P-cores + 4 Skymont LP E-cores",
+    "numa_nodes": 1,
+    "tdp_nominal_watts": 17,
+    "tdp_burst_watts": 37
+  },
+  "gpu": {
+    "model": "Intel Arc 140V GPU",
+    "pci_id": "8086:64a0",
+    "pci_revision": "04",
+    "pci_slot": "00:02.0",
+    "architecture": "Xe2-LPG",
+    "kernel_driver": "xe",
+    "render_node": "/dev/dri/renderD128",
+    "xe_cores": 8,
+    "vector_engines": 64
+  },
+  "memory": {
+    "type": "LPDDR5X-8533 on-package unified memory",
+    "capacity_bytes": 33153888256,
+    "capacity_gb": 32.0,
+    "mem_total_kb": 32376844,
+    "mem_available_baseline_kb": 25772444,
+    "bus_width_bits": 128,
+    "theoretical_bandwidth_gbps": 136.5,
+    "planning_sustained_bandwidth_gbps": "90-115"
+  },
+  "software_stack": {
+    "os_name": "CachyOS",
+    "kernel_release": "7.2.3-1-cachyos-deckify",
+    "kernel_build": "#1 SMP PREEMPT_DYNAMIC Sun, 06 Sep 2026 19:41:42 +0000",
+    "os_family": "Arch Linux (rolling)",
+    "drm_driver": "xe",
+    "opencl_platform": "rusticl (Mesa Intel Graphics LNL)"
+  },
+  "status": "hardware_verified",
+  "verified_at": "2026-09-18"
+}

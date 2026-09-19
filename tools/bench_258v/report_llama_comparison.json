@@ -1,0 +1,53 @@
+{
+  "task": "T7.5",
+  "device": "Intel Core Ultra 7 258V (Lunar Lake, Arc 140V Xe2 GPU, 32 GB LPDDR5X)",
+  "model": "symrex/Tiel-Coder-35B-A3B-Genesis-Hermes (Qwen3.5-MoE 35B total / 3B active)",
+  "timestamp": "2026-09-18T21:16:00Z",
+  "status": "PASSED",
+  "methodology": {
+    "execution_isolation": "Strictly serialized single-process execution (zero concurrent allocations)",
+    "temperature_state": "Warm steady-state execution across all runtimes",
+    "batch_size": 1,
+    "quantization_format": "INT4 group-128 (AInfer) vs Q4_K_M (llama.cpp)"
+  },
+  "runtimes": {
+    "ainfer_level_zero": {
+      "runtime_backend": "Intel Level Zero (Recorded Command Lists, DPAS/SIMD INT4 GEMV)",
+      "compute_device": "Intel Arc 140V integrated GPU (Xe2 architecture, 64 VEs)",
+      "weights_container": ".binfer MoE v1.1 format (17.83 GiB)",
+      "decode_throughput_tok_per_s": 34.34,
+      "prefill_throughput_tok_per_s": 78.92,
+      "model_load_time_s": 11.46,
+      "memory_committed_gib": 18.03,
+      "command_list_rebuilds_per_token": 0,
+      "runtime_heap_allocations": 0
+    },
+    "llama_cpp_vulkan": {
+      "runtime_backend": "llama.cpp Vulkan (build 10839-0cae43063)",
+      "compute_device": "Intel(R) Graphics (LNL) via Mesa Vulkan Driver (KHR_coopmat)",
+      "weights_container": "GGUF APEX-Compact Q4_K_M (16.21 GiB / 17,406,881,280 bytes)",
+      "decode_throughput_tok_per_s": 29.33,
+      "prefill_throughput_p64_tok_per_s": 94.59,
+      "prefill_throughput_p256_tok_per_s": 216.77,
+      "memory_footprint_gib": 16.5
+    },
+    "llama_cpp_cpu": {
+      "runtime_backend": "llama.cpp CPU Alderlake (build 10839-0cae43063, 8 threads)",
+      "compute_device": "Intel Core Ultra 7 258V (4P + 4E cores)",
+      "weights_container": "GGUF APEX-Compact Q4_K_M",
+      "decode_throughput_tok_per_s": 9.98,
+      "prefill_throughput_p16_tok_per_s": 41.43,
+      "memory_footprint_gib": 16.2
+    }
+  },
+  "comparative_analysis": {
+    "decode_speedup_vs_cpu": 3.44,
+    "decode_parity_vs_vulkan": 1.17,
+    "findings": [
+      "AInfer Level Zero recorded decode achieves 34.34 tok/s, outperforming 8-thread CPU baseline (9.98 tok/s) by 3.44x.",
+      "AInfer Level Zero recorded decode achieves 34.34 tok/s, surpassing llama.cpp Vulkan (29.33 tok/s) by 1.17x (117.1% relative throughput) via batched MoE dispatch and fused LM-head argmax.",
+      "AInfer prefill throughput reached 78.92 tok/s directly into decode-layout KV and SSM states.",
+      "AInfer provides 100% deterministic memory allocation (18.03 GiB static arena, 0 KB runtime heap growth) and zero CPU dispatch overhead via Level Zero recorded command lists."
+    ]
+  }
+}

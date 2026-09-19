@@ -1,0 +1,19 @@
+{
+  "task": "T4.7",
+  "device": "Arc 140V (Xe2)",
+  "all_passed": true,
+  "deltanet_moe_block": {
+    "max_diff": 2.6226e-05,
+    "latency_us": 19.5251,
+    "status": "PASS"
+  },
+  "fullattn_moe_block": {
+    "max_diff": 0.000274658,
+    "latency_us": 12.75,
+    "status": "PASS"
+  },
+  "full_model_40_layers_projection": {
+    "total_latency_ms": 0.713253,
+    "projected_tok_per_s": 1402.03
+  }
+}

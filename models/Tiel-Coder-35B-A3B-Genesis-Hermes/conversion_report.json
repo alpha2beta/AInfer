@@ -1,0 +1,4065 @@
+{
+  "created": "2026-09-18",
+  "file": "tiel-coder-35b-text-int4g128.binfer",
+  "bytes": 19140624224,
+  "sha256": "28abf07e248623148fa013835f7932146f5b8f86bbd5865df86931575c20e24a",
+  "tensors": 712,
+  "quantized_int4": 401,
+  "unquantized": 311,
+  "is_moe": true,
+  "policy": "INT4 symmetric g128 BF16 scales",
+  "group_size": 128,
+  "per_tensor": {
+    "lm_head.weight": {
+      "max_abs_err": 0.021240234375,
+      "mean_abs_err": 0.002010419541374617,
+      "src_bytes": 1017118720,
+      "q_bytes": 254279680,
+      "scale_bytes": 7946240
+    },
+    "model.language_model.embed_tokens.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1017118720
+    },
+    "model.language_model.layers.0.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.0.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.0.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.0.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.0.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.009144145995378494,
+      "mean_abs_err": 0.0021873037330806255,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.0.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.005517901852726936,
+      "mean_abs_err": 0.0010676565580070019,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.0.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0272216796875,
+      "mean_abs_err": 0.001462128828279674,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.0.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0201416015625,
+      "mean_abs_err": 0.001692382269538939,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.0.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.0.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0303431898355484,
+      "mean_abs_err": 0.0016264296136796474,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.0.mlp.experts.down_proj": {
+      "max_abs_err": 0.0135323666036129,
+      "mean_abs_err": 0.0005406960408436134,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.0.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.01031494140625,
+      "mean_abs_err": 0.0006155730588943698,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.0.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.0.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0222516730427742,
+      "mean_abs_err": 0.0012112564872950315,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.0.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01422119140625,
+      "mean_abs_err": 0.001351407845504582,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.0.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00953020341694355,
+      "mean_abs_err": 0.0011856250930577517,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.0.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.0.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.1.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.1.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.1.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.1.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.1.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.009708675555884838,
+      "mean_abs_err": 0.002452261745929718,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.1.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011253885924816132,
+      "mean_abs_err": 0.0017552708741277456,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.1.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0194091796875,
+      "mean_abs_err": 0.0016657918458804488,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.1.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0205078125,
+      "mean_abs_err": 0.0017158992122858763,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.1.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.1.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.04296875,
+      "mean_abs_err": 0.0016194807831197977,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.1.mlp.experts.down_proj": {
+      "max_abs_err": 0.01220703125,
+      "mean_abs_err": 0.0010078463310492225,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.1.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.00830078125,
+      "mean_abs_err": 0.000939092466069269,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.1.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.1.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0286865234375,
+      "mean_abs_err": 0.0012370587792247534,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.1.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01141357421875,
+      "mean_abs_err": 0.001297669718042016,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.1.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0127127505838871,
+      "mean_abs_err": 0.0011964772129431367,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.1.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.1.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.10.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.10.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.10.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.10.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.10.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.01606784202158451,
+      "mean_abs_err": 0.0021252722945064306,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.10.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010714875534176826,
+      "mean_abs_err": 0.0017854457255452871,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.10.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.017822265625,
+      "mean_abs_err": 0.0018684513634070754,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.10.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0207345150411129,
+      "mean_abs_err": 0.0015331909526139498,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.10.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.10.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.058837890625,
+      "mean_abs_err": 0.0015732641331851482,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.10.mlp.experts.down_proj": {
+      "max_abs_err": 0.0169677734375,
+      "mean_abs_err": 0.0010187699808739126,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.10.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0187465138733387,
+      "mean_abs_err": 0.001051490064128302,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.10.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.10.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.032470703125,
+      "mean_abs_err": 0.0011906260624527931,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.10.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0095389224588871,
+      "mean_abs_err": 0.001110939309000969,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.10.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01385498046875,
+      "mean_abs_err": 0.0012997465673834085,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.10.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.10.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.11.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.11.mlp.experts.down_proj": {
+      "max_abs_err": 0.015380859375,
+      "mean_abs_err": 0.0010221460906905122,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.11.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.015625,
+      "mean_abs_err": 0.001051524068316212,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.11.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.11.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0362374410033226,
+      "mean_abs_err": 0.0011750856647267938,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.11.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01043701171875,
+      "mean_abs_err": 0.0009861161233857274,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.11.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.016357421875,
+      "mean_abs_err": 0.0012578610330820084,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.11.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.11.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.11.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.11.self_attn.k_proj.weight": {
+      "max_abs_err": 0.01456124521791935,
+      "mean_abs_err": 0.0017754578730091453,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.11.self_attn.o_proj.weight": {
+      "max_abs_err": 0.044921875,
+      "mean_abs_err": 0.0014562561409547925,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.11.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.11.self_attn.q_proj.weight": {
+      "max_abs_err": 0.01806640625,
+      "mean_abs_err": 0.0016505691455677152,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.11.self_attn.v_proj.weight": {
+      "max_abs_err": 0.01177978515625,
+      "mean_abs_err": 0.0014443715335801244,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.12.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.12.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.12.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.12.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.12.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.01345155294984579,
+      "mean_abs_err": 0.0022488378453999758,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.12.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011978709138929844,
+      "mean_abs_err": 0.001833553658798337,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.12.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.019775390625,
+      "mean_abs_err": 0.0018262432422488928,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.12.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0161655955016613,
+      "mean_abs_err": 0.0014527118764817715,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.12.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.12.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.05224609375,
+      "mean_abs_err": 0.0015736132627353072,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.12.mlp.experts.down_proj": {
+      "max_abs_err": 0.01556396484375,
+      "mean_abs_err": 0.0010058658954221755,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.12.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0149710513651371,
+      "mean_abs_err": 0.001048176232870901,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.12.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.12.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.036865234375,
+      "mean_abs_err": 0.0011671583633869886,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.12.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0127127505838871,
+      "mean_abs_err": 0.0010600801324471831,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.12.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01519775390625,
+      "mean_abs_err": 0.0012815711088478565,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.12.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.12.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.13.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.13.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.13.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.13.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.13.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.013231495395302773,
+      "mean_abs_err": 0.002305872505530715,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.13.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010184560902416706,
+      "mean_abs_err": 0.0019174537155777216,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.13.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0301513671875,
+      "mean_abs_err": 0.0018344797426834702,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.13.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0240478515625,
+      "mean_abs_err": 0.0015639574266970158,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.13.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.13.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.055419921875,
+      "mean_abs_err": 0.001527526997961104,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.13.mlp.experts.down_proj": {
+      "max_abs_err": 0.0213274285197258,
+      "mean_abs_err": 0.0010195011709583923,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.13.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.01556396484375,
+      "mean_abs_err": 0.001051253013429232,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.13.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.13.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.037841796875,
+      "mean_abs_err": 0.0011865174164995551,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.13.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01116943359375,
+      "mean_abs_err": 0.0010759964352473617,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.13.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0140206478536129,
+      "mean_abs_err": 0.0013212532503530383,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.13.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.13.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.14.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.14.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.14.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.14.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.14.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012367231771349907,
+      "mean_abs_err": 0.0023832474835217,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.14.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011577957309782505,
+      "mean_abs_err": 0.0020335346926003695,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.14.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.027099609375,
+      "mean_abs_err": 0.0019630214665085077,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.14.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0223388671875,
+      "mean_abs_err": 0.0014032600447535515,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.14.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.14.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0498046875,
+      "mean_abs_err": 0.001567634055390954,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.14.mlp.experts.down_proj": {
+      "max_abs_err": 0.0169677734375,
+      "mean_abs_err": 0.0010126105407834984,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.14.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0148489810526371,
+      "mean_abs_err": 0.001055051907314919,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.14.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.14.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0308314710855484,
+      "mean_abs_err": 0.0011325266677886248,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.14.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01031494140625,
+      "mean_abs_err": 0.001008522231131792,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.14.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0152587890625,
+      "mean_abs_err": 0.001323749776929617,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.14.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.14.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.15.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.15.mlp.experts.down_proj": {
+      "max_abs_err": 0.0296805240213871,
+      "mean_abs_err": 0.0010147527573280968,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.15.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0142822265625,
+      "mean_abs_err": 0.0010581862661638297,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.15.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.15.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0378069207072258,
+      "mean_abs_err": 0.0011183478636667132,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.15.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.00987897627055645,
+      "mean_abs_err": 0.0010383876506239176,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.15.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.019287109375,
+      "mean_abs_err": 0.001319022267125547,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.15.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.15.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.15.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.15.self_attn.k_proj.weight": {
+      "max_abs_err": 0.0141775943338871,
+      "mean_abs_err": 0.0017118724063038826,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.15.self_attn.o_proj.weight": {
+      "max_abs_err": 0.0498046875,
+      "mean_abs_err": 0.0014485965948551893,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.15.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.15.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0177001953125,
+      "mean_abs_err": 0.001522313104942441,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.15.self_attn.v_proj.weight": {
+      "max_abs_err": 0.01510184071958065,
+      "mean_abs_err": 0.0014484862331300974,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.16.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.16.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.16.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.16.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.16.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.010939368978142738,
+      "mean_abs_err": 0.002305116970092058,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.16.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009139807894825935,
+      "mean_abs_err": 0.0019427643856033683,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.16.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.028564453125,
+      "mean_abs_err": 0.0018696198239922523,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.16.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0164794921875,
+      "mean_abs_err": 0.0014267246006056666,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.16.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.16.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.052490234375,
+      "mean_abs_err": 0.0014753959840163589,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.16.mlp.experts.down_proj": {
+      "max_abs_err": 0.017578125,
+      "mean_abs_err": 0.0010257249377900735,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.16.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0161481574177742,
+      "mean_abs_err": 0.0010614472448651213,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.16.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.16.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.037109375,
+      "mean_abs_err": 0.0010958744678646326,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.16.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.00921630859375,
+      "mean_abs_err": 0.0009972697589546442,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.16.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01148332841694355,
+      "mean_abs_err": 0.001324509154073894,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.16.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.16.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.17.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.17.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.17.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.17.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.17.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012074854224920273,
+      "mean_abs_err": 0.0023579648695886135,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.17.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011495453305542469,
+      "mean_abs_err": 0.0020503795240074396,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.17.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0225830078125,
+      "mean_abs_err": 0.0018601499032229185,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.17.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0211530402302742,
+      "mean_abs_err": 0.0014418703503906727,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.17.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.17.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0531180277466774,
+      "mean_abs_err": 0.001494293101131916,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.17.mlp.experts.down_proj": {
+      "max_abs_err": 0.0298549123108387,
+      "mean_abs_err": 0.0010261947682010941,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.17.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0215192511677742,
+      "mean_abs_err": 0.0010651776537997648,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.17.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.17.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0378069207072258,
+      "mean_abs_err": 0.0011437369976192713,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.17.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.00982666015625,
+      "mean_abs_err": 0.0010602108668535948,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.17.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00958251953125,
+      "mean_abs_err": 0.0013581704115495086,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.17.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.17.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.18.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.18.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.18.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.18.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.18.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.011412393301725388,
+      "mean_abs_err": 0.002149141626432538,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.18.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009002534672617912,
+      "mean_abs_err": 0.0019480560440570116,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.18.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0232805535197258,
+      "mean_abs_err": 0.0018921606242656708,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.18.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.021728515625,
+      "mean_abs_err": 0.0014452820178121328,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.18.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.18.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0458984375,
+      "mean_abs_err": 0.001545226899906993,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.18.mlp.experts.down_proj": {
+      "max_abs_err": 0.023681640625,
+      "mean_abs_err": 0.0010293327941326424,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.18.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0145438052713871,
+      "mean_abs_err": 0.0010675661615096033,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.18.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.18.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0276925228536129,
+      "mean_abs_err": 0.001118793385103345,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.18.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01416015625,
+      "mean_abs_err": 0.0011447281576693058,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.18.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0118408203125,
+      "mean_abs_err": 0.0013681660639122128,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.18.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.18.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.19.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.19.mlp.experts.down_proj": {
+      "max_abs_err": 0.02685546875,
+      "mean_abs_err": 0.0010320418878109194,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.19.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0174560546875,
+      "mean_abs_err": 0.001071555703674676,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.19.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.19.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.036376953125,
+      "mean_abs_err": 0.0011518499813973904,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.19.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01312255859375,
+      "mean_abs_err": 0.0011003041872754693,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.19.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00986153818666935,
+      "mean_abs_err": 0.0013263854198157787,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.19.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.19.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.19.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.19.self_attn.k_proj.weight": {
+      "max_abs_err": 0.0152587890625,
+      "mean_abs_err": 0.0015734708867967129,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.19.self_attn.o_proj.weight": {
+      "max_abs_err": 0.047607421875,
+      "mean_abs_err": 0.0014851437881588936,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.19.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.19.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0281982421875,
+      "mean_abs_err": 0.0015038972487673163,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.19.self_attn.v_proj.weight": {
+      "max_abs_err": 0.01483154296875,
+      "mean_abs_err": 0.0013985256664454937,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.2.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.2.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.2.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.2.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.2.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012560615316033363,
+      "mean_abs_err": 0.002069078618660569,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.2.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010699255391955376,
+      "mean_abs_err": 0.0017732573905959725,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.2.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0186767578125,
+      "mean_abs_err": 0.0017198848072439432,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.2.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.020751953125,
+      "mean_abs_err": 0.0016464869258925319,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.2.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.2.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.04736328125,
+      "mean_abs_err": 0.0016392931574955583,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.2.mlp.experts.down_proj": {
+      "max_abs_err": 0.0201416015625,
+      "mean_abs_err": 0.0010056578175863251,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.2.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.008544921875,
+      "mean_abs_err": 0.0009872576883935835,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.2.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.2.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0316336527466774,
+      "mean_abs_err": 0.001227688742801547,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.2.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01534598134458065,
+      "mean_abs_err": 0.0012608893448486924,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.2.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01019287109375,
+      "mean_abs_err": 0.0012369179166853428,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.2.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.2.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.20.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.20.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.20.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.20.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.20.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.014335359446704388,
+      "mean_abs_err": 0.002657142002135515,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.20.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010101791471242905,
+      "mean_abs_err": 0.0021720549557358027,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.20.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0283203125,
+      "mean_abs_err": 0.0022250604815781116,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.20.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.023193359375,
+      "mean_abs_err": 0.0018129422096535563,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.20.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.20.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0553850457072258,
+      "mean_abs_err": 0.0017952026100829244,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.20.mlp.experts.down_proj": {
+      "max_abs_err": 0.02294921875,
+      "mean_abs_err": 0.0010104807224706747,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.20.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0159912109375,
+      "mean_abs_err": 0.0010599722190818284,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.20.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.20.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0361328125,
+      "mean_abs_err": 0.001134303631260991,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.20.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01611328125,
+      "mean_abs_err": 0.0010470374254509807,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.20.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00933837890625,
+      "mean_abs_err": 0.001298378687351942,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.20.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.20.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.21.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.21.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.21.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.21.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.21.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012220248579978943,
+      "mean_abs_err": 0.002416003728285432,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.21.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011951273307204247,
+      "mean_abs_err": 0.002008377341553569,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.21.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0357491597533226,
+      "mean_abs_err": 0.0021562022157013416,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.21.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0250244140625,
+      "mean_abs_err": 0.0017014177283272147,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.21.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.21.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.060791015625,
+      "mean_abs_err": 0.0018007396720349789,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.21.mlp.experts.down_proj": {
+      "max_abs_err": 0.025634765625,
+      "mean_abs_err": 0.0010195390350418165,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.21.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0189208984375,
+      "mean_abs_err": 0.001072871087671956,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.21.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.21.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0341796875,
+      "mean_abs_err": 0.0011308162938803434,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.21.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01708984375,
+      "mean_abs_err": 0.0010721518192440271,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.21.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.013916015625,
+      "mean_abs_err": 0.001310903811827302,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.21.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.21.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.22.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.22.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.22.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.22.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.22.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.011869069188833237,
+      "mean_abs_err": 0.002314418787136674,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.22.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010412258096039295,
+      "mean_abs_err": 0.0020871853921562433,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.22.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.021484375,
+      "mean_abs_err": 0.0021863626316189766,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.22.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0245361328125,
+      "mean_abs_err": 0.0016267196042463183,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.22.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.22.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0654296875,
+      "mean_abs_err": 0.0018123234622180462,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.22.mlp.experts.down_proj": {
+      "max_abs_err": 0.02392578125,
+      "mean_abs_err": 0.0010393927732366137,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.22.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.01495361328125,
+      "mean_abs_err": 0.0010798107177834027,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.22.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.22.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.02490234375,
+      "mean_abs_err": 0.0011224189074710011,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.22.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0142822265625,
+      "mean_abs_err": 0.0009943211916834116,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.22.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0152587890625,
+      "mean_abs_err": 0.0013165397103875875,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.22.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.22.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.23.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.23.mlp.experts.down_proj": {
+      "max_abs_err": 0.0225830078125,
+      "mean_abs_err": 0.0010457588286953978,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.23.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0218505859375,
+      "mean_abs_err": 0.0010821186588145792,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.23.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.23.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.03759765625,
+      "mean_abs_err": 0.0010686498135328293,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.23.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.012451171875,
+      "mean_abs_err": 0.0008556233951821923,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.23.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.015869140625,
+      "mean_abs_err": 0.0012452277587726712,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.23.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.23.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.23.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.23.self_attn.k_proj.weight": {
+      "max_abs_err": 0.016357421875,
+      "mean_abs_err": 0.0020363060757517815,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.23.self_attn.o_proj.weight": {
+      "max_abs_err": 0.049072265625,
+      "mean_abs_err": 0.0016520596109330654,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.23.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.23.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0288957878947258,
+      "mean_abs_err": 0.001846224069595337,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.23.self_attn.v_proj.weight": {
+      "max_abs_err": 0.0167236328125,
+      "mean_abs_err": 0.001576990936882794,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.24.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.24.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.24.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.24.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.24.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.013859997503459454,
+      "mean_abs_err": 0.002335734199732542,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.24.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.013380167074501514,
+      "mean_abs_err": 0.002040066057816148,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.24.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0251813605427742,
+      "mean_abs_err": 0.0021191148553043604,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.24.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0221819207072258,
+      "mean_abs_err": 0.001568906009197235,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.24.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.24.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0570242777466774,
+      "mean_abs_err": 0.0017846537521108985,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.24.mlp.experts.down_proj": {
+      "max_abs_err": 0.0159563347697258,
+      "mean_abs_err": 0.0010365259877289645,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.24.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.016357421875,
+      "mean_abs_err": 0.0010797755458042957,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.24.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.24.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.059814453125,
+      "mean_abs_err": 0.0010667814640328288,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.24.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.013427734375,
+      "mean_abs_err": 0.0009729146840982139,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.24.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01220703125,
+      "mean_abs_err": 0.001288886065594852,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.24.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.24.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.25.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.25.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.25.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.25.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.25.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.014948764815926552,
+      "mean_abs_err": 0.002403446938842535,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.25.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009934919886291027,
+      "mean_abs_err": 0.0020124169532209635,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.25.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0211181640625,
+      "mean_abs_err": 0.0021332968026399612,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.25.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0218505859375,
+      "mean_abs_err": 0.0017124578589573503,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.25.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.25.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0625,
+      "mean_abs_err": 0.0017335197189822793,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.25.mlp.experts.down_proj": {
+      "max_abs_err": 0.0169328972697258,
+      "mean_abs_err": 0.00104179086338263,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.25.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0186767578125,
+      "mean_abs_err": 0.0010852880295715295,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.25.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.25.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.03369140625,
+      "mean_abs_err": 0.0011220559244975448,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.25.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01229422353208065,
+      "mean_abs_err": 0.0009915181435644627,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.25.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01199776865541935,
+      "mean_abs_err": 0.0013286937028169632,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.25.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.25.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.26.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.26.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.26.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.26.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.26.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.013137434609234333,
+      "mean_abs_err": 0.0023446297273039818,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.26.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011569923721253872,
+      "mean_abs_err": 0.0020945812575519085,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.26.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.03180801868438721,
+      "mean_abs_err": 0.0022707334719598293,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.26.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.025146484375,
+      "mean_abs_err": 0.00156346894800663,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.26.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.26.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.04833984375,
+      "mean_abs_err": 0.0018000679556280375,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.26.mlp.experts.down_proj": {
+      "max_abs_err": 0.016845703125,
+      "mean_abs_err": 0.001050461949489545,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.26.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0179443359375,
+      "mean_abs_err": 0.001086226140614599,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.26.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.26.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0235421322286129,
+      "mean_abs_err": 0.0010841891635209322,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.26.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0092337466776371,
+      "mean_abs_err": 0.0009359769173897803,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.26.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0189208984375,
+      "mean_abs_err": 0.0013263269793242216,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.26.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.26.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.27.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.27.mlp.experts.down_proj": {
+      "max_abs_err": 0.0218331478536129,
+      "mean_abs_err": 0.0010560712034930475,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.27.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0228097103536129,
+      "mean_abs_err": 0.001097546482924372,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.27.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.27.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0341796875,
+      "mean_abs_err": 0.001137720188125968,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.27.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01474435068666935,
+      "mean_abs_err": 0.0010415602009743452,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.27.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01007080078125,
+      "mean_abs_err": 0.0013191576581448317,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.27.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.27.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.27.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.27.self_attn.k_proj.weight": {
+      "max_abs_err": 0.016357421875,
+      "mean_abs_err": 0.0018923783209174871,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.27.self_attn.o_proj.weight": {
+      "max_abs_err": 0.0467006117105484,
+      "mean_abs_err": 0.0017118799732998013,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.27.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.27.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0235595703125,
+      "mean_abs_err": 0.0017016256460919976,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.27.self_attn.v_proj.weight": {
+      "max_abs_err": 0.0180838443338871,
+      "mean_abs_err": 0.0015686748083680868,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.28.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.28.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.28.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.28.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.28.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.014491003938019276,
+      "mean_abs_err": 0.0024358881637454033,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.28.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010555206798017025,
+      "mean_abs_err": 0.002200332935899496,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.28.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.03857421875,
+      "mean_abs_err": 0.0021636979654431343,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.28.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0262451171875,
+      "mean_abs_err": 0.0016319782007485628,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.28.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.28.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.05419921875,
+      "mean_abs_err": 0.0017570609925314784,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.28.mlp.experts.down_proj": {
+      "max_abs_err": 0.0252685546875,
+      "mean_abs_err": 0.0010658872488420457,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.28.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.023681640625,
+      "mean_abs_err": 0.0011015241288987454,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.28.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.28.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.032958984375,
+      "mean_abs_err": 0.0011490392498672009,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.28.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.018310546875,
+      "mean_abs_err": 0.001037552603520453,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.28.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01007080078125,
+      "mean_abs_err": 0.0013504058588296175,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.28.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.28.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.29.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.29.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.29.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.29.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.29.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.010869325138628483,
+      "mean_abs_err": 0.002332511357963085,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.29.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009710513055324554,
+      "mean_abs_err": 0.002148232888430357,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.29.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0304827019572258,
+      "mean_abs_err": 0.002167845144867897,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.29.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.02294921875,
+      "mean_abs_err": 0.001623894670046866,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.29.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.29.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.05908203125,
+      "mean_abs_err": 0.0017799701308831573,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.29.mlp.experts.down_proj": {
+      "max_abs_err": 0.0172642283141613,
+      "mean_abs_err": 0.001067694611265324,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.29.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0185546875,
+      "mean_abs_err": 0.0011088457540608943,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.29.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.29.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0332728773355484,
+      "mean_abs_err": 0.001211379887536168,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.29.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01456124521791935,
+      "mean_abs_err": 0.0011285750661045313,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.29.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0241001658141613,
+      "mean_abs_err": 0.0013665016740560532,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.29.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.29.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.3.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.3.mlp.experts.down_proj": {
+      "max_abs_err": 0.0364815890789032,
+      "mean_abs_err": 0.0010072709701489657,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.3.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.01531982421875,
+      "mean_abs_err": 0.0009982661249523517,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.3.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.3.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0296805240213871,
+      "mean_abs_err": 0.001214694930240512,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.3.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0137939453125,
+      "mean_abs_err": 0.0012570943217724562,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.3.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00933837890625,
+      "mean_abs_err": 0.001248362474143505,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.3.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.3.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.3.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.3.self_attn.k_proj.weight": {
+      "max_abs_err": 0.01318359375,
+      "mean_abs_err": 0.001737124752253294,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.3.self_attn.o_proj.weight": {
+      "max_abs_err": 0.04150390625,
+      "mean_abs_err": 0.0015044737374410033,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.3.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.3.self_attn.q_proj.weight": {
+      "max_abs_err": 0.02392578125,
+      "mean_abs_err": 0.0017248750664293766,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.3.self_attn.v_proj.weight": {
+      "max_abs_err": 0.01055908203125,
+      "mean_abs_err": 0.001560887903906405,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.30.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.30.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.30.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.30.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.30.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.013065656647086143,
+      "mean_abs_err": 0.0024015395902097225,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.30.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011900264769792557,
+      "mean_abs_err": 0.0022890176624059677,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.30.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0242919921875,
+      "mean_abs_err": 0.0022433598060160875,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.30.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0304129458963871,
+      "mean_abs_err": 0.0016329503851011395,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.30.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.30.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0625,
+      "mean_abs_err": 0.001828290754929185,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.30.mlp.experts.down_proj": {
+      "max_abs_err": 0.018798828125,
+      "mean_abs_err": 0.001069041623850353,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.30.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0183977410197258,
+      "mean_abs_err": 0.0011132482359244023,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.30.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.30.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.025390625,
+      "mean_abs_err": 0.0011296665761619806,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.30.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0161481574177742,
+      "mean_abs_err": 0.0012292282190173864,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.30.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01251220703125,
+      "mean_abs_err": 0.0013491655699908733,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.30.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.30.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.31.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.31.mlp.experts.down_proj": {
+      "max_abs_err": 0.025146484375,
+      "mean_abs_err": 0.0010788422150653787,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.31.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0174386166036129,
+      "mean_abs_err": 0.0011235352176299784,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.31.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.31.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0328892320394516,
+      "mean_abs_err": 0.0011931373737752438,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.31.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0183802992105484,
+      "mean_abs_err": 0.0012711293529719114,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.31.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01123046875,
+      "mean_abs_err": 0.001325679011642933,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.31.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.31.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.31.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.31.self_attn.k_proj.weight": {
+      "max_abs_err": 0.01544189453125,
+      "mean_abs_err": 0.0019100133795291185,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.31.self_attn.o_proj.weight": {
+      "max_abs_err": 0.0508510023355484,
+      "mean_abs_err": 0.001731420517899096,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.31.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.31.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0274658203125,
+      "mean_abs_err": 0.0017697616713121533,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.31.self_attn.v_proj.weight": {
+      "max_abs_err": 0.0189034603536129,
+      "mean_abs_err": 0.0017016170313581824,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.32.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.32.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.32.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.32.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.32.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.015336897224187851,
+      "mean_abs_err": 0.00247959210537374,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.32.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.01113630086183548,
+      "mean_abs_err": 0.0020921395625919104,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.32.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.041748046875,
+      "mean_abs_err": 0.002197141293436289,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.32.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0223388671875,
+      "mean_abs_err": 0.001704469439573586,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.32.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.32.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0607561394572258,
+      "mean_abs_err": 0.0018145133508369327,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.32.mlp.experts.down_proj": {
+      "max_abs_err": 0.01953125,
+      "mean_abs_err": 0.0010940471984213218,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.32.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0194440558552742,
+      "mean_abs_err": 0.0011563954831217416,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.32.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.32.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.032958984375,
+      "mean_abs_err": 0.0013183052651584148,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.32.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01546805165708065,
+      "mean_abs_err": 0.0011534737423062325,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.32.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.017333984375,
+      "mean_abs_err": 0.001282988814637065,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.32.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.32.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.33.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.33.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.33.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.33.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.33.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012329909950494766,
+      "mean_abs_err": 0.0023962606210261583,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.33.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009351850487291813,
+      "mean_abs_err": 0.0019173168111592531,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.33.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0341796875,
+      "mean_abs_err": 0.0022230329923331738,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.33.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.025146484375,
+      "mean_abs_err": 0.0017019497463479638,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.33.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.33.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0673828125,
+      "mean_abs_err": 0.0018272228771820664,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.33.mlp.experts.down_proj": {
+      "max_abs_err": 0.02685546875,
+      "mean_abs_err": 0.0011108311664429493,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.33.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.021484375,
+      "mean_abs_err": 0.0011715135005943011,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.33.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.33.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0262451171875,
+      "mean_abs_err": 0.0011657041031867266,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.33.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0140380859375,
+      "mean_abs_err": 0.0013358235592022538,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.33.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0126953125,
+      "mean_abs_err": 0.0013023782521486282,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.33.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.33.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.34.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.34.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.34.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.34.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.34.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.01232996117323637,
+      "mean_abs_err": 0.0025759926065802574,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.34.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.01083366759121418,
+      "mean_abs_err": 0.0018662236398085952,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.34.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0244140625,
+      "mean_abs_err": 0.002286286558955908,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.34.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0225830078125,
+      "mean_abs_err": 0.0017548163887113333,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.34.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.34.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.060302734375,
+      "mean_abs_err": 0.001973013626411557,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.34.mlp.experts.down_proj": {
+      "max_abs_err": 0.0228271484375,
+      "mean_abs_err": 0.0011191802332177758,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.34.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0260532908141613,
+      "mean_abs_err": 0.0011688492304529063,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.34.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.34.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.026123046875,
+      "mean_abs_err": 0.0011481421533972025,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.34.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0147705078125,
+      "mean_abs_err": 0.0013705105520784855,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.34.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01287841796875,
+      "mean_abs_err": 0.0013626250438392162,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.34.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.34.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.35.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.35.mlp.experts.down_proj": {
+      "max_abs_err": 0.0264892578125,
+      "mean_abs_err": 0.0011226327915210277,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.35.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0283203125,
+      "mean_abs_err": 0.0011607364904193673,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.35.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.35.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.029541015625,
+      "mean_abs_err": 0.001136593404226005,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.35.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0174560546875,
+      "mean_abs_err": 0.001395154744386673,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.35.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.014404296875,
+      "mean_abs_err": 0.0012687111739069223,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.35.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.35.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.35.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.35.self_attn.k_proj.weight": {
+      "max_abs_err": 0.0210484080016613,
+      "mean_abs_err": 0.0019656075164675713,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.35.self_attn.o_proj.weight": {
+      "max_abs_err": 0.042236328125,
+      "mean_abs_err": 0.0019407826475799084,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.35.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.35.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0302734375,
+      "mean_abs_err": 0.0018282916862517595,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.35.self_attn.v_proj.weight": {
+      "max_abs_err": 0.02587890625,
+      "mean_abs_err": 0.0024543378967791796,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.36.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.36.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.36.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.36.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.36.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.015311556868255138,
+      "mean_abs_err": 0.002669003326445818,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.36.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.009118856862187386,
+      "mean_abs_err": 0.001727644121274352,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.36.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0322265625,
+      "mean_abs_err": 0.002442937111482024,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.36.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.02734375,
+      "mean_abs_err": 0.001864621415734291,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.36.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.36.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.1407645046710968,
+      "mean_abs_err": 0.0019125636899843812,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.36.mlp.experts.down_proj": {
+      "max_abs_err": 0.0203857421875,
+      "mean_abs_err": 0.001140557804319542,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.36.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.029541015625,
+      "mean_abs_err": 0.0011760950546886306,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.36.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.36.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.031982421875,
+      "mean_abs_err": 0.0011025009443983436,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.36.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0181884765625,
+      "mean_abs_err": 0.0015082978643476963,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.36.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0210135318338871,
+      "mean_abs_err": 0.0012353025376796722,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.36.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.36.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.37.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.37.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.37.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.37.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.37.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012494413182139397,
+      "mean_abs_err": 0.002694450318813324,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.37.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010443363338708878,
+      "mean_abs_err": 0.0017654916737228632,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.37.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0434919074177742,
+      "mean_abs_err": 0.0025023124180734158,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.37.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.02734375,
+      "mean_abs_err": 0.0017245286144316196,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.37.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.37.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0443638414144516,
+      "mean_abs_err": 0.001986892893910408,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.37.mlp.experts.down_proj": {
+      "max_abs_err": 0.0191650390625,
+      "mean_abs_err": 0.0011530738993315026,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.37.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.02685546875,
+      "mean_abs_err": 0.0011817777049145661,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.37.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.37.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0276925228536129,
+      "mean_abs_err": 0.0011005541309714317,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.37.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.017333984375,
+      "mean_abs_err": 0.0015357625670731068,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.37.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01446533203125,
+      "mean_abs_err": 0.0012031177757307887,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.37.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.37.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.38.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.38.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.38.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.38.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.38.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.012890982441604137,
+      "mean_abs_err": 0.002830113749951124,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.38.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010560501366853714,
+      "mean_abs_err": 0.0020480810198932886,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.38.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0514787882566452,
+      "mean_abs_err": 0.002358104335144162,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.38.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0286865234375,
+      "mean_abs_err": 0.001757703023031354,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.38.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.38.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.041259765625,
+      "mean_abs_err": 0.001896515255793929,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.38.mlp.experts.down_proj": {
+      "max_abs_err": 0.0180838443338871,
+      "mean_abs_err": 0.001160335523309186,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.38.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.02783203125,
+      "mean_abs_err": 0.0012076943639840465,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.38.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.38.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0278843455016613,
+      "mean_abs_err": 0.0011261457111686468,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.38.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0157470703125,
+      "mean_abs_err": 0.001455127028748393,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.38.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01384626142680645,
+      "mean_abs_err": 0.0011672258842736483,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.38.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.38.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.39.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.39.mlp.experts.down_proj": {
+      "max_abs_err": 0.0456891730427742,
+      "mean_abs_err": 0.0011807532864622772,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.39.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0264892578125,
+      "mean_abs_err": 0.0012874734457000159,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.39.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.39.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.021484375,
+      "mean_abs_err": 0.0011315001174807549,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.39.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01336669921875,
+      "mean_abs_err": 0.0012112612603232265,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.39.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0206298828125,
+      "mean_abs_err": 0.0010322162415832281,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.39.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.39.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.39.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.39.self_attn.k_proj.weight": {
+      "max_abs_err": 0.0162876658141613,
+      "mean_abs_err": 0.002135063987225294,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.39.self_attn.o_proj.weight": {
+      "max_abs_err": 0.0384347066283226,
+      "mean_abs_err": 0.0019146825652569532,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.39.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.39.self_attn.q_proj.weight": {
+      "max_abs_err": 0.030029296875,
+      "mean_abs_err": 0.0018546988721936941,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.39.self_attn.v_proj.weight": {
+      "max_abs_err": 0.0260009765625,
+      "mean_abs_err": 0.0020939514506608248,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.4.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.4.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.4.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.4.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.4.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.011179611086845398,
+      "mean_abs_err": 0.0021947803907096386,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.4.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.014016660861670971,
+      "mean_abs_err": 0.001766479341313243,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.4.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0188337042927742,
+      "mean_abs_err": 0.0017542006680741906,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.4.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.01953125,
+      "mean_abs_err": 0.0016459713224321604,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.4.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.4.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.051060259342193604,
+      "mean_abs_err": 0.0016263618599623442,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.4.mlp.experts.down_proj": {
+      "max_abs_err": 0.016183018684387207,
+      "mean_abs_err": 0.0010025426527136005,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.4.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.016845703125,
+      "mean_abs_err": 0.0010164161794818938,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.4.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.4.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0306396484375,
+      "mean_abs_err": 0.0011941147968173027,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.4.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01068115234375,
+      "mean_abs_err": 0.0011596784461289644,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.4.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0091552734375,
+      "mean_abs_err": 0.0012011555954813957,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.4.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.4.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.5.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.5.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.5.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.5.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.5.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.010473406873643398,
+      "mean_abs_err": 0.002328620757907629,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.5.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010565903037786484,
+      "mean_abs_err": 0.0018460639985278249,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.5.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.022216796875,
+      "mean_abs_err": 0.001761279534548521,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.5.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0203508660197258,
+      "mean_abs_err": 0.0016025848453864455,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.5.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.5.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.05322265625,
+      "mean_abs_err": 0.0016193198971450329,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.5.mlp.experts.down_proj": {
+      "max_abs_err": 0.01611328125,
+      "mean_abs_err": 0.001004366720735561,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.5.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.01378522627055645,
+      "mean_abs_err": 0.0010220182557532098,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.5.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.5.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.027587890625,
+      "mean_abs_err": 0.0012300864327698946,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.5.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01043701171875,
+      "mean_abs_err": 0.0011788331903517246,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.5.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.007720947265625,
+      "mean_abs_err": 0.0012629266129806638,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.5.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.5.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.6.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.6.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.6.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.6.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.6.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.011472541838884354,
+      "mean_abs_err": 0.002326422370970249,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.6.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011746544390916824,
+      "mean_abs_err": 0.0019554938189685345,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.6.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.024169921875,
+      "mean_abs_err": 0.0017734674038365483,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.6.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.018310546875,
+      "mean_abs_err": 0.001529281958937645,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.6.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.6.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.0458984375,
+      "mean_abs_err": 0.0016251422930508852,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.6.mlp.experts.down_proj": {
+      "max_abs_err": 0.0190080925822258,
+      "mean_abs_err": 0.001003047997073736,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.6.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0164794921875,
+      "mean_abs_err": 0.0010233118700853083,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.6.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.6.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0240478515625,
+      "mean_abs_err": 0.0012068504001945257,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.6.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01019287109375,
+      "mean_abs_err": 0.0010915067978203297,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.6.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00732421875,
+      "mean_abs_err": 0.0012539108283817768,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.6.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.6.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.7.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.7.mlp.experts.down_proj": {
+      "max_abs_err": 0.0234375,
+      "mean_abs_err": 0.0009986868244595826,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.7.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0135498046875,
+      "mean_abs_err": 0.0010241444288112689,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.7.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.7.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0308837890625,
+      "mean_abs_err": 0.0011800697539001703,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.7.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01611328125,
+      "mean_abs_err": 0.0010978938080370426,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.7.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0206298828125,
+      "mean_abs_err": 0.0012587591772899032,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.7.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.7.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.7.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.7.self_attn.k_proj.weight": {
+      "max_abs_err": 0.021484375,
+      "mean_abs_err": 0.0017143040895462036,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.7.self_attn.o_proj.weight": {
+      "max_abs_err": 0.0439453125,
+      "mean_abs_err": 0.001518058474175632,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.7.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1024
+    },
+    "model.language_model.layers.7.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0205426886677742,
+      "mean_abs_err": 0.0016241930425167084,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.7.self_attn.v_proj.weight": {
+      "max_abs_err": 0.01239013671875,
+      "mean_abs_err": 0.001545602921396494,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.8.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.8.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.8.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.8.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.8.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.013018871657550335,
+      "mean_abs_err": 0.002453613793477416,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.8.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.010210607200860977,
+      "mean_abs_err": 0.0018007922917604446,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.8.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0213623046875,
+      "mean_abs_err": 0.0018778815865516663,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.8.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0240478515625,
+      "mean_abs_err": 0.0016769145149737597,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.8.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.8.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.045166015625,
+      "mean_abs_err": 0.00159035949036479,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.8.mlp.experts.down_proj": {
+      "max_abs_err": 0.0191127248108387,
+      "mean_abs_err": 0.0009911703164107166,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.8.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0140380859375,
+      "mean_abs_err": 0.001022974305669777,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.8.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.8.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.031005859375,
+      "mean_abs_err": 0.0012051919475197792,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.8.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0157470703125,
+      "mean_abs_err": 0.0011808895505964756,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.8.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.0079345703125,
+      "mean_abs_err": 0.0012942543253302574,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.8.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.8.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.9.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.9.linear_attn.A_log": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.9.linear_attn.conv1d.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 131072
+    },
+    "model.language_model.layers.9.linear_attn.dt_bias": {
+      "copied_unquantized": true,
+      "src_bytes": 128
+    },
+    "model.language_model.layers.9.linear_attn.in_proj_a.weight": {
+      "max_abs_err": 0.01417521946132183,
+      "mean_abs_err": 0.002305367961525917,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.9.linear_attn.in_proj_b.weight": {
+      "max_abs_err": 0.011811327189207077,
+      "mean_abs_err": 0.0019297145772725344,
+      "src_bytes": 131072,
+      "q_bytes": 32768,
+      "scale_bytes": 1024
+    },
+    "model.language_model.layers.9.linear_attn.in_proj_qkv.weight": {
+      "max_abs_err": 0.0201416015625,
+      "mean_abs_err": 0.0018432586221024394,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "model.language_model.layers.9.linear_attn.in_proj_z.weight": {
+      "max_abs_err": 0.0186767578125,
+      "mean_abs_err": 0.0015727030113339424,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.9.linear_attn.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "model.language_model.layers.9.linear_attn.out_proj.weight": {
+      "max_abs_err": 0.050537109375,
+      "mean_abs_err": 0.0015652159927412868,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "model.language_model.layers.9.mlp.experts.down_proj": {
+      "max_abs_err": 0.0153459832072258,
+      "mean_abs_err": 0.0010072433506138623,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "model.language_model.layers.9.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.0135498046875,
+      "mean_abs_err": 0.001039788818161469,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "model.language_model.layers.9.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 2097152
+    },
+    "model.language_model.layers.9.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0299072265625,
+      "mean_abs_err": 0.001177029451355338,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.9.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.01287841796875,
+      "mean_abs_err": 0.0012280980590730906,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.9.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.00970458984375,
+      "mean_abs_err": 0.0012762064579874277,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "model.language_model.layers.9.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.layers.9.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "model.language_model.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 8192
+    },
+    "mtp.fc.weight": {
+      "max_abs_err": 0.0245535708963871,
+      "mean_abs_err": 0.0008100254344753921,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "mtp.layers.0.input_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    },
+    "mtp.layers.0.mlp.experts.down_proj": {
+      "max_abs_err": 0.055419921875,
+      "mean_abs_err": 0.0014222576646716334,
+      "src_bytes": 536870912,
+      "q_bytes": 134217728,
+      "scale_bytes": 4194304
+    },
+    "mtp.layers.0.mlp.experts.gate_up_proj": {
+      "max_abs_err": 0.037353515625,
+      "mean_abs_err": 0.0014844448523945175,
+      "src_bytes": 1073741824,
+      "q_bytes": 268435456,
+      "scale_bytes": 8388608
+    },
+    "mtp.layers.0.mlp.gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 1048576
+    },
+    "mtp.layers.0.mlp.shared_expert.down_proj.weight": {
+      "max_abs_err": 0.0237339548766613,
+      "mean_abs_err": 0.0010134055046364665,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "mtp.layers.0.mlp.shared_expert.gate_proj.weight": {
+      "max_abs_err": 0.0101143978536129,
+      "mean_abs_err": 0.0009167637908831239,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "mtp.layers.0.mlp.shared_expert.up_proj.weight": {
+      "max_abs_err": 0.01378522627055645,
+      "mean_abs_err": 0.0013454320142045617,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "mtp.layers.0.mlp.shared_expert_gate.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    },
+    "mtp.layers.0.post_attention_layernorm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    },
+    "mtp.layers.0.self_attn.k_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "mtp.layers.0.self_attn.k_proj.weight": {
+      "max_abs_err": 0.0164794921875,
+      "mean_abs_err": 0.001987168565392494,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "mtp.layers.0.self_attn.o_proj.weight": {
+      "max_abs_err": 0.1305803656578064,
+      "mean_abs_err": 0.0022082081995904446,
+      "src_bytes": 16777216,
+      "q_bytes": 4194304,
+      "scale_bytes": 131072
+    },
+    "mtp.layers.0.self_attn.q_norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 512
+    },
+    "mtp.layers.0.self_attn.q_proj.weight": {
+      "max_abs_err": 0.0275355763733387,
+      "mean_abs_err": 0.0019145994447171688,
+      "src_bytes": 33554432,
+      "q_bytes": 8388608,
+      "scale_bytes": 262144
+    },
+    "mtp.layers.0.self_attn.v_proj.weight": {
+      "max_abs_err": 0.0176478810608387,
+      "mean_abs_err": 0.0023775610607117414,
+      "src_bytes": 2097152,
+      "q_bytes": 524288,
+      "scale_bytes": 16384
+    },
+    "mtp.norm.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    },
+    "mtp.pre_fc_norm_embedding.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    },
+    "mtp.pre_fc_norm_hidden.weight": {
+      "copied_unquantized": true,
+      "src_bytes": 4096
+    }
+  }
+}

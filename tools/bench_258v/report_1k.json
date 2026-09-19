@@ -1,0 +1,50 @@
+{
+  "task": "T7.1",
+  "device": "Intel(R) Arc(TM) Graphics",
+  "model": "models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer",
+  "max_context": 4096,
+  "prompt_tokens": 1024,
+  "decode_tokens_per_run": 8,
+  "measured_runs": 1,
+  "timing_fields": {
+    "model_load_time_ms": 10412.8,
+    "cold_ttft_ms": 46592.4,
+    "warm_ttft_ms": 46417,
+    "prefill_time_ms": 46417,
+    "prefill_tok_per_s": 22.0609,
+    "first_decode_latency_ms": 55.6349,
+    "sustained_decode_tok_per_s": 17.986,
+    "inter_token_jitter": {
+      "min_ms": 55.4712,
+      "max_ms": 55.7928,
+      "mean_ms": 55.603,
+      "stddev_ms": 0.116799,
+      "p50_ms": 55.5913,
+      "p90_ms": 55.7596,
+      "p95_ms": 55.7762,
+      "p99_ms": 55.7895
+    }
+  },
+  "memory_footprint": {
+    "payload_arena_bytes": 18594016768,
+    "scale_arena_bytes": 546467840,
+    "kv_cache_bytes": 83886080,
+    "ssm_state_bytes": 65863680,
+    "workspace_bytes": 67108864,
+    "total_committed_bytes": 19357343232,
+    "total_committed_gib": 18.0279,
+    "rss_before_init_kb": 574520,
+    "rss_after_init_kb": 574520,
+    "rss_final_kb": 574520
+  },
+  "raw_runs": [
+    {
+      "run_index": 1,
+      "warm_ttft_ms": 46417,
+      "prefill_time_ms": 46417,
+      "prefill_tok_per_s": 22.0609,
+      "first_decode_ms": 55.6349,
+      "sustained_decode_tok_per_s": 17.986
+    }
+  ]
+}

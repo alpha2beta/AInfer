@@ -1,0 +1,10 @@
+{
+  "device": "Intel(R) Arc(TM) Graphics",
+  "test_cases": 100,
+  "exact_id_matches": 100,
+  "max_weight_diff": 1.043e-07,
+  "max_shared_diff": 1.192e-07,
+  "latency_us": 130.48,
+  "throughput_tokens_sec": 7664,
+  "all_pass": true
+}

@@ -1,0 +1,59 @@
+{
+  "model_weights": {
+    "int4_quantized_parameters": 34456993792,
+    "int4_payload_bytes": 17228496896,
+    "int4_scales_bytes": 538390528,
+    "unquantized_tensor_bytes": 3034084320,
+    "total_static_weight_bytes": 20800971744,
+    "total_static_weight_gb": 19.37
+  },
+  "deltanet_state": {
+    "layers": 30,
+    "state_bytes_constant": 31948800,
+    "state_mb": 30.47
+  },
+  "system_reserve_gb": 3.5,
+  "total_physical_memory_gb": 32.0,
+  "context_tiers": {
+    "tier1_4k": {
+      "context_length": 4096,
+      "kv_cache_fp16_mb": 80.0,
+      "kv_cache_int8_mb": 40.0,
+      "workspace_mb": 350.0,
+      "total_committed_gb": 23.32,
+      "available_headroom_gb": 8.68,
+      "headroom_percent": 27.1,
+      "status": "PASS"
+    },
+    "tier2_16k": {
+      "context_length": 16384,
+      "kv_cache_fp16_mb": 320.0,
+      "kv_cache_int8_mb": 160.0,
+      "workspace_mb": 350.0,
+      "total_committed_gb": 23.56,
+      "available_headroom_gb": 8.44,
+      "headroom_percent": 26.4,
+      "status": "PASS"
+    },
+    "tier3_32k": {
+      "context_length": 32768,
+      "kv_cache_fp16_mb": 640.0,
+      "kv_cache_int8_mb": 320.0,
+      "workspace_mb": 350.0,
+      "total_committed_gb": 23.87,
+      "available_headroom_gb": 8.13,
+      "headroom_percent": 25.4,
+      "status": "PASS"
+    },
+    "tier4_64k": {
+      "context_length": 65536,
+      "kv_cache_fp16_mb": 1280.0,
+      "kv_cache_int8_mb": 640.0,
+      "workspace_mb": 350.0,
+      "total_committed_gb": 24.49,
+      "available_headroom_gb": 7.51,
+      "headroom_percent": 23.5,
+      "status": "PASS"
+    }
+  }
+}

@@ -12,7 +12,10 @@ import os
 
 REPO_ROOT = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))))
-MODEL_DIR = os.path.join(REPO_ROOT, "models", "Qwen3.8-27B")
+DEFAULT_MODEL_DIR = os.path.join(REPO_ROOT, "models", "Tiel-Coder-35B-A3B-Genesis-Hermes")
+if not os.path.exists(DEFAULT_MODEL_DIR):
+    DEFAULT_MODEL_DIR = os.path.join(REPO_ROOT, "models", "Qwen3.8-27B")
+MODEL_DIR = os.environ.get("AINFER_MODEL_DIR", DEFAULT_MODEL_DIR)
 
 BOS_ID = 248044  # <|endoftext|> doubles as BOS-pad in this config
 EOS_IDS = (248046, 248044)  # <|im_end|>, <|endoftext|> per generation_config
@@ -24,7 +27,7 @@ def load_tokenizer_config():
 
 
 def added_special_tokens(cfg=None):
-    """{id: content} for the 33 added special tokens, sorted by id."""
+    """{id: content} for the added special tokens, sorted by id."""
     cfg = cfg or load_tokenizer_config()
     return {int(k): v["content"] for k, v in cfg["added_tokens_decoder"].items()}
 
@@ -58,12 +61,10 @@ def render_chat(messages, add_generation_prompt=True, enable_thinking=False):
     from jinja2 import Environment, BaseLoader
     with open(os.path.join(MODEL_DIR, "chat_template.jinja")) as f:
         src = f.read()
-    # Default (lenient) Undefined, matching HF apply_chat_template: assistant
-    # messages without tool_calls render instead of raising (T8.4).
     env = Environment(loader=BaseLoader(), keep_trailing_newline=True)
-    # The template calls raise_exception(); provide it like HF does.
     def _raise(msg):
         raise ValueError(msg)
+    env.globals["raise_exception"] = _raise
     tmpl = env.from_string(src)
     return tmpl.render(messages=messages,
                        add_generation_prompt=add_generation_prompt,

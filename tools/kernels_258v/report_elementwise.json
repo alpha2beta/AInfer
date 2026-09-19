@@ -1,0 +1,28 @@
+{
+  "task": "T4.6",
+  "device": "Arc 140V (Xe2)",
+  "all_passed": true,
+  "rmsnorm_2048": {
+    "max_diff": 4.76837e-07,
+    "latency_us": 0.420998,
+    "status": "PASS"
+  },
+  "rmsnorm_head_256": {
+    "max_diff": 7.15256e-07,
+    "status": "PASS"
+  },
+  "silu_mul_512": {
+    "max_diff": 5.96046e-08,
+    "status": "PASS"
+  },
+  "residual_add_2048": {
+    "max_diff": 0,
+    "status": "PASS"
+  },
+  "argmax_vocab_248320": {
+    "cpu_token": 123456,
+    "gpu_token": 123456,
+    "latency_us": 126.022,
+    "status": "PASS"
+  }
+}

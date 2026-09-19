@@ -1,1 +1,1 @@
-{"device":"B60","tensors":866,"verified":866,"failed":0,"payload_arena":15571457024,"scale_arena":406978560,"h2d_gbs":1.02,"d2h_gbs":3.92,"alloc_ms":72.5}
+{"device":"Intel(R) Arc(TM) Graphics","is_moe":true,"tensors":712,"verified":712,"failed":0,"payload_arena":18594016768,"scale_arena":546467840,"h2d_gbs":2.69,"d2h_gbs":0.51,"alloc_ms":19623.4}

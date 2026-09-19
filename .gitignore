@@ -26,3 +26,39 @@ venv/
 .idea/
 .DS_Store
 *~
+
+# Local binaries & toolchain sysroot (paths are explicit so tool source dirs stay tracked)
+tools/l0probe/l0probe
+tools/l0load/l0load
+tools/toolchain/cache/
+tools/toolchain/sysroot/
+
+# CMake build trees inside tool dirs
+tools/l0probe/build/
+
+# HF download cache
+.cache/
+
+# Compiled test/bench binaries, shared libs & SPIR-V (rebuilt from committed .cpp/.cl)
+*.spv
+*.so
+tools/bench_258v/bench_258v
+tools/bench_258v/bench_deltanet
+tools/bench_258v/bench_prefill
+tools/bench_258v/profile_pipeline
+tools/bench_258v/sweep_258v
+tools/bench_gemv/bench_gemv
+tools/bench_gemv/bench_gemv_2row
+tools/bench_gemv/test_batched_moe
+tools/bench_gemv/test_gateup_swiglu
+tools/bench_gemv/test_prefill_gemm
+tools/cmdlist/smoke_l0
+tools/decode/decode_258v
+tools/decode/test_runtime_258v
+tools/decode/verify_moe_step
+tools/kernels_258v/test_attention
+tools/kernels_258v/test_deltanet
+tools/kernels_258v/test_elementwise
+tools/kernels_258v/test_layer_block
+tools/router/shootout
+tools/router/test_router

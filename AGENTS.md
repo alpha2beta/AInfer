@@ -2,25 +2,37 @@
 
 ## What this repo is
 
-Custom NInfer-style inference runtime plan for pinned model `Qwen/Qwen3.8-27B`
-(hybrid: 64 text layers = 48 linear-attention + 16 full-attention, MTP head,
-vision encoder **deferred**). Target HW is Intel Arc Pro B60 (`8086:e211`, Battlemage G21).
+Custom NInfer-style inference runtime for pinned model
+**`symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized`** (dequantized SafeTensors
+release of the `LuffyTheFox/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF` fine-tune; base
+architecture `Qwen3.5-MoE` / `model_type: qwen3_5_moe` — **not** an official `Qwen/...`
+repo release, despite earlier planning docs assuming one)
+(sparse MoE hybrid: 40 text layers = 30 DeltaNet-style linear-attention + 10 full-attention,
+256 routed experts / 8 active per token, batch size 1, text-only — the checkpoint also ships
+a vision tower which is excluded from the v1 `.binfer` export). Target hardware is
+**Intel Core Ultra 7 258V** (integrated Arc 140V GPU, Xe2, 32 GB unified LPDDR5X memory)
+running under **CachyOS**.
+
+Branch `258v` is the active migration track. The prior production implementation for
+Intel Arc Pro B60 (`8086:e211`, Qwen3.8-27B) is archived under `B60_*` (`B60_plan.md`,
+`B60_tasks.md`, `B60_progress.md`, `B60_STATUS.md`).
 
 ## Doc trio — update consistently
 
 - `plan.md` = design. `tasks.md` = scope; task IDs (`T0.1`…`X2`) are stable, never renumber.
   `progress.md` = live status (mirrors tasks phase tables + changelog).
+  `STATUS.md` = single-source current release truth.
 - After finishing work: mark status in `tasks.md`, update `progress.md` dashboard/rows/changelog.
 
 ## Key domain facts (do not re-derive)
 
-- KV cache covers **16 full layers only**; 48 linear layers carry FP32 SSM state (~144 MiB).
-  Naive 64-layer KV math overestimates ~4×.
-- v1 is **text-only, 4K context**. Native 262K + vision are out of scope.
-- `Dirk-Qwen3.8-27B-UD-Q4_K_S.gguf` (repo root) is **baseline-only**; quantizer source is
-  `models/Qwen3.8-27B/` SafeTensors BF16 (`@1d4bf0f`, see `manifest.json`).
-- `docs/binfer_spec.md` is normative for the container. Sharp edges: section 5 (tensor dir)
-  has **no length prefix**, table entries are 32 B (`I2Q3I`), dir entries 192 B with 12 B reserved.
+- KV cache covers **10 full layers only** (out of 40 layers total); 30 linear layers carry FP32 SSM state (~60 MiB).
+  Naive 40-layer KV math overestimates ~4×.
+- All 35B model parameters must reside in 32 GB unified system memory in INT4 (~17.5 GB weights + scales).
+  Measured headroom on 32 GB RAM is 8+ GB for OS and workspaces (see `memory_feasibility_estimate.md`).
+- Primary runtime path is **single-process in-memory** prefill $\to$ decode. Disk-based cache handoff is diagnostic-only.
+- Target OS is CachyOS (rolling release): toolchain packages must be pinned with local pacman cache snapshots.
+- B60 baseline documents and reports are preserved with `B60_` prefix for regression benchmarking.
 
 ## Environment (Ubuntu + Arc Pro B60)
 

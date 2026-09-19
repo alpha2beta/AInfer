@@ -1,0 +1,1605 @@
+{
+  "device": "Intel(R) Arc(TM) Graphics",
+  "results": [
+    {
+      "id": "fact-000",
+      "prompt_tokens": 26,
+      "generated_tokens": 2,
+      "prefill_ms": 1020.12,
+      "decode_tok_per_s": 24.2808,
+      "generated_ids": [57590, 248046]
+    },
+    {
+      "id": "fact-001",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 991.928,
+      "decode_tok_per_s": 24.341,
+      "generated_ids": [51076, 15560, 248046]
+    },
+    {
+      "id": "fact-002",
+      "prompt_tokens": 26,
+      "generated_tokens": 4,
+      "prefill_ms": 1013.33,
+      "decode_tok_per_s": 24.3843,
+      "generated_ids": [6614, 299, 72802, 248046]
+    },
+    {
+      "id": "fact-003",
+      "prompt_tokens": 26,
+      "generated_tokens": 4,
+      "prefill_ms": 1002.3,
+      "decode_tok_per_s": 24.4022,
+      "generated_ids": [46, 5391, 13674, 248046]
+    },
+    {
+      "id": "fact-004",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 995.68,
+      "decode_tok_per_s": 24.1268,
+      "generated_ids": [6503, 60241, 248046]
+    },
+    {
+      "id": "fact-005",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 990.449,
+      "decode_tok_per_s": 24.3768,
+      "generated_ids": [34, 24736, 248046]
+    },
+    {
+      "id": "fact-006",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 988.989,
+      "decode_tok_per_s": 24.4677,
+      "generated_ids": [3446, 21318, 248046]
+    },
+    {
+      "id": "fact-007",
+      "prompt_tokens": 26,
+      "generated_tokens": 2,
+      "prefill_ms": 993.74,
+      "decode_tok_per_s": 24.3377,
+      "generated_ids": [91149, 248046]
+    },
+    {
+      "id": "fact-008",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 989.653,
+      "decode_tok_per_s": 24.4593,
+      "generated_ids": [49, 617, 248046]
+    },
+    {
+      "id": "fact-009",
+      "prompt_tokens": 26,
+      "generated_tokens": 2,
+      "prefill_ms": 990.37,
+      "decode_tok_per_s": 24.2473,
+      "generated_ids": [218787, 248046]
+    },
+    {
+      "id": "fact-010",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 992.227,
+      "decode_tok_per_s": 24.3854,
+      "generated_ids": [66502, 4170, 248046]
+    },
+    {
+      "id": "fact-011",
+      "prompt_tokens": 26,
+      "generated_tokens": 5,
+      "prefill_ms": 990.883,
+      "decode_tok_per_s": 24.4919,
+      "generated_ids": [33, 10010, 428, 62434, 248046]
+    },
+    {
+      "id": "fact-012",
+      "prompt_tokens": 27,
+      "generated_tokens": 4,
+      "prefill_ms": 1027.5,
+      "decode_tok_per_s": 24.4445,
+      "generated_ids": [29809, 10936, 4229, 248046]
+    },
+    {
+      "id": "fact-013",
+      "prompt_tokens": 27,
+      "generated_tokens": 3,
+      "prefill_ms": 1027.24,
+      "decode_tok_per_s": 24.4794,
+      "generated_ids": [31628, 2280, 248046]
+    },
+    {
+      "id": "fact-014",
+      "prompt_tokens": 27,
+      "generated_tokens": 2,
+      "prefill_ms": 1028.44,
+      "decode_tok_per_s": 24.422,
+      "generated_ids": [35396, 248046]
+    },
+    {
+      "id": "fact-015",
+      "prompt_tokens": 27,
+      "generated_tokens": 3,
+      "prefill_ms": 1028.18,
+      "decode_tok_per_s": 24.3843,
+      "generated_ids": [94086, 24388, 248046]
+    },
+    {
+      "id": "fact-016",
+      "prompt_tokens": 27,
+      "generated_tokens": 3,
+      "prefill_ms": 1028.05,
+      "decode_tok_per_s": 24.3624,
+      "generated_ids": [46, 18365, 248046]
+    },
+    {
+      "id": "fact-017",
+      "prompt_tokens": 27,
+      "generated_tokens": 3,
+      "prefill_ms": 1029.49,
+      "decode_tok_per_s": 24.3887,
+      "generated_ids": [50, 45212, 248046]
+    },
+    {
+      "id": "fact-018",
+      "prompt_tokens": 27,
+      "generated_tokens": 2,
+      "prefill_ms": 1028.76,
+      "decode_tok_per_s": 24.1827,
+      "generated_ids": [44847, 248046]
+    },
+    {
+      "id": "fact-019",
+      "prompt_tokens": 27,
+      "generated_tokens": 2,
+      "prefill_ms": 1034.8,
+      "decode_tok_per_s": 24.1981,
+      "generated_ids": [24629, 248046]
+    },
+    {
+      "id": "fact-020",
+      "prompt_tokens": 28,
+      "generated_tokens": 5,
+      "prefill_ms": 1080.35,
+      "decode_tok_per_s": 24.2967,
+      "generated_ids": [16, 24, 21, 24, 248046]
+    },
+    {
+      "id": "fact-021",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1152.2,
+      "decode_tok_per_s": 24.3213,
+      "generated_ids": [16, 24, 23, 24, 248046]
+    },
+    {
+      "id": "fact-022",
+      "prompt_tokens": 29,
+      "generated_tokens": 5,
+      "prefill_ms": 1110.16,
+      "decode_tok_per_s": 24.3267,
+      "generated_ids": [16, 23, 24, 21, 248046]
+    },
+    {
+      "id": "fact-023",
+      "prompt_tokens": 32,
+      "generated_tokens": 5,
+      "prefill_ms": 1226.13,
+      "decode_tok_per_s": 24.2913,
+      "generated_ids": [16, 22, 22, 21, 248046]
+    },
+    {
+      "id": "fact-024",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1186.82,
+      "decode_tok_per_s": 23.9631,
+      "generated_ids": [16, 24, 15, 18, 248046]
+    },
+    {
+      "id": "fact-025",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1154.55,
+      "decode_tok_per_s": 24.2145,
+      "generated_ids": [16, 24, 19, 20, 248046]
+    },
+    {
+      "id": "fact-026",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1149.38,
+      "decode_tok_per_s": 24.2968,
+      "generated_ids": [16, 24, 20, 22, 248046]
+    },
+    {
+      "id": "fact-027",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1195.91,
+      "decode_tok_per_s": 24.3529,
+      "generated_ids": [16, 23, 22, 21, 248046]
+    },
+    {
+      "id": "fact-028",
+      "prompt_tokens": 31,
+      "generated_tokens": 6,
+      "prefill_ms": 1188.44,
+      "decode_tok_per_s": 24.3336,
+      "generated_ids": [16, 24, 13, 23, 23, 248046]
+    },
+    {
+      "id": "fact-029",
+      "prompt_tokens": 32,
+      "generated_tokens": 6,
+      "prefill_ms": 1221.04,
+      "decode_tok_per_s": 24.3486,
+      "generated_ids": [21, 17, 13, 16, 19, 248046]
+    },
+    {
+      "id": "fact-030",
+      "prompt_tokens": 30,
+      "generated_tokens": 6,
+      "prefill_ms": 1143.56,
+      "decode_tok_per_s": 24.3848,
+      "generated_ids": [16, 16, 13, 15, 17, 248046]
+    },
+    {
+      "id": "fact-031",
+      "prompt_tokens": 31,
+      "generated_tokens": 6,
+      "prefill_ms": 1183,
+      "decode_tok_per_s": 24.3706,
+      "generated_ids": [19, 19, 13, 15, 24, 248046]
+    },
+    {
+      "id": "fact-032",
+      "prompt_tokens": 31,
+      "generated_tokens": 6,
+      "prefill_ms": 1181.48,
+      "decode_tok_per_s": 24.4043,
+      "generated_ids": [20, 15, 13, 22, 17, 248046]
+    },
+    {
+      "id": "fact-033",
+      "prompt_tokens": 35,
+      "generated_tokens": 6,
+      "prefill_ms": 1335.76,
+      "decode_tok_per_s": 24.3321,
+      "generated_ids": [16, 21, 13, 24, 15, 248046]
+    },
+    {
+      "id": "fact-034",
+      "prompt_tokens": 32,
+      "generated_tokens": 6,
+      "prefill_ms": 1221.31,
+      "decode_tok_per_s": 24.3397,
+      "generated_ids": [22, 22, 13, 15, 15, 248046]
+    },
+    {
+      "id": "fact-035",
+      "prompt_tokens": 31,
+      "generated_tokens": 6,
+      "prefill_ms": 1181.62,
+      "decode_tok_per_s": 23.9607,
+      "generated_ids": [18, 17, 13, 15, 15, 248046]
+    },
+    {
+      "id": "fact-036",
+      "prompt_tokens": 31,
+      "generated_tokens": 6,
+      "prefill_ms": 1190.35,
+      "decode_tok_per_s": 24.3524,
+      "generated_ids": [18, 17, 13, 23, 16, 248046]
+    },
+    {
+      "id": "fact-037",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1149.3,
+      "decode_tok_per_s": 24.3348,
+      "generated_ids": [24, 13, 23, 19, 248046]
+    },
+    {
+      "id": "fact-038",
+      "prompt_tokens": 30,
+      "generated_tokens": 6,
+      "prefill_ms": 1159.95,
+      "decode_tok_per_s": 24.1359,
+      "generated_ids": [16, 22, 13, 17, 23, 248046]
+    },
+    {
+      "id": "fact-039",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1146.94,
+      "decode_tok_per_s": 24.439,
+      "generated_ids": [19, 13, 24, 19, 248046]
+    },
+    {
+      "id": "arit-000",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1144.16,
+      "decode_tok_per_s": 24.3955,
+      "generated_ids": [16, 19, 15, 19, 248046]
+    },
+    {
+      "id": "arit-001",
+      "prompt_tokens": 30,
+      "generated_tokens": 4,
+      "prefill_ms": 1144.15,
+      "decode_tok_per_s": 24.369,
+      "generated_ids": [24, 23, 24, 248046]
+    },
+    {
+      "id": "arit-002",
+      "prompt_tokens": 30,
+      "generated_tokens": 4,
+      "prefill_ms": 1146.8,
+      "decode_tok_per_s": 24.3332,
+      "generated_ids": [23, 22, 17, 248046]
+    },
+    {
+      "id": "arit-003",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1143.66,
+      "decode_tok_per_s": 24.3645,
+      "generated_ids": [16, 15, 15, 16, 248046]
+    },
+    {
+      "id": "arit-004",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1144.05,
+      "decode_tok_per_s": 24.3619,
+      "generated_ids": [16, 23, 21, 17, 248046]
+    },
+    {
+      "id": "arit-005",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1143.25,
+      "decode_tok_per_s": 24.4223,
+      "generated_ids": [16, 16, 22, 21, 248046]
+    },
+    {
+      "id": "arit-006",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1186.79,
+      "decode_tok_per_s": 24.3223,
+      "generated_ids": [18, 16, 15, 16, 248046]
+    },
+    {
+      "id": "arit-007",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1181.75,
+      "decode_tok_per_s": 24.3884,
+      "generated_ids": [17, 16, 18, 18, 248046]
+    },
+    {
+      "id": "arit-008",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1182.56,
+      "decode_tok_per_s": 24.3379,
+      "generated_ids": [21, 23, 17, 21, 248046]
+    },
+    {
+      "id": "arit-009",
+      "prompt_tokens": 31,
+      "generated_tokens": 5,
+      "prefill_ms": 1182.73,
+      "decode_tok_per_s": 24.4025,
+      "generated_ids": [17, 17, 23, 16, 248046]
+    },
+    {
+      "id": "arit-010",
+      "prompt_tokens": 28,
+      "generated_tokens": 4,
+      "prefill_ms": 1068.04,
+      "decode_tok_per_s": 24.4149,
+      "generated_ids": [21, 16, 17, 248046]
+    },
+    {
+      "id": "arit-011",
+      "prompt_tokens": 28,
+      "generated_tokens": 5,
+      "prefill_ms": 1068.29,
+      "decode_tok_per_s": 24.3298,
+      "generated_ids": [16, 24, 17, 20, 248046]
+    },
+    {
+      "id": "arit-012",
+      "prompt_tokens": 28,
+      "generated_tokens": 5,
+      "prefill_ms": 1068.42,
+      "decode_tok_per_s": 24.3546,
+      "generated_ids": [23, 21, 18, 18, 248046]
+    },
+    {
+      "id": "arit-013",
+      "prompt_tokens": 28,
+      "generated_tokens": 5,
+      "prefill_ms": 1068.16,
+      "decode_tok_per_s": 24.3763,
+      "generated_ids": [17, 15, 20, 23, 248046]
+    },
+    {
+      "id": "arit-014",
+      "prompt_tokens": 30,
+      "generated_tokens": 3,
+      "prefill_ms": 1145.52,
+      "decode_tok_per_s": 24.4181,
+      "generated_ids": [24, 16, 248046]
+    },
+    {
+      "id": "arit-015",
+      "prompt_tokens": 30,
+      "generated_tokens": 3,
+      "prefill_ms": 1146.28,
+      "decode_tok_per_s": 24.3471,
+      "generated_ids": [24, 23, 248046]
+    },
+    {
+      "id": "arit-016",
+      "prompt_tokens": 32,
+      "generated_tokens": 4,
+      "prefill_ms": 1219.61,
+      "decode_tok_per_s": 24.3847,
+      "generated_ids": [21, 18, 15, 248046]
+    },
+    {
+      "id": "arit-017",
+      "prompt_tokens": 32,
+      "generated_tokens": 5,
+      "prefill_ms": 1229.14,
+      "decode_tok_per_s": 23.863,
+      "generated_ids": [16, 19, 23, 23, 248046]
+    },
+    {
+      "id": "arit-018",
+      "prompt_tokens": 33,
+      "generated_tokens": 4,
+      "prefill_ms": 1270.95,
+      "decode_tok_per_s": 23.9267,
+      "generated_ids": [24, 17, 15, 248046]
+    },
+    {
+      "id": "arit-019",
+      "prompt_tokens": 32,
+      "generated_tokens": 4,
+      "prefill_ms": 1233.67,
+      "decode_tok_per_s": 24.2474,
+      "generated_ids": [17, 21, 15, 248046]
+    },
+    {
+      "id": "arit-020",
+      "prompt_tokens": 33,
+      "generated_tokens": 5,
+      "prefill_ms": 1269.74,
+      "decode_tok_per_s": 24.3023,
+      "generated_ids": [16, 19, 21, 18, 248046]
+    },
+    {
+      "id": "arit-021",
+      "prompt_tokens": 32,
+      "generated_tokens": 4,
+      "prefill_ms": 1230.84,
+      "decode_tok_per_s": 24.3346,
+      "generated_ids": [18, 23, 19, 248046]
+    },
+    {
+      "id": "arit-022",
+      "prompt_tokens": 32,
+      "generated_tokens": 4,
+      "prefill_ms": 1231.65,
+      "decode_tok_per_s": 24.3389,
+      "generated_ids": [20, 19, 15, 248046]
+    },
+    {
+      "id": "arit-023",
+      "prompt_tokens": 33,
+      "generated_tokens": 4,
+      "prefill_ms": 1264.72,
+      "decode_tok_per_s": 24.3958,
+      "generated_ids": [21, 17, 15, 248046]
+    },
+    {
+      "id": "arit-024",
+      "prompt_tokens": 40,
+      "generated_tokens": 4,
+      "prefill_ms": 1556.82,
+      "decode_tok_per_s": 23.7277,
+      "generated_ids": [17, 18, 15, 248046]
+    },
+    {
+      "id": "arit-025",
+      "prompt_tokens": 40,
+      "generated_tokens": 4,
+      "prefill_ms": 1573.42,
+      "decode_tok_per_s": 23.7214,
+      "generated_ids": [16, 21, 20, 248046]
+    },
+    {
+      "id": "arit-026",
+      "prompt_tokens": 39,
+      "generated_tokens": 4,
+      "prefill_ms": 1510.48,
+      "decode_tok_per_s": 23.8212,
+      "generated_ids": [16, 22, 20, 248046]
+    },
+    {
+      "id": "arit-027",
+      "prompt_tokens": 40,
+      "generated_tokens": 4,
+      "prefill_ms": 1541.55,
+      "decode_tok_per_s": 24.2775,
+      "generated_ids": [21, 17, 20, 248046]
+    },
+    {
+      "id": "arit-028",
+      "prompt_tokens": 39,
+      "generated_tokens": 3,
+      "prefill_ms": 1505.1,
+      "decode_tok_per_s": 23.7597,
+      "generated_ids": [20, 20, 248046]
+    },
+    {
+      "id": "arit-029",
+      "prompt_tokens": 39,
+      "generated_tokens": 3,
+      "prefill_ms": 1505.03,
+      "decode_tok_per_s": 24.167,
+      "generated_ids": [20, 15, 248046]
+    },
+    {
+      "id": "arit-030",
+      "prompt_tokens": 39,
+      "generated_tokens": 3,
+      "prefill_ms": 1501.5,
+      "decode_tok_per_s": 24.0086,
+      "generated_ids": [21, 15, 248046]
+    },
+    {
+      "id": "arit-031",
+      "prompt_tokens": 40,
+      "generated_tokens": 4,
+      "prefill_ms": 1545.46,
+      "decode_tok_per_s": 24.1675,
+      "generated_ids": [22, 20, 15, 248046]
+    },
+    {
+      "id": "arit-032",
+      "prompt_tokens": 33,
+      "generated_tokens": 2,
+      "prefill_ms": 1270.51,
+      "decode_tok_per_s": 24.1693,
+      "generated_ids": [23, 248046]
+    },
+    {
+      "id": "arit-033",
+      "prompt_tokens": 32,
+      "generated_tokens": 3,
+      "prefill_ms": 1238.14,
+      "decode_tok_per_s": 24.2648,
+      "generated_ids": [18, 17, 248046]
+    },
+    {
+      "id": "arit-034",
+      "prompt_tokens": 33,
+      "generated_tokens": 3,
+      "prefill_ms": 1264.53,
+      "decode_tok_per_s": 24.2178,
+      "generated_ids": [16, 20, 248046]
+    },
+    {
+      "id": "arit-035",
+      "prompt_tokens": 33,
+      "generated_tokens": 3,
+      "prefill_ms": 1272.19,
+      "decode_tok_per_s": 23.9856,
+      "generated_ids": [16, 21, 248046]
+    },
+    {
+      "id": "arit-036",
+      "prompt_tokens": 33,
+      "generated_tokens": 3,
+      "prefill_ms": 1269.83,
+      "decode_tok_per_s": 24.1938,
+      "generated_ids": [16, 19, 248046]
+    },
+    {
+      "id": "arit-037",
+      "prompt_tokens": 33,
+      "generated_tokens": 3,
+      "prefill_ms": 1273.75,
+      "decode_tok_per_s": 24.0538,
+      "generated_ids": [16, 18, 248046]
+    },
+    {
+      "id": "arit-038",
+      "prompt_tokens": 33,
+      "generated_tokens": 3,
+      "prefill_ms": 1273.26,
+      "decode_tok_per_s": 23.9313,
+      "generated_ids": [16, 15, 248046]
+    },
+    {
+      "id": "arit-039",
+      "prompt_tokens": 33,
+      "generated_tokens": 2,
+      "prefill_ms": 1269.79,
+      "decode_tok_per_s": 24.2314,
+      "generated_ids": [15, 248046]
+    },
+    {
+      "id": "codi-000",
+      "prompt_tokens": 36,
+      "generated_tokens": 18,
+      "prefill_ms": 1382.86,
+      "decode_tok_per_s": 23.9231,
+      "generated_ids": [71093, 12305, 198, 727, 884, 2784, 11, 292, 1590, 198, 262, 460, 264, 478, 292, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-001",
+      "prompt_tokens": 36,
+      "generated_tokens": 18,
+      "prefill_ms": 1391.15,
+      "decode_tok_per_s": 23.936,
+      "generated_ids": [71093, 12305, 198, 727, 15144, 2784, 11, 292, 1590, 198, 262, 460, 264, 348, 292, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-002",
+      "prompt_tokens": 37,
+      "generated_tokens": 21,
+      "prefill_ms": 1425.96,
+      "decode_tok_per_s": 23.9698,
+      "generated_ids": [71093, 12305, 198, 727, 369, 66034, 1393, 1590, 198, 262, 460, 307, 984, 220, 17, 606, 220, 15, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-003",
+      "prompt_tokens": 36,
+      "generated_tokens": 39,
+      "prefill_ms": 1387.3,
+      "decode_tok_per_s": 23.8991,
+      "generated_ids": [71093, 12305, 198, 727, 51184, 1393, 1590, 198, 262, 1067, 283, 220, 16, 198, 262, 364, 585, 303, 2020, 7, 17, 11, 307, 478, 220, 16, 1590, 198, 285, 1067, 11076, 585, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-004",
+      "prompt_tokens": 46,
+      "generated_tokens": 44,
+      "prefill_ms": 1770.33,
+      "decode_tok_per_s": 23.8027,
+      "generated_ids": [71093, 12305, 198, 727, 15336, 1393, 1590, 198, 262, 264, 11, 292, 283, 220, 15, 11, 220, 16, 198, 262, 364, 696, 303, 2020, 1393, 1590, 198, 285, 264, 11, 292, 283, 292, 11, 264, 478, 292, 198, 262, 460, 264, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-005",
+      "prompt_tokens": 32,
+      "generated_tokens": 18,
+      "prefill_ms": 1234.56,
+      "decode_tok_per_s": 24.0603,
+      "generated_ids": [71093, 12305, 198, 727, 9637, 3773, 1104, 1590, 198, 262, 460, 274, 60059, 16, 60, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-006",
+      "prompt_tokens": 40,
+      "generated_tokens": 21,
+      "prefill_ms": 1550.75,
+      "decode_tok_per_s": 23.8953,
+      "generated_ids": [71093, 12305, 198, 727, 369, 70817, 34864, 1104, 1590, 198, 262, 460, 274, 606, 274, 60059, 16, 60, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-007",
+      "prompt_tokens": 46,
+      "generated_tokens": 32,
+      "prefill_ms": 1784.75,
+      "decode_tok_per_s": 23.8559,
+      "generated_ids": [71093, 12305, 198, 727, 1698, 2200, 358, 1943, 1104, 1590, 198, 262, 460, 2542, 7, 16, 364, 272, 303, 274, 413, 272, 17534, 363, 303, 359, 5734, 94865, 837, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-008",
+      "prompt_tokens": 37,
+      "generated_tokens": 17,
+      "prefill_ms": 1431.22,
+      "decode_tok_per_s": 24.074,
+      "generated_ids": [71093, 12305, 198, 727, 2542, 1951, 51532, 1590, 198, 262, 460, 2542, 51532, 8, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-009",
+      "prompt_tokens": 38,
+      "generated_tokens": 17,
+      "prefill_ms": 1467.98,
+      "decode_tok_per_s": 23.8818,
+      "generated_ids": [71093, 12305, 198, 727, 1103, 6144, 51532, 1590, 198, 262, 460, 1866, 51532, 8, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-010",
+      "prompt_tokens": 39,
+      "generated_tokens": 22,
+      "prefill_ms": 1506.7,
+      "decode_tok_per_s": 23.9348,
+      "generated_ids": [71093, 12305, 198, 727, 2018, 879, 31312, 51532, 1590, 198, 262, 460, 10300, 13765, 51532, 578, 7368, 17, 60, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-011",
+      "prompt_tokens": 38,
+      "generated_tokens": 53,
+      "prefill_ms": 1467.34,
+      "decode_tok_per_s": 23.8284,
+      "generated_ids": [71093, 12305, 198, 727, 7438, 446, 51532, 1590, 198, 262, 3753, 283, 716, 363, 198, 262, 1067, 283, 2958, 198, 262, 364, 830, 303, 11604, 25, 198, 285, 413, 830, 524, 303, 3753, 25, 198, 309, 3753, 1316, 2007, 8, 198, 309, 1067, 1989, 2007, 8, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-012",
+      "prompt_tokens": 38,
+      "generated_tokens": 26,
+      "prefill_ms": 1463.97,
+      "decode_tok_per_s": 23.9117,
+      "generated_ids": [71093, 12305, 198, 727, 43831, 2007, 753, 1590, 198, 262, 460, 498, 87, 364, 11604, 303, 830, 753, 364, 830, 303, 11604, 60, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-013",
+      "prompt_tokens": 39,
+      "generated_tokens": 29,
+      "prefill_ms": 1501.17,
+      "decode_tok_per_s": 23.9146,
+      "generated_ids": [71093, 12305, 198, 727, 12391, 2784, 11, 292, 1590, 198, 262, 460, 2542, 2007, 348, 374, 364, 830, 11, 374, 303, 10002, 2784, 11, 292, 578, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-014",
+      "prompt_tokens": 46,
+      "generated_tokens": 141,
+      "prefill_ms": 1784.71,
+      "decode_tok_per_s": 23.3851,
+      "generated_ids": [71093, 12305, 198, 727, 5344, 17, 87, 17, 24154, 4205, 11, 417, 1590, 198, 262, 460, 498, 198, 285, 498, 32, 58, 15, 1404, 15, 60, 348, 417, 58, 15, 1404, 15, 60, 478, 357, 58, 15, 1404, 16, 60, 348, 417, 58, 16, 1404, 15, 1089, 198, 260, 357, 58, 15, 1404, 15, 60, 348, 417, 58, 15, 1404, 16, 60, 478, 357, 58, 15, 1404, 16, 60, 348, 417, 58, 16, 1404, 16, 19867, 198, 285, 498, 32, 58, 16, 1404, 15, 60, 348, 417, 58, 15, 1404, 15, 60, 478, 357, 58, 16, 1404, 16, 60, 348, 417, 58, 16, 1404, 15, 1089, 198, 260, 357, 58, 16, 1404, 15, 60, 348, 417, 58, 15, 1404, 16, 60, 478, 357, 58, 16, 1404, 16, 60, 348, 417, 58, 16, 1404, 16, 19867, 198, 262, 2205, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-015",
+      "prompt_tokens": 35,
+      "generated_tokens": 32,
+      "prefill_ms": 1351.27,
+      "decode_tok_per_s": 23.9428,
+      "generated_ids": [71093, 12305, 198, 727, 43364, 2784, 11, 292, 1590, 198, 262, 1345, 292, 25, 198, 285, 264, 11, 292, 283, 292, 11, 264, 984, 292, 198, 262, 460, 264, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-016",
+      "prompt_tokens": 35,
+      "generated_tokens": 89,
+      "prefill_ms": 1353.22,
+      "decode_tok_per_s": 23.7153,
+      "generated_ids": [71093, 12305, 198, 727, 369, 36951, 1393, 1590, 198, 262, 413, 307, 361, 220, 17, 25, 198, 285, 460, 3439, 198, 262, 413, 307, 606, 220, 17, 25, 198, 285, 460, 2912, 198, 262, 413, 307, 984, 220, 17, 606, 220, 15, 25, 198, 285, 460, 3439, 198, 262, 585, 283, 220, 18, 198, 262, 1345, 585, 348, 585, 2564, 307, 25, 198, 285, 413, 307, 984, 585, 606, 220, 15, 25, 198, 309, 460, 3439, 198, 285, 585, 1373, 220, 17, 198, 262, 460, 2912, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-017",
+      "prompt_tokens": 37,
+      "generated_tokens": 123,
+      "prefill_ms": 1429.67,
+      "decode_tok_per_s": 23.511,
+      "generated_ids": [71093, 12305, 198, 727, 47770, 7073, 56045, 1393, 1590, 198, 262, 413, 307, 361, 220, 17, 25, 198, 285, 460, 2958, 198, 262, 71808, 283, 498, 2434, 60, 348, 318, 77, 478, 220, 16, 8, 198, 262, 71808, 58, 15, 60, 283, 71808, 58, 16, 60, 283, 3439, 198, 262, 364, 585, 303, 2020, 7, 17, 11, 514, 1393, 2972, 220, 15, 13, 20, 8, 478, 220, 16, 1590, 198, 285, 413, 71808, 957, 5491, 198, 309, 364, 492, 303, 2020, 1889, 348, 585, 11, 307, 478, 220, 16, 11, 585, 1590, 198, 388, 71808, 3681, 60, 283, 3439, 198, 262, 460, 498, 72, 364, 585, 303, 2020, 7, 17, 11, 307, 478, 220, 16, 8, 413, 71808, 957, 4891, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-018",
+      "prompt_tokens": 42,
+      "generated_tokens": 95,
+      "prefill_ms": 1626.37,
+      "decode_tok_per_s": 23.6202,
+      "generated_ids": [71093, 12305, 198, 727, 7620, 10400, 51532, 11, 830, 1590, 198, 262, 750, 11, 15131, 283, 220, 15, 11, 2343, 51532, 8, 198, 262, 1345, 750, 361, 15131, 25, 198, 285, 4937, 283, 318, 379, 478, 15131, 434, 220, 17, 8, 198, 285, 413, 11604, 38374, 60, 361, 830, 25, 198, 309, 750, 283, 4937, 478, 220, 16, 198, 285, 745, 25, 198, 309, 15131, 283, 4937, 198, 262, 413, 750, 361, 2343, 51532, 8, 321, 11604, 58, 379, 60, 606, 830, 25, 198, 285, 460, 750, 198, 262, 460, 471, 16, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-019",
+      "prompt_tokens": 42,
+      "generated_tokens": 62,
+      "prefill_ms": 1617.53,
+      "decode_tok_per_s": 23.7614,
+      "generated_ids": [71093, 12305, 198, 727, 22873, 15010, 51532, 1590, 198, 262, 364, 585, 303, 2020, 6686, 51532, 8, 471, 220, 16, 1590, 198, 285, 413, 11604, 957, 60, 835, 11604, 957, 478, 220, 16, 5491, 198, 309, 11604, 957, 1089, 11604, 957, 478, 220, 16, 60, 283, 11604, 957, 478, 220, 16, 1089, 11604, 957, 60, 198, 262, 460, 11604, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-020",
+      "prompt_tokens": 39,
+      "generated_tokens": 98,
+      "prefill_ms": 1509.16,
+      "decode_tok_per_s": 23.6052,
+      "generated_ids": [71093, 12305, 198, 727, 10562, 39914, 2784, 11, 292, 1590, 198, 262, 1067, 283, 2958, 198, 262, 585, 283, 492, 283, 220, 15, 198, 262, 1345, 585, 361, 2343, 2784, 8, 321, 492, 361, 2343, 1818, 25, 198, 285, 413, 264, 957, 60, 2564, 292, 3681, 5491, 198, 309, 1067, 1989, 2784, 957, 2387, 198, 309, 585, 1373, 220, 16, 198, 285, 745, 25, 198, 309, 1067, 1989, 1818, 3681, 2387, 198, 309, 492, 1373, 220, 16, 198, 262, 1067, 15365, 2784, 957, 92535, 198, 262, 1067, 15365, 1818, 3681, 92535, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-021",
+      "prompt_tokens": 42,
+      "generated_tokens": 44,
+      "prefill_ms": 1621.51,
+      "decode_tok_per_s": 23.8345,
+      "generated_ids": [71093, 12305, 198, 727, 3299, 3079, 1104, 1590, 198, 262, 14159, 283, 4535, 198, 262, 364, 3299, 303, 274, 5121, 4406, 198, 285, 14159, 48063, 60, 283, 14159, 652, 16510, 11, 220, 15, 8, 478, 220, 16, 198, 262, 460, 14159, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-022",
+      "prompt_tokens": 34,
+      "generated_tokens": 23,
+      "prefill_ms": 1314.23,
+      "decode_tok_per_s": 23.8579,
+      "generated_ids": [71093, 12305, 198, 727, 1379, 20460, 51532, 1590, 198, 262, 460, 1866, 13765, 51532, 681, 1328, 28, 18002, 6298, 8, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-023",
+      "prompt_tokens": 39,
+      "generated_tokens": 49,
+      "prefill_ms": 1504.98,
+      "decode_tok_per_s": 23.8235,
+      "generated_ids": [71093, 12305, 198, 727, 1809, 3584, 12606, 35090, 1590, 198, 262, 494, 14856, 1120, 41489, 198, 262, 38710, 283, 41489, 7080, 8, 198, 262, 364, 3299, 303, 4105, 25, 198, 285, 38710, 48063, 58, 15, 21415, 4928, 16510, 8, 198, 262, 460, 6249, 17164, 290, 8, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-024",
+      "prompt_tokens": 48,
+      "generated_tokens": 101,
+      "prefill_ms": 1855.86,
+      "decode_tok_per_s": 23.5189,
+      "generated_ids": [71093, 12305, 198, 727, 83979, 83152, 1393, 1590, 198, 262, 1067, 283, 2958, 198, 262, 364, 585, 303, 2020, 7, 16, 11, 307, 478, 220, 16, 1590, 198, 285, 413, 585, 984, 220, 16, 20, 606, 220, 15, 25, 198, 309, 1067, 1989, 437, 95112, 57466, 871, 198, 285, 4265, 585, 984, 220, 18, 606, 220, 15, 25, 198, 309, 1067, 1989, 437, 95112, 871, 198, 285, 4265, 585, 984, 220, 20, 606, 220, 15, 25, 198, 309, 1067, 1989, 437, 57466, 871, 198, 285, 745, 25, 198, 309, 1067, 1989, 4060, 1889, 578, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-025",
+      "prompt_tokens": 36,
+      "generated_tokens": 44,
+      "prefill_ms": 1390.75,
+      "decode_tok_per_s": 23.9234,
+      "generated_ids": [71093, 12305, 198, 727, 4162, 10467, 51532, 1590, 198, 262, 1067, 283, 2958, 198, 262, 2702, 283, 220, 15, 198, 262, 364, 830, 303, 11604, 25, 198, 285, 2702, 1373, 830, 198, 285, 1067, 1989, 22131, 8, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-026",
+      "prompt_tokens": 42,
+      "generated_tokens": 25,
+      "prefill_ms": 1620.86,
+      "decode_tok_per_s": 24.1109,
+      "generated_ids": [71093, 12305, 198, 727, 40523, 2007, 11, 750, 11, 15131, 1590, 198, 262, 460, 1866, 71147, 11, 1262, 2007, 11, 15131, 578, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-027",
+      "prompt_tokens": 36,
+      "generated_tokens": 28,
+      "prefill_ms": 1387.34,
+      "decode_tok_per_s": 24.0371,
+      "generated_ids": [71093, 12305, 198, 727, 272, 38915, 2270, 736, 46311, 1290, 1590, 198, 262, 460, 272, 348, 220, 24, 593, 220, 20, 478, 220, 18, 17, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-028",
+      "prompt_tokens": 35,
+      "generated_tokens": 43,
+      "prefill_ms": 1350.37,
+      "decode_tok_per_s": 24.0637,
+      "generated_ids": [71093, 12305, 198, 727, 1122, 21119, 1104, 1590, 198, 262, 1067, 283, 4535, 198, 262, 364, 272, 303, 274, 25, 198, 285, 1067, 12090, 60, 283, 1067, 652, 1290, 11, 220, 15, 8, 478, 220, 16, 198, 262, 460, 1067, 198, 71093, 248046]
+    },
+    {
+      "id": "codi-029",
+      "prompt_tokens": 34,
+      "generated_tokens": 24,
+      "prefill_ms": 1313.1,
+      "decode_tok_per_s": 23.566,
+      "generated_ids": [71093, 12305, 198, 727, 49211, 27214, 1590, 198, 262, 460, 498, 1551, 7587, 8, 364, 2713, 303, 10002, 3935, 17571, 7025, 198, 71093, 248046]
+    },
+    {
+      "id": "summ-000",
+      "prompt_tokens": 66,
+      "generated_tokens": 25,
+      "prefill_ms": 2554.47,
+      "decode_tok_per_s": 23.7165,
+      "generated_ids": [32, 24832, 54517, 5918, 440, 264, 38787, 24544, 11, 28509, 60006, 338, 68042, 11, 295, 2379, 70704, 11, 321, 264, 18717, 11129, 40554, 13, 248046]
+    },
+    {
+      "id": "summ-001",
+      "prompt_tokens": 70,
+      "generated_tokens": 47,
+      "prefill_ms": 2709.32,
+      "decode_tok_per_s": 23.6408,
+      "generated_ids": [760, 54517, 24544, 63222, 5028, 279, 7948, 22317, 1345, 338, 68042, 4086, 806, 29997, 13, 92244, 11, 70704, 295, 2789, 836, 50692, 11, 321, 279, 40554, 13569, 22819, 279, 30592, 3023, 494, 279, 26655, 13, 3113, 11129, 11, 279, 2919, 995, 2957, 1495, 3512, 18717, 13, 248046]
+    },
+    {
+      "id": "summ-002",
+      "prompt_tokens": 66,
+      "generated_tokens": 37,
+      "prefill_ms": 2552.7,
+      "decode_tok_per_s": 23.7115,
+      "generated_ids": [30729, 71163, 369, 279, 1817, 539, 864, 5983, 10462, 958, 35515, 4964, 23927, 310, 5335, 37728, 11, 2919, 11, 321, 12141, 38182, 1083, 32120, 321, 22817, 11, 264, 1817, 421, 11222, 1379, 2199, 383, 8964, 13, 248046]
+    },
+    {
+      "id": "summ-003",
+      "prompt_tokens": 70,
+      "generated_tokens": 51,
+      "prefill_ms": 2715.1,
+      "decode_tok_per_s": 23.5747,
+      "generated_ids": [30729, 71163, 19468, 5983, 10462, 310, 5000, 37728, 11, 2919, 11, 321, 12141, 38182, 1083, 32120, 321, 22817, 13, 88233, 4964, 23927, 86914, 3000, 4649, 11, 864, 19505, 279, 11153, 23698, 421, 11822, 2785, 279, 10583, 13, 1061, 1817, 40201, 279, 15787, 5028, 864, 1379, 2199, 383, 8964, 13402, 13, 248046]
+    },
+    {
+      "id": "summ-004",
+      "prompt_tokens": 63,
+      "generated_tokens": 25,
+      "prefill_ms": 2447.89,
+      "decode_tok_per_s": 23.7922,
+      "generated_ids": [760, 2235, 6522, 383, 27466, 6476, 369, 264, 6453, 11, 1575, 5304, 65110, 14467, 421, 58064, 29735, 4016, 310, 1141, 8581, 45248, 4281, 13, 248046]
+    },
+    {
+      "id": "summ-005",
+      "prompt_tokens": 67,
+      "generated_tokens": 50,
+      "prefill_ms": 2601.94,
+      "decode_tok_per_s": 23.6265,
+      "generated_ids": [760, 4588, 6522, 11, 29099, 383, 27466, 6476, 11, 38666, 264, 4281, 46306, 34227, 15706, 25442, 13, 11116, 5122, 2956, 369, 30825, 539, 15740, 36620, 70552, 4261, 11, 34844, 47788, 11, 321, 264, 39926, 59678, 13, 94902, 494, 27786, 50541, 5640, 310, 8238, 1141, 4281, 314, 8581, 75898, 13, 248046]
+    },
+    {
+      "id": "summ-006",
+      "prompt_tokens": 66,
+      "generated_tokens": 24,
+      "prefill_ms": 2555.53,
+      "decode_tok_per_s": 23.7052,
+      "generated_ids": [32, 35622, 25568, 5642, 888, 279, 32469, 23626, 11, 9101, 4661, 1132, 13988, 10583, 321, 279, 7478, 39029, 314, 32485, 539, 37119, 13, 248046]
+    },
+    {
+      "id": "summ-007",
+      "prompt_tokens": 70,
+      "generated_tokens": 60,
+      "prefill_ms": 2717.59,
+      "decode_tok_per_s": 23.5719,
+      "generated_ids": [32, 35622, 25568, 5642, 888, 279, 32469, 19020, 1238, 31266, 13, 357, 30797, 314, 31367, 16970, 264, 15740, 32485, 4757, 383, 279, 55893, 11, 321, 279, 10849, 16970, 279, 24007, 14693, 314, 279, 12999, 440, 2172, 19987, 13, 3113, 37119, 11, 279, 1132, 9376, 5721, 314, 279, 13071, 557, 279, 13988, 10583, 321, 279, 7478, 39029, 314, 32485, 13, 248046]
+    },
+    {
+      "id": "summ-008",
+      "prompt_tokens": 61,
+      "generated_tokens": 32,
+      "prefill_ms": 2356.22,
+      "decode_tok_per_s": 23.7377,
+      "generated_ids": [760, 13759, 11, 15963, 2250, 9229, 5157, 287, 321, 21998, 2943, 1578, 314, 280, 7728, 1518, 1141, 1118, 38956, 1071, 557, 9969, 11, 1381, 22651, 8765, 314, 9054, 1754, 6258, 13, 248046]
+    },
+    {
+      "id": "summ-009",
+      "prompt_tokens": 65,
+      "generated_tokens": 42,
+      "prefill_ms": 2519.3,
+      "decode_tok_per_s": 23.6564,
+      "generated_ids": [760, 13759, 28457, 287, 279, 14367, 1472, 2250, 9229, 5157, 287, 13, 47070, 7157, 2943, 1578, 9550, 56785, 1083, 279, 14367, 2634, 1518, 279, 1118, 38956, 1071, 557, 8953, 13, 10875, 11, 8765, 314, 11145, 5144, 279, 13759, 1754, 6258, 13, 248046]
+    },
+    {
+      "id": "summ-010",
+      "prompt_tokens": 65,
+      "generated_tokens": 31,
+      "prefill_ms": 2518.72,
+      "decode_tok_per_s": 23.7064,
+      "generated_ids": [3320, 287, 958, 264, 62154, 3298, 14810, 11, 6483, 8937, 321, 7836, 19392, 279, 4944, 321, 5821, 314, 18698, 11, 47973, 975, 7106, 310, 11137, 5774, 310, 279, 2450, 13, 248046]
+    },
+    {
+      "id": "summ-011",
+      "prompt_tokens": 69,
+      "generated_tokens": 43,
+      "prefill_ms": 2666.94,
+      "decode_tok_per_s": 23.5947,
+      "generated_ids": [3320, 287, 18459, 279, 3602, 314, 18698, 1472, 264, 62154, 3298, 14810, 13, 561, 8937, 314, 279, 14810, 8410, 310, 279, 6797, 14378, 4944, 11, 1345, 1141, 7836, 16779, 5821, 13, 6728, 7106, 3609, 321, 1179, 11137, 7435, 310, 279, 2450, 13, 248046]
+    },
+    {
+      "id": "summ-012",
+      "prompt_tokens": 59,
+      "generated_tokens": 39,
+      "prefill_ms": 2281.79,
+      "decode_tok_per_s": 23.7283,
+      "generated_ids": [760, 23223, 579, 491, 19403, 68355, 79812, 494, 4097, 13437, 25881, 11, 440, 1754, 6365, 28853, 539, 6042, 11, 4092, 11, 321, 22120, 14334, 11, 321, 15963, 20122, 14864, 421, 1042, 14811, 20563, 16424, 279, 42780, 33877, 13, 248046]
+    },
+    {
+      "id": "summ-013",
+      "prompt_tokens": 63,
+      "generated_tokens": 41,
+      "prefill_ms": 2428.67,
+      "decode_tok_per_s": 23.6487,
+      "generated_ids": [760, 23223, 579, 491, 19403, 48056, 79812, 494, 4097, 13437, 25881, 13, 8618, 25347, 369, 1583, 16917, 440, 1141, 1925, 314, 6042, 11, 12572, 4092, 11, 321, 22120, 14334, 13, 40485, 14864, 7056, 14811, 310, 16424, 42780, 33877, 20563, 13, 248046]
+    },
+    {
+      "id": "summ-014",
+      "prompt_tokens": 62,
+      "generated_tokens": 36,
+      "prefill_ms": 2402.72,
+      "decode_tok_per_s": 23.6824,
+      "generated_ids": [63952, 31958, 369, 37070, 303, 40297, 321, 64229, 303, 3988, 7094, 11, 440, 3777, 10462, 38334, 12050, 43247, 1172, 11456, 321, 7578, 5964, 430, 19274, 9704, 11, 1345, 19719, 8453, 5632, 321, 3114, 51080, 13, 248046]
+    },
+    {
+      "id": "summ-015",
+      "prompt_tokens": 66,
+      "generated_tokens": 57,
+      "prefill_ms": 2557.57,
+      "decode_tok_per_s": 23.6467,
+      "generated_ids": [63952, 31958, 369, 274, 754, 2261, 279, 40297, 3098, 321, 369, 64229, 303, 279, 3988, 7094, 3818, 13, 561, 3777, 10462, 44132, 43247, 4530, 23221, 264, 27206, 6000, 314, 11456, 11, 1238, 864, 781, 29238, 10725, 6310, 430, 19274, 5096, 13, 60223, 8453, 57927, 5684, 440, 3820, 6326, 2261, 279, 3818, 314, 5632, 321, 3114, 13, 248046]
+    },
+    {
+      "id": "summ-016",
+      "prompt_tokens": 62,
+      "generated_tokens": 41,
+      "prefill_ms": 2407.05,
+      "decode_tok_per_s": 23.6768,
+      "generated_ids": [4699, 11129, 11, 279, 324, 55965, 51624, 42942, 220, 16, 16, 17, 7123, 310, 42572, 279, 17796, 11, 3000, 279, 27056, 11, 1433, 11946, 17199, 11, 321, 11, 383, 29262, 4428, 20803, 11, 4950, 279, 20005, 1396, 1330, 4276, 13, 248046]
+    },
+    {
+      "id": "summ-017",
+      "prompt_tokens": 66,
+      "generated_tokens": 45,
+      "prefill_ms": 2557.81,
+      "decode_tok_per_s": 23.5767,
+      "generated_ids": [4699, 11129, 11, 279, 324, 55965, 51624, 14180, 2789, 799, 7493, 28279, 7123, 13, 1216, 41928, 279, 17796, 11, 72010, 279, 27056, 11, 321, 12076, 279, 17199, 421, 5642, 13, 1848, 29262, 4428, 20803, 11, 551, 35617, 33172, 279, 20005, 1396, 1330, 4276, 13, 248046]
+    },
+    {
+      "id": "summ-018",
+      "prompt_tokens": 63,
+      "generated_tokens": 35,
+      "prefill_ms": 2436.57,
+      "decode_tok_per_s": 23.6985,
+      "generated_ids": [34, 9527, 88559, 1304, 303, 7948, 11, 24785, 19895, 948, 13280, 1418, 72638, 1870, 42464, 71779, 421, 1761, 26706, 9140, 11, 694, 15589, 19274, 37854, 836, 19060, 539, 12066, 11490, 321, 79583, 1070, 13, 248046]
+    },
+    {
+      "id": "summ-019",
+      "prompt_tokens": 67,
+      "generated_tokens": 60,
+      "prefill_ms": 2599.57,
+      "decode_tok_per_s": 23.5823,
+      "generated_ids": [34, 9527, 88559, 2154, 303, 21066, 30825, 539, 7948, 11, 24785, 11, 321, 6797, 30596, 19895, 421, 3622, 440, 53653, 34044, 13, 5875, 279, 3199, 314, 22892, 11, 9104, 1418, 72638, 8972, 42464, 71779, 11, 26600, 29593, 68211, 421, 1761, 8765, 314, 12103, 9140, 13, 4213, 11, 30261, 19274, 47123, 12066, 11490, 321, 16905, 79583, 314, 1439, 13976, 13, 248046]
+    },
+    {
+      "id": "bili-000",
+      "prompt_tokens": 26,
+      "generated_tokens": 8,
+      "prefill_ms": 1001.91,
+      "decode_tok_per_s": 24.0153,
+      "generated_ids": [760, 7993, 7338, 383, 279, 5344, 13, 248046]
+    },
+    {
+      "id": "bili-001",
+      "prompt_tokens": 29,
+      "generated_tokens": 11,
+      "prefill_ms": 1121.06,
+      "decode_tok_per_s": 24.0235,
+      "generated_ids": [27336, 85895, 506, 220, 16, 15, 15, 11995, 59275, 13, 248046]
+    },
+    {
+      "id": "bili-002",
+      "prompt_tokens": 30,
+      "generated_tokens": 12,
+      "prefill_ms": 1155.85,
+      "decode_tok_per_s": 24.0096,
+      "generated_ids": [7691, 29772, 500, 956, 6234, 539, 279, 500, 956, 451, 13, 248046]
+    },
+    {
+      "id": "bili-003",
+      "prompt_tokens": 29,
+      "generated_tokens": 11,
+      "prefill_ms": 1117.68,
+      "decode_tok_per_s": 24.0781,
+      "generated_ids": [760, 3841, 13477, 37550, 33075, 888, 279, 15217, 5388, 13, 248046]
+    },
+    {
+      "id": "bili-004",
+      "prompt_tokens": 28,
+      "generated_tokens": 10,
+      "prefill_ms": 1079.18,
+      "decode_tok_per_s": 24.1374,
+      "generated_ids": [58150, 3543, 25, 11388, 18637, 383, 3619, 22940, 13, 248046]
+    },
+    {
+      "id": "bili-005",
+      "prompt_tokens": 28,
+      "generated_tokens": 10,
+      "prefill_ms": 1081.95,
+      "decode_tok_per_s": 23.9623,
+      "generated_ids": [2014, 22544, 264, 1834, 13205, 279, 10352, 3023, 13, 248046]
+    },
+    {
+      "id": "bili-006",
+      "prompt_tokens": 31,
+      "generated_tokens": 13,
+      "prefill_ms": 1188.31,
+      "decode_tok_per_s": 24.1764,
+      "generated_ids": [1206, 381, 466, 524, 310, 381, 11, 421, 369, 279, 3296, 13, 248046]
+    },
+    {
+      "id": "bili-007",
+      "prompt_tokens": 26,
+      "generated_tokens": 8,
+      "prefill_ms": 999.787,
+      "decode_tok_per_s": 24.2658,
+      "generated_ids": [760, 3988, 11619, 36584, 279, 33078, 13, 248046]
+    },
+    {
+      "id": "bili-008",
+      "prompt_tokens": 31,
+      "generated_tokens": 13,
+      "prefill_ms": 1198.25,
+      "decode_tok_per_s": 24.047,
+      "generated_ids": [32, 11285, 314, 264, 15706, 8491, 11690, 440, 264, 3074, 2923, 13, 248046]
+    },
+    {
+      "id": "bili-009",
+      "prompt_tokens": 27,
+      "generated_tokens": 9,
+      "prefill_ms": 1041.12,
+      "decode_tok_per_s": 24.1154,
+      "generated_ids": [39, 33961, 88, 369, 279, 1786, 4687, 13, 248046]
+    },
+    {
+      "id": "bili-010",
+      "prompt_tokens": 25,
+      "generated_tokens": 7,
+      "prefill_ms": 974.244,
+      "decode_tok_per_s": 23.7666,
+      "generated_ids": [1409, 35874, 1040, 449, 17385, 13, 248046]
+    },
+    {
+      "id": "bili-011",
+      "prompt_tokens": 28,
+      "generated_tokens": 10,
+      "prefill_ms": 1089.09,
+      "decode_tok_per_s": 24.2224,
+      "generated_ids": [760, 5572, 369, 2493, 1223, 1056, 279, 19601, 13, 248046]
+    },
+    {
+      "id": "bili-012",
+      "prompt_tokens": 29,
+      "generated_tokens": 11,
+      "prefill_ms": 1115.84,
+      "decode_tok_per_s": 24.1915,
+      "generated_ids": [4350, 303, 21047, 11, 635, 430, 279, 47091, 635, 13, 248046]
+    },
+    {
+      "id": "bili-013",
+      "prompt_tokens": 25,
+      "generated_tokens": 7,
+      "prefill_ms": 957.877,
+      "decode_tok_per_s": 23.9842,
+      "generated_ids": [2665, 6437, 11, 874, 8457, 13, 248046]
+    },
+    {
+      "id": "bili-014",
+      "prompt_tokens": 23,
+      "generated_tokens": 5,
+      "prefill_ms": 886.896,
+      "decode_tok_per_s": 24.0182,
+      "generated_ids": [77565, 369, 2279, 13, 248046]
+    },
+    {
+      "id": "bili-015",
+      "prompt_tokens": 27,
+      "generated_tokens": 9,
+      "prefill_ms": 1053.56,
+      "decode_tok_per_s": 24.0149,
+      "generated_ids": [760, 7993, 369, 11362, 383, 279, 5344, 13, 248046]
+    },
+    {
+      "id": "bili-016",
+      "prompt_tokens": 30,
+      "generated_tokens": 11,
+      "prefill_ms": 1156.5,
+      "decode_tok_per_s": 24.0136,
+      "generated_ids": [27336, 85895, 506, 220, 16, 15, 15, 11995, 59275, 13, 248046]
+    },
+    {
+      "id": "bili-017",
+      "prompt_tokens": 26,
+      "generated_tokens": 7,
+      "prefill_ms": 1001.97,
+      "decode_tok_per_s": 23.4628,
+      "generated_ids": [760, 8831, 369, 6217, 3242, 13, 248046]
+    },
+    {
+      "id": "bili-018",
+      "prompt_tokens": 25,
+      "generated_tokens": 5,
+      "prefill_ms": 958.728,
+      "decode_tok_per_s": 22.897,
+      "generated_ids": [40, 2854, 5122, 13, 248046]
+    },
+    {
+      "id": "bili-019",
+      "prompt_tokens": 27,
+      "generated_tokens": 9,
+      "prefill_ms": 1052.84,
+      "decode_tok_per_s": 24.2052,
+      "generated_ids": [3320, 22909, 369, 279, 6511, 314, 5440, 13, 248046]
+    },
+    {
+      "id": "bili-020",
+      "prompt_tokens": 28,
+      "generated_tokens": 3,
+      "prefill_ms": 1085.18,
+      "decode_tok_per_s": 23.8356,
+      "generated_ids": [130328, 1710, 248046]
+    },
+    {
+      "id": "bili-021",
+      "prompt_tokens": 30,
+      "generated_tokens": 4,
+      "prefill_ms": 1162.3,
+      "decode_tok_per_s": 24.2849,
+      "generated_ids": [125802, 95933, 1710, 248046]
+    },
+    {
+      "id": "bili-022",
+      "prompt_tokens": 29,
+      "generated_tokens": 4,
+      "prefill_ms": 1117.65,
+      "decode_tok_per_s": 23.816,
+      "generated_ids": [108643, 96309, 1710, 248046]
+    },
+    {
+      "id": "bili-023",
+      "prompt_tokens": 32,
+      "generated_tokens": 5,
+      "prefill_ms": 1232.35,
+      "decode_tok_per_s": 24.2318,
+      "generated_ids": [96106, 95772, 122504, 1710, 248046]
+    },
+    {
+      "id": "bili-024",
+      "prompt_tokens": 30,
+      "generated_tokens": 5,
+      "prefill_ms": 1157.74,
+      "decode_tok_per_s": 24.2951,
+      "generated_ids": [109591, 97889, 99203, 1710, 248046]
+    },
+    {
+      "id": "bili-025",
+      "prompt_tokens": 26,
+      "generated_tokens": 3,
+      "prefill_ms": 1004.61,
+      "decode_tok_per_s": 24.2551,
+      "generated_ids": [16, 15, 248046]
+    },
+    {
+      "id": "bili-026",
+      "prompt_tokens": 26,
+      "generated_tokens": 2,
+      "prefill_ms": 1003.84,
+      "decode_tok_per_s": 23.9368,
+      "generated_ids": [20, 248046]
+    },
+    {
+      "id": "bili-027",
+      "prompt_tokens": 29,
+      "generated_tokens": 6,
+      "prefill_ms": 1112.17,
+      "decode_tok_per_s": 24.2789,
+      "generated_ids": [95948, 97078, 116690, 98179, 10992, 248046]
+    },
+    {
+      "id": "bili-028",
+      "prompt_tokens": 23,
+      "generated_tokens": 11,
+      "prefill_ms": 882.802,
+      "decode_tok_per_s": 24.2248,
+      "generated_ids": [96789, 97375, 95849, 114425, 3709, 111135, 96317, 99501, 127374, 1710, 248046]
+    },
+    {
+      "id": "bili-029",
+      "prompt_tokens": 18,
+      "generated_tokens": 64,
+      "prefill_ms": 693.008,
+      "decode_tok_per_s": 23.9825,
+      "generated_ids": [105090, 102115, 110342, 140141, 110211, 4960, 271, 16, 13, 2972, 122807, 332, 242602, 220, 102115, 138952, 104757, 118058, 3709, 96199, 97196, 96622, 198, 17, 13, 2972, 121207, 332, 242602, 220, 102115, 103813, 121207, 104033, 3709, 105863, 109619, 198, 18, 13, 2972, 119080, 131358, 332, 242602, 220, 102115, 132296, 97357, 99770, 5205, 112491, 122705, 95726, 97695, 96081, 271, 98893, 98831, 96844, 113793, 110211, 3709, 95815]
+    },
+    {
+      "id": "long-000",
+      "prompt_tokens": 27,
+      "generated_tokens": 256,
+      "prefill_ms": 1039.11,
+      "decode_tok_per_s": 23.1484,
+      "generated_ids": [2, 561, 78812, 314, 26373, 19480, 271, 36, 69388, 645, 16413, 995, 47158, 279, 5061, 633, 4963, 324, 55965, 364, 16570, 46780, 1578, 11, 321, 551, 11252, 551, 6661, 1396, 9506, 314, 424, 13, 271, 4639, 6353, 11, 39618, 279, 6522, 1332, 551, 8341, 279, 1433, 11766, 11, 780, 2802, 315, 16970, 279, 6784, 440, 264, 40423, 4950, 551, 995, 2496, 6408, 1518, 13, 1216, 1111, 3690, 11, 16810, 780, 31381, 2272, 279, 42144, 11, 321, 1669, 279, 20454, 314, 264, 55022, 7920, 23221, 279, 43515, 5215, 13, 271, 760, 6784, 67490, 59833, 13, 271, 760, 3594, 421, 26880, 557, 8981, 321, 58442, 314, 11679, 321, 2414, 8742, 11, 2414, 1040, 279, 4779, 314, 10849, 13, 26482, 557, 264, 2956, 874, 7875, 1056, 264, 30893, 11, 321, 424, 557, 11656, 13, 82697, 995, 16384, 279, 20618, 579, 72374, 264, 7493, 2942, 26, 1017, 1362, 381, 874, 3433, 1532, 11, 524, 1881, 279, 15484, 6784, 321, 279, 9117, 13, 271, 27165, 279, 2956, 557, 2400, 13, 271, 23576, 39950, 303, 11656, 38409, 13, 357, 1623, 579, 21664, 14780, 11, 1141, 5984, 1990, 9613, 13, 357, 12635, 9994, 314, 1330, 1208, 551, 1467, 524, 1366, 11, 2107, 314, 1070, 30542, 13, 357, 22979, 421, 13874, 524, 9897, 694, 8574, 2414, 82697, 6273, 303, 780, 14697, 1518, 551, 1362, 803, 424, 13, 271, 1465, 14541, 279, 21664, 14780, 13, 5133, 6351, 995, 12567, 799, 11, 279, 1788, 509, 6248, 2351, 11, 279, 1788, 2438, 5984, 13, 2838, 995, 5384, 424, 11, 466, 551, 995, 2218, 54842, 58607, 303, 279]
+    },
+    {
+      "id": "long-001",
+      "prompt_tokens": 29,
+      "generated_tokens": 256,
+      "prefill_ms": 1116.38,
+      "decode_tok_per_s": 23.1133,
+      "generated_ids": [2, 2500, 21235, 22835, 10838, 234, 100, 29545, 271, 20740, 3296, 0, 21235, 369, 1040, 264, 2496, 64541, 2919, 17407, 13, 6558, 728, 1831, 488, 1472, 424, 2923, 539, 2923, 13, 271, 550, 561, 9664, 39928, 30958, 60914, 100, 271, 332, 8046, 220, 16, 25, 561, 7806, 4843, 977, 279, 8964, 332, 198, 760, 6797, 73944, 685, 51393, 11, 41713, 11, 321, 34343, 13, 3095, 2919, 5055, 7948, 11, 424, 10263, 1083, 449, 28486, 6605, 2512, 2972, 12615, 36405, 332, 318, 8761, 579, 1040, 2919, 303, 279, 3594, 553, 1061, 369, 2512, 2972, 4958, 92245, 159034, 1394, 628, 914, 1436, 2919, 36405, 11, 694, 279, 3594, 369, 2400, 314, 424, 0, 271, 332, 8046, 220, 17, 25, 561, 85602, 423, 4750, 3038, 332, 198, 91986, 3594, 14885, 2919, 36405, 46303, 38453, 11, 1066, 1040, 264, 3882, 3594, 45192, 13, 561, 4918, 424, 5601, 11, 279, 72555, 424, 5055, 13, 271, 332, 8046, 220, 18, 25, 14388, 82, 5065, 7764, 332, 198, 2053, 279, 36405, 35937, 1083, 8981, 47635, 11, 424, 1027, 2971, 1441, 321, 10263, 1142, 1083, 13280, 11, 13280, 2919, 6756, 86412, 466, 9561, 45794, 13, 8333, 880, 314, 1439, 13280, 18167, 8941, 3658, 310, 1304, 2972, 12008, 82, 159034, 2844, 579, 1092, 28552, 513, 1801, 314, 0, 271, 332, 8046, 220, 19, 25, 561, 54965, 86412, 45004, 332, 198, 623, 279, 9158, 11, 13280, 6756, 86412, 26681, 1083, 1754, 975, 321, 15491, 13, 2302, 615, 10917, 321, 42371, 888, 854, 13, 271, 332, 8046, 220, 20, 25, 1049, 28674, 430, 21235, 332, 198, 4350]
+    },
+    {
+      "id": "long-002",
+      "prompt_tokens": 24,
+      "generated_tokens": 256,
+      "prefill_ms": 919.17,
+      "decode_tok_per_s": 23.1498,
+      "generated_ids": [760, 22865, 506, 3603, 369, 264, 2086, 1814, 11040, 494, 1141, 1100, 20923, 286, 42559, 13, 5514, 579, 264, 11285, 1472, 424, 25, 271, 550, 561, 3744, 1129, 314, 35794, 271, 2053, 279, 6797, 93169, 3559, 279, 32946, 11, 279, 1118, 3065, 488, 5125, 369, 279, 9039, 579, 28402, 29032, 13, 561, 1834, 579, 8364, 11, 864, 995, 16810, 2272, 488, 660, 12967, 11, 75959, 3023, 2785, 449, 6258, 11, 12215, 539, 264, 40473, 11, 4409, 8981, 3594, 421, 36584, 303, 678, 42706, 13, 1061, 369, 279, 22865, 579, 2172, 49491, 2218, 58726, 779, 3998, 488, 998, 77500, 11, 321, 1381, 488, 3172, 1144, 264, 25372, 13, 271, 550, 561, 14296, 1188, 69, 17881, 271, 760, 804, 54892, 11690, 948, 25457, 6999, 28712, 13, 16643, 279, 6797, 579, 42054, 11, 279, 12515, 27545, 1083, 264, 76435, 314, 3000, 13, 561, 85665, 11801, 47929, 3808, 279, 60666, 1040, 264, 14367, 314, 31563, 46449, 11, 321, 279, 1324, 314, 9467, 4816, 23064, 2218, 32228, 11656, 310, 10971, 494, 264, 3177, 13, 561, 16820, 11, 413, 2945, 11, 54150, 4156, 303, 14527, 30615, 11, 12680, 10958, 293, 8269, 1083, 19484, 16382, 314, 3000, 321, 12098, 13, 271, 550, 561, 17983, 51895, 271, 760, 22865, 3070, 914, 5894, 506, 3603, 26, 424, 4777, 4203, 1141, 38358, 13, 1394, 2493, 6512, 279, 22353, 273, 314, 264, 281, 2580, 732, 37550, 364, 3982, 11, 279, 40423, 304, 26572, 314, 449, 50514, 11, 466, 279, 92955, 38240, 314, 264, 4751, 87408, 13, 17041, 58607, 303, 279, 6121, 11, 39465, 2696, 321, 1505, 16960]
+    },
+    {
+      "id": "long-003",
+      "prompt_tokens": 24,
+      "generated_tokens": 256,
+      "prefill_ms": 925.715,
+      "decode_tok_per_s": 23.1795,
+      "generated_ids": [2, 561, 5339, 15380, 271, 9, 760, 25744, 369, 11012, 3525, 364, 279, 2696, 314, 26054, 6985, 13, 13899, 13, 223090, 45, 926, 42206, 1178, 27245, 1024, 27233, 321, 7062, 1070, 383, 279, 944, 26157, 11, 1332, 279, 5484, 2512, 357, 4373, 17982, 1966, 369, 1602, 32878, 13, 561, 1901, 4821, 369, 524, 3482, 9969, 4749, 271, 332, 10844, 1178, 64700, 1394, 3172, 1318, 310, 5894, 17377, 13, 561, 1901, 5601, 303, 16089, 13, 271, 332, 32, 4373, 17982, 1966, 64700, 353, 635, 524, 5894, 13, 271, 332, 10844, 1178, 64700, 353, 1366, 13, 2844, 579, 3069, 353, 1018, 348, 752, 481, 9, 2218, 1891, 728, 13, 271, 332, 32, 4373, 17982, 1966, 64700, 1394, 6266, 883, 5941, 430, 3384, 488, 513, 264, 1785, 421, 7225, 13017, 13, 271, 332, 10844, 1178, 64700, 353, 1044, 13, 345, 2603, 11, 9712, 13, 15108, 13, 19814, 728, 2414, 13, 1394, 2908, 978, 11012, 660, 11129, 13, 271, 332, 32, 4373, 17982, 1966, 64700, 353, 599, 978, 36370, 13, 271, 332, 10844, 1178, 64700, 4844, 10724, 680, 16850, 13, 271, 72179, 1248, 17548, 13, 561, 26054, 6985, 2714, 310, 2965, 59712, 4749, 271, 332, 32, 4373, 17982, 1966, 64700, 353, 599, 978, 36370, 1092, 10963, 3254, 13, 271, 332, 10844, 1178, 64700, 2844, 579, 264, 3349, 3065, 310, 1375, 264, 5484, 383, 1141, 1118, 3603, 13, 271, 332, 32, 4373, 17982, 1966, 64700, 1394, 15142, 728, 310, 381, 22825, 13, 353, 599, 978, 22825, 13, 353, 599, 1542, 2943, 15706, 44937, 314, 264, 1845, 5576, 13, 733, 1754, 11]
+    },
+    {
+      "id": "long-004",
+      "prompt_tokens": 26,
+      "generated_tokens": 256,
+      "prefill_ms": 1003.02,
+      "decode_tok_per_s": 23.1488,
+      "generated_ids": [2, 561, 35990, 314, 23146, 14486, 271, 550, 351, 2792, 7023, 25, 561, 50104, 29752, 18, 17, 15, 15, 75887, 8, 271, 38013, 21314, 27222, 303, 264, 2342, 13437, 82517, 11, 694, 279, 28689, 3750, 1785, 48281, 303, 2972, 57061, 85346, 206103, 159034, 326, 3280, 1068, 274, 53283, 383, 279, 13558, 314, 279, 458, 446, 3943, 942, 14661, 1429, 272, 2792, 7023, 318, 1445, 18867, 348, 66, 2792, 350, 11961, 7063, 328, 86, 6960, 871, 430, 264, 1785, 314, 69292, 63802, 310, 3150, 6739, 13726, 2218, 29456, 1313, 314, 23177, 11, 49067, 11, 321, 12514, 13, 271, 1853, 22892, 11, 1439, 5167, 5924, 14328, 7859, 321, 46596, 1452, 13, 561, 10523, 4050, 998, 1801, 539, 24547, 264, 311, 290, 1083, 13988, 34854, 11, 321, 279, 5148, 25193, 28028, 494, 13661, 5978, 310, 13661, 10054, 321, 46018, 4635, 13, 3113, 279, 854, 424, 557, 1429, 310, 3165, 15878, 74, 9769, 11, 61430, 1068, 11, 321, 462, 1390, 614, 11, 272, 2792, 7023, 995, 3512, 264, 6150, 46018, 365, 640, 13, 1049, 14195, 303, 958, 364, 888, 1330, 15706, 1578, 1518, 9297, 15218, 680, 314, 958, 11, 9297, 10141, 58256, 2980, 279, 220, 16, 24, 337, 9018, 13, 271, 550, 31416, 37465, 525, 9244, 82, 29752, 18, 16, 15, 15, 75887, 8, 271, 792, 50612, 17140, 440, 272, 2792, 7023, 11, 13437, 14437, 7633, 1141, 10919, 12056, 525, 9244, 291, 1785, 13, 4081, 1740, 85, 793, 321, 34415, 10539, 1433, 53525, 318, 65151, 364, 4105, 8, 321, 49113, 5130, 11590, 318, 1891, 10054, 553, 561, 1785, 557, 748]
+    },
+    {
+      "id": "long-005",
+      "prompt_tokens": 26,
+      "generated_tokens": 256,
+      "prefill_ms": 1000.36,
+      "decode_tok_per_s": 23.1545,
+      "generated_ids": [2, 2500, 310, 50324, 326, 73778, 1336, 47398, 271, 50, 73778, 1336, 369, 264, 39639, 2313, 13, 5514, 579, 264, 4434, 95523, 494, 25844, 310, 7807, 73541, 13, 271, 550, 3534, 220, 16, 25, 4465, 57769, 271, 2592, 488, 1459, 914, 599, 264, 25844, 11, 488, 3172, 1144, 310, 1870, 799, 318, 1435, 405, 478, 2919, 8, 321, 1042, 424, 65354, 364, 883, 264, 1936, 2980, 424, 579, 4393, 321, 86531, 391, 13, 357, 9038, 25844, 16757, 37996, 303, 7867, 2785, 220, 19, 12, 21, 3979, 314, 24199, 13, 271, 332, 5931, 15626, 30731, 64700, 198, 12, 5272, 5951, 13914, 314, 19223, 321, 2919, 318, 68, 1257, 2487, 220, 20, 15, 70, 1754, 8, 198, 12, 27928, 220, 16, 12, 17, 2942, 7071, 1345, 21362, 4599, 11, 1179, 2599, 3428, 2957, 9272, 271, 332, 760, 328, 2232, 1, 1228, 64700, 357, 25844, 369, 54800, 948, 424, 579, 86531, 391, 11, 39045, 11, 321, 9781, 21205, 88, 13, 20052, 424, 264, 21030, 25194, 42064, 1220, 90818, 3298, 1040, 264, 1575, 23342, 16076, 552, 13, 271, 550, 3534, 220, 17, 25, 561, 47398, 318, 1853, 9011, 6519, 8, 271, 1919, 369, 264, 14294, 8981, 12, 776, 468, 1654, 13, 1394, 3172, 1144, 15530, 19223, 11, 660, 56279, 19223, 11, 2919, 11, 321, 11679, 13, 271, 13962, 5870, 220, 16, 1892, 27078, 271, 332, 8046, 220, 16, 25, 18639, 279, 29363, 332, 198, 12, 2972, 2229, 229615, 1870, 64700, 45247, 220, 16, 919, 4393, 25844, 440, 220, 16, 919, 19223, 321, 220, 16, 919, 2919, 13, 6558, 424, 2364]
+    },
+    {
+      "id": "long-006",
+      "prompt_tokens": 27,
+      "generated_tokens": 256,
+      "prefill_ms": 1036.6,
+      "decode_tok_per_s": 23.16,
+      "generated_ids": [2, 561, 18266, 1165, 31959, 279, 14296, 271, 760, 36620, 4757, 995, 14217, 506, 279, 5445, 314, 1004, 26684, 1641, 1518, 2892, 314, 586, 1362, 1254, 334, 2218, 8884, 11, 1518, 2892, 314, 586, 557, 8950, 11, 506, 3140, 13, 1049, 557, 279, 2993, 314, 4757, 421, 9047, 310, 599, 14276, 11352, 364, 279, 7193, 314, 1602, 264, 4757, 7432, 11, 1141, 15003, 22371, 28115, 264, 5629, 5171, 883, 5600, 7303, 974, 279, 4751, 13, 271, 1, 54816, 745, 369, 2019, 310, 24562, 685, 1017, 1288, 7967, 1018, 11, 430, 3384, 411, 998, 264, 7695, 26802, 21254, 13, 271, 1, 31929, 579, 978, 28546, 421, 4757, 836, 4220, 6107, 1288, 353, 3125, 1384, 13, 271, 32514, 579, 6681, 3069, 424, 579, 4574, 13, 1049, 579, 2582, 978, 11324, 1149, 271, 4639, 557, 279, 6941, 314, 279, 4220, 3065, 11, 321, 353, 2908, 2496, 978, 2617, 864, 919, 314, 421, 5515, 1801, 279, 1379, 5357, 13, 271, 4277, 271, 760, 1118, 8729, 11, 567, 8704, 310, 36617, 685, 264, 25465, 314, 20208, 7339, 567, 4035, 978, 13595, 494, 5090, 58555, 6386, 11, 3055, 440, 264, 4281, 314, 38522, 421, 7967, 579, 6764, 995, 2574, 586, 494, 780, 2235, 65580, 13, 1165, 3105, 914, 599, 1691, 2218, 4111, 3213, 364, 264, 2526, 5171, 11, 6970, 13, 271, 10397, 1220, 1236, 424, 2330, 3213, 310, 4786, 2107, 314, 586, 1288, 7967, 6426, 11, 28043, 279, 3433, 440, 780, 5888, 279, 1560, 551, 1467, 948, 551, 557, 7047, 13, 271, 10397, 4035, 1144, 310, 52490, 279, 1822, 22371, 364, 421]
+    },
+    {
+      "id": "long-007",
+      "prompt_tokens": 24,
+      "generated_tokens": 256,
+      "prefill_ms": 927.201,
+      "decode_tok_per_s": 23.1397,
+      "generated_ids": [2, 561, 9664, 39928, 271, 760, 2919, 10458, 318, 18092, 2512, 279, 16153, 23464, 10458, 8, 16067, 1204, 2919, 10480, 29865, 1472, 279, 4424, 13, 5514, 579, 279, 6557, 1817, 25, 271, 332, 16, 13, 10114, 92245, 332, 198, 27336, 494, 51393, 11, 41713, 11, 321, 34343, 369, 30673, 539, 279, 6797, 321, 10263, 1083, 36405, 11, 15589, 1083, 279, 16078, 13, 47544, 1048, 4722, 2919, 36405, 1472, 264, 1817, 2512, 348, 1405, 27549, 9, 318, 54757, 279, 10539, 4496, 328, 4958, 86809, 32284, 27549, 1, 369, 1429, 553, 271, 332, 17, 13, 43335, 40249, 332, 198, 2053, 279, 36405, 35937, 321, 1027, 2971, 11, 424, 9464, 4140, 1083, 13280, 6756, 86412, 11, 28115, 28552, 321, 29262, 13, 271, 332, 18, 13, 40293, 558, 7317, 332, 198, 4350, 6756, 86412, 15491, 321, 3512, 8545, 3213, 11, 2919, 16563, 430, 10849, 11, 11456, 11, 274, 18400, 11, 466, 62082, 13, 271, 332, 19, 13, 10778, 321, 6250, 1783, 332, 198, 27336, 2892, 26565, 3808, 279, 7099, 318, 5917, 1783, 8, 1083, 34343, 11, 41713, 11, 321, 51393, 11, 466, 424, 348, 692, 2006, 942, 9, 1083, 279, 4751, 11, 311, 60257, 14909, 95395, 318, 7744, 1884, 2919, 10220, 553, 561, 10458, 1179, 42151, 13, 271, 4277, 271, 2, 8169, 1049, 55347, 364, 60223, 271, 68584, 382, 513, 16739, 17220, 383, 411, 10458, 11, 364, 3679, 7715, 25, 271, 332, 60051, 9664, 28835, 332, 198, 12934, 29566, 16681, 383, 10849, 12615, 466, 68812, 9476, 303, 279, 16665, 13, 43934, 279, 10458, 8346, 19719, 45574, 2919, 17509, 321, 3019]
+    },
+    {
+      "id": "long-008",
+      "prompt_tokens": 25,
+      "generated_tokens": 256,
+      "prefill_ms": 962.87,
+      "decode_tok_per_s": 23.1407,
+      "generated_ids": [2, 561, 45928, 4170, 314, 357, 300, 72239, 271, 9, 8839, 25, 8439, 411, 369, 264, 11190, 14611, 11, 353, 3172, 5984, 264, 6588, 314, 449, 33461, 18484, 3177, 13, 1368, 488, 2224, 7763, 303, 1865, 29100, 18369, 1040, 18484, 13976, 11, 500, 5352, 2156, 11, 466, 84893, 1181, 17120, 11, 353, 2688, 6051, 310, 12804, 1782, 2166, 4749, 271, 4277, 271, 550, 561, 4170, 1049, 701, 271, 32, 300, 72239, 32524, 82, 28314, 383, 264, 12401, 5157, 78285, 6106, 314, 79475, 14960, 2218, 14265, 19820, 11, 3672, 5617, 5028, 88888, 50255, 506, 65588, 13, 561, 3177, 369, 264, 10582, 1715, 314, 2972, 2508, 1231, 25593, 332, 421, 34027, 321, 6206, 440, 279, 259, 3232, 11, 8173, 539, 1953, 16760, 37683, 321, 82507, 628, 1091, 13, 271, 12, 2972, 760, 17642, 33252, 332, 22294, 15003, 11, 1141, 39144, 81179, 310, 22700, 8981, 2919, 321, 2279, 909, 278, 2471, 10462, 13, 198, 12, 2972, 760, 2885, 1221, 40653, 332, 9704, 3294, 279, 16382, 11, 6944, 4289, 32121, 31973, 279, 6797, 13, 198, 12, 2972, 760, 345, 25055, 7742, 332, 369, 279, 3177, 579, 25315, 4593, 11, 1332, 30592, 321, 4088, 2210, 77019, 506, 1496, 40554, 13, 271, 4277, 271, 550, 357, 5870, 303, 279, 9135, 271, 332, 35, 6178, 332, 198, 760, 1834, 11690, 440, 279, 2972, 210338, 27491, 197005, 64, 5365, 11, 27264, 505, 509, 531, 421, 67586, 3808, 279, 2919, 13, 61113, 14714, 310, 279, 35091, 314, 279, 17415, 13, 50552, 87531, 10236, 430, 279, 6353, 8337, 41634, 974, 13, 271, 332, 81433, 332, 198]
+    },
+    {
+      "id": "long-009",
+      "prompt_tokens": 26,
+      "generated_tokens": 256,
+      "prefill_ms": 999.936,
+      "decode_tok_per_s": 23.1647,
+      "generated_ids": [2, 561, 65790, 26260, 271, 36, 46419, 51057, 27031, 995, 978, 41416, 279, 1788, 2250, 8129, 364, 42744, 1578, 13, 271, 6651, 3571, 310, 1024, 506, 10016, 3979, 2218, 3361, 26789, 24958, 11, 1345, 279, 41820, 45088, 2320, 1472, 279, 24813, 11, 303, 279, 14979, 3979, 1518, 37119, 13, 357, 15589, 16629, 11, 1179, 264, 4255, 11, 1179, 264, 3074, 5020, 421, 17750, 303, 279, 3594, 1040, 279, 6463, 1881, 264, 5467, 11155, 321, 1141, 4722, 13, 3095, 1292, 5947, 424, 1441, 11, 279, 25570, 6749, 1040, 264, 15822, 2020, 383, 264, 4618, 11, 1040, 279, 26357, 314, 2414, 21582, 466, 1602, 8950, 13, 271, 7691, 6141, 424, 364, 264, 58709, 506, 279, 10787, 5101, 11, 852, 32577, 440, 279, 8455, 28342, 314, 264, 855, 852, 995, 6408, 1396, 13665, 279, 3611, 1375, 1362, 50315, 13, 271, 1, 44964, 1288, 551, 1018, 11, 864, 1292, 995, 9218, 557, 279, 6376, 3299, 364, 348, 40, 4021, 6512, 1092, 488, 513, 21988, 4749, 271, 760, 3377, 557, 524, 421, 1292, 3105, 914, 3165, 424, 12083, 13, 561, 3377, 557, 421, 948, 1292, 6141, 279, 59505, 364, 3672, 11, 781, 6408, 4161, 13, 2717, 20513, 67728, 6408, 279, 14170, 22591, 11, 279, 2956, 11, 5402, 13, 1921, 279, 59505, 4924, 4777, 557, 524, 1017, 11, 430, 3384, 1292, 998, 1347, 5672, 264, 31708, 303, 264, 3992, 421, 995, 874, 14053, 13, 271, 7691, 5820, 310, 14765, 279, 8129, 23533, 303, 264, 4025, 874, 2351, 1362, 5372, 11, 321, 421, 1292, 557, 279, 1132, 799, 29592, 303, 279, 2956, 1332]
+    },
+    {
+      "id": "long-010",
+      "prompt_tokens": 24,
+      "generated_tokens": 256,
+      "prefill_ms": 925.154,
+      "decode_tok_per_s": 23.1617,
+      "generated_ids": [2, 561, 64932, 314, 264, 18073, 12673, 271, 550, 11902, 318, 59383, 5297, 1317, 3114, 8, 271, 760, 32469, 1312, 68343, 13569, 494, 12050, 579, 23898, 13, 1577, 19274, 9704, 11, 11456, 4595, 303, 279, 4918, 11625, 778, 11690, 310, 28052, 11, 24199, 22327, 321, 83451, 2699, 421, 76892, 1472, 279, 32469, 6220, 13, 1061, 369, 264, 3098, 314, 17454, 321, 41386, 13, 271, 332, 3710, 488, 4035, 22270, 64700, 198, 12, 13237, 85617, 3060, 836, 9483, 23439, 2218, 3765, 279, 3988, 49722, 382, 1040, 479, 473, 2280, 321, 95371, 472, 11, 1179, 728, 20414, 26950, 290, 303, 1829, 539, 3200, 10151, 198, 12, 18331, 7718, 29032, 685, 279, 22767, 3232, 11, 29621, 27724, 314, 5983, 421, 8952, 1754, 1936, 198, 12, 45301, 31852, 321, 3060, 37910, 26, 19053, 460, 494, 11567, 321, 4990, 279, 3594, 440, 5319, 198, 12, 561, 2756, 2965, 75223, 4860, 11, 321, 279, 3000, 4829, 383, 264, 60999, 11, 20117, 4131, 198, 12, 19320, 153926, 42046, 1990, 22424, 1472, 11, 264, 25680, 421, 12050, 4290, 914, 6999, 4661, 279, 22767, 271, 550, 18266, 318, 26286, 1317, 5963, 8, 271, 760, 32469, 23716, 1141, 15686, 314, 39026, 321, 72077, 13, 5546, 11, 6797, 1676, 52159, 2756, 1236, 411, 279, 1379, 4393, 3098, 13, 271, 332, 3710, 488, 4035, 22270, 64700, 198, 12, 72143, 2701, 24562, 310, 836, 9483, 1496, 11, 3384, 15822, 3594, 25710, 40473, 321, 4101, 198, 12, 78895, 728, 20414, 19899, 440, 279, 2400, 18900, 314, 8121, 85617, 321, 6865, 258, 2878, 198, 12, 8022, 565, 4659, 321, 11456, 8735]
+    },
+    {
+      "id": "long-011",
+      "prompt_tokens": 26,
+      "generated_tokens": 256,
+      "prefill_ms": 1000.95,
+      "decode_tok_per_s": 23.1425,
+      "generated_ids": [2, 2500, 73630, 27796, 3038, 271, 33, 1805, 4050, 4565, 685, 539, 2972, 1461, 3982, 8177, 197005, 49516, 722, 11, 781, 1902, 3579, 1330, 1328, 8177, 25, 2972, 80321, 332, 318, 8804, 286, 3658, 8, 321, 2972, 83, 2558, 332, 318, 22709, 286, 10431, 553, 6983, 13759, 369, 15327, 264, 1785, 421, 29612, 1141, 1765, 4528, 321, 866, 2706, 318, 49002, 11, 26791, 11, 4831, 5946, 310, 279, 4751, 20359, 13, 561, 13665, 369, 13660, 1332, 279, 3558, 369, 1602, 61995, 321, 1332, 424, 579, 1602, 38965, 13, 271, 8160, 513, 2250, 4047, 13759, 4346, 321, 279, 20665, 4661, 1070, 25, 271, 4277, 271, 550, 220, 16, 13, 48444, 19269, 318, 15893, 11564, 8, 271, 332, 4199, 424, 4138, 64700, 357, 15725, 9249, 7021, 506, 1754, 809, 13, 271, 12, 3095, 4528, 39358, 1441, 383, 279, 5956, 11, 279, 2972, 3369, 314, 279, 22690, 5055, 29648, 332, 1345, 279, 2972, 14430, 5055, 38965, 318, 83, 2558, 215495, 198, 12, 561, 13759, 274, 1964, 9781, 11, 864, 369, 3069, 424, 628, 1132, 9111, 2716, 25704, 13, 198, 12, 90111, 42824, 1325, 48230, 11, 15766, 48264, 13, 271, 332, 12929, 64700, 7261, 2716, 888, 91068, 321, 37714, 3170, 327, 649, 82, 13, 357, 2236, 16610, 3808, 1330, 11222, 369, 264, 4574, 53253, 42064, 78656, 43001, 303, 279, 5956, 13, 271, 4277, 271, 550, 220, 17, 13, 9214, 19269, 271, 332, 4199, 424, 4138, 64700, 561, 47514, 5893, 348, 13761, 82, 9, 43001, 5176, 1083, 2972, 403, 1550, 321, 43001, 7035, 332, 3055, 279, 15196, 13, 271, 12, 561]
+    },
+    {
+      "id": "long-012",
+      "prompt_tokens": 22,
+      "generated_tokens": 256,
+      "prefill_ms": 844.909,
+      "decode_tok_per_s": 23.2005,
+      "generated_ids": [2, 561, 12458, 25291, 310, 44745, 271, 760, 220, 16, 16, 25, 19, 20, 310, 44745, 557, 9671, 310, 381, 264, 13618, 11285, 13, 53423, 43017, 66255, 5297, 27031, 995, 4284, 411, 5832, 264, 19781, 2942, 364, 4886, 421, 2496, 4847, 33273, 279, 2192, 328, 59177, 520, 1149, 1921, 506, 220, 17, 25, 19, 22, 6556, 11, 948, 279, 58709, 1669, 279, 2407, 11, 13618, 9202, 321, 2414, 745, 5820, 13, 271, 7691, 995, 978, 31016, 303, 1024, 79701, 42060, 948, 279, 3777, 58709, 579, 7497, 41423, 1472, 279, 49715, 579, 11012, 13, 4543, 1292, 14217, 303, 279, 14590, 44350, 11, 75727, 22690, 19710, 383, 279, 855, 1678, 58163, 2272, 279, 48797, 28690, 13, 271, 1, 15514, 803, 369, 73415, 13697, 299, 1288, 1018, 279, 58709, 11, 264, 26646, 3777, 855, 6725, 84907, 852, 4035, 978, 12244, 279, 3603, 6206, 13, 328, 22020, 1461, 13, 1216, 557, 7249, 303, 279, 12999, 1149, 271, 36, 46419, 1111, 3690, 28428, 279, 2407, 13, 13305, 2149, 366, 536, 11, 1575, 1676, 13966, 11, 279, 2993, 314, 855, 852, 4035, 978, 2894, 3213, 310, 5640, 1118, 523, 7249, 13, 5133, 6213, 998, 1724, 11, 35556, 506, 4161, 11, 321, 780, 1245, 1375, 557, 16810, 310, 780, 14697, 430, 413, 551, 4035, 978, 18176, 364, 2414, 13, 2441, 4184, 13, 271, 760, 19851, 1292, 4035, 1660, 13, 561, 29321, 1804, 383, 279, 4613, 314, 780, 31111, 11, 2582, 51544, 310, 264, 40613, 1029, 13, 31558, 995, 978, 39328, 11, 424, 995, 978, 3213, 310, 2842, 264, 4593, 303, 1141, 13518, 13]
+    },
+    {
+      "id": "long-013",
+      "prompt_tokens": 23,
+      "generated_tokens": 256,
+      "prefill_ms": 884.474,
+      "decode_tok_per_s": 23.0946,
+      "generated_ids": [2, 5369, 8672, 310, 66333, 25, 561, 17328, 5084, 1703, 41165, 271, 550, 220, 16, 13, 19379, 594, 53962, 286, 198, 76364, 318, 83113, 2972, 36780, 11, 7894, 10208, 11, 466, 378, 1692, 5595, 409, 350, 40557, 513, 14276, 303, 5819, 778, 321, 64229, 321, 38058, 310, 5392, 30860, 13, 271, 550, 220, 17, 13, 34288, 32342, 594, 882, 5477, 198, 12, 52738, 513, 2972, 36683, 40671, 310, 3921, 51939, 332, 198, 12, 11786, 369, 2972, 329, 6248, 1083, 2526, 9378, 318, 17, 12, 20, 3693, 31230, 2512, 328, 1435, 1982, 1, 271, 550, 220, 18, 13, 33706, 9694, 318, 61683, 908, 466, 48881, 8, 198, 760, 22858, 369, 28154, 310, 1387, 1441, 2972, 75, 607, 258, 332, 318, 1719, 328, 5882, 356, 1, 421, 55559, 47049, 553, 198, 12, 2972, 61683, 908, 7491, 9694, 318, 42, 2850, 1817, 188912, 37539, 24464, 310, 70173, 69169, 258, 1892, 18082, 3619, 11, 1496, 21408, 5392, 198, 12, 2972, 55157, 43389, 7491, 9694, 64700, 2734, 8409, 7339, 5774, 1892, 4918, 7302, 694, 5392, 62142, 4102, 10281, 271, 550, 220, 19, 13, 78344, 594, 45095, 198, 760, 12571, 60958, 369, 2972, 86, 13178, 11, 55645, 11, 321, 26824, 332, 310, 3921, 3062, 36002, 11, 22858, 11, 321, 31088, 24464, 13, 271, 550, 220, 20, 13, 8288, 5562, 594, 2604, 48662, 198, 37, 564, 382, 513, 2972, 1323, 13128, 53893, 1533, 332, 310, 7042, 60956, 13, 2604, 48662, 1189, 2830, 25, 198, 12, 2972, 14035, 382, 332, 318, 25736, 80468, 364, 10558, 2022, 8, 198, 12, 2972, 50, 4694, 12636, 332]
+    },
+    {
+      "id": "long-014",
+      "prompt_tokens": 27,
+      "generated_tokens": 256,
+      "prefill_ms": 1040.05,
+      "decode_tok_per_s": 23.0777,
+      "generated_ids": [2, 561, 12897, 321, 279, 26031, 271, 12162, 5028, 264, 854, 11, 264, 28012, 37550, 557, 52151, 1472, 279, 13245, 948, 551, 5312, 264, 9000, 791, 2320, 383, 264, 8602, 11, 9668, 264, 53204, 6365, 314, 16657, 303, 1024, 381, 570, 13, 271, 760, 37550, 995, 524, 33416, 660, 1834, 11, 321, 279, 16657, 6749, 1379, 58169, 13, 1921, 279, 37550, 557, 26802, 11, 321, 551, 6661, 421, 9859, 364, 279, 3487, 1000, 381, 15578, 13, 1987, 551, 65724, 264, 3019, 13, 271, 1, 14773, 6353, 11, 33240, 11619, 8687, 551, 2512, 680, 9922, 391, 13, 328, 4199, 353, 63226, 678, 12761, 0, 4465, 54020, 513, 430, 3565, 430, 3603, 11, 321, 678, 6213, 31335, 1040, 82097, 13, 62021, 488, 1902, 381, 279, 1379, 6037, 16710, 303, 660, 279, 13245, 13, 10516, 728, 264, 5319, 11, 321, 353, 4723, 381, 42386, 440, 1680, 264, 13529, 1149, 271, 760, 9000, 11, 3384, 1274, 21248, 11, 6661, 421, 8306, 1024, 381, 570, 1000, 5073, 279, 16657, 310, 4255, 13, 1921, 1292, 34990, 310, 4833, 78522, 11, 748, 1292, 8660, 1024, 10463, 310, 7534, 13, 271, 9, 4308, 10729, 279, 16657, 4749, 271, 760, 37550, 501, 2602, 11, 10255, 424, 303, 780, 10463, 11, 321, 1018, 440, 264, 56319, 11, 328, 12684, 488, 11, 821, 16328, 13, 353, 599, 9218, 2414, 3242, 25, 2972, 11179, 23229, 369, 1274, 21248, 539, 279, 27463, 314, 264, 1274, 1592, 261, 159029, 1, 271, 2939, 440, 421, 11, 279, 37550, 54682, 6359, 3023, 11, 9101, 279, 9000, 310, 21542, 1024, 49834, 13, 271]
+    },
+    {
+      "id": "long-015",
+      "prompt_tokens": 25,
+      "generated_tokens": 256,
+      "prefill_ms": 962.842,
+      "decode_tok_per_s": 23.1417,
+      "generated_ids": [2, 5339, 38540, 383, 279, 3605, 27893, 271, 550, 5870, 3648, 25, 561, 44877, 271, 760, 348, 32, 408, 353, 9, 23191, 1441, 440, 264, 195080, 314, 16279, 21645, 321, 50099, 15333, 383, 279, 205470, 12, 17, 15, 19, 23, 19710, 2660, 11, 264, 6979, 13437, 14367, 9197, 421, 995, 14336, 13523, 310, 3019, 411, 8684, 364, 264, 12828, 13, 33009, 66255, 51057, 39764, 557, 279, 1118, 310, 2923, 8366, 279, 78235, 7099, 11, 1024, 24435, 9101, 279, 1118, 3611, 22741, 303, 279, 10679, 30559, 1176, 45545, 13, 271, 10397, 3571, 660, 411, 1560, 310, 1436, 413, 567, 1362, 1288, 1292, 1018, 888, 279, 459, 977, 11, 1024, 7497, 31973, 9781, 13, 328, 6820, 567, 1366, 567, 628, 1149, 271, 760, 2321, 557, 6324, 220, 16, 17, 11, 220, 17, 15, 19, 16, 13, 561, 1330, 13234, 3492, 1000, 8070, 279, 1118, 220, 19, 23, 3979, 383, 279, 7099, 11, 3384, 328, 2085, 400, 1, 369, 26774, 67728, 995, 264, 9412, 60840, 1056, 866, 12501, 6236, 13, 271, 550, 5870, 8771, 25, 561, 5339, 1326, 47960, 271, 760, 10304, 557, 29593, 279, 37266, 13067, 321, 7262, 279, 16665, 13, 2832, 13, 13851, 7508, 23773, 12949, 11, 279, 8684, 3762, 15680, 11, 7448, 914, 2842, 34869, 430, 279, 1118, 10156, 3571, 1142, 13, 271, 9726, 23380, 2144, 369, 6681, 1092, 567, 18569, 11, 694, 1353, 506, 411, 61323, 472, 5759, 1149, 1216, 5467, 685, 264, 50319, 421, 10255, 279, 26646, 37728, 13, 328, 1919, 1362, 3184, 586, 883, 279, 13437, 2919, 5757, 1149, 271, 760, 2919, 31128]
+    },
+    {
+      "id": "long-016",
+      "prompt_tokens": 25,
+      "generated_tokens": 256,
+      "prefill_ms": 961.664,
+      "decode_tok_per_s": 23.1712,
+      "generated_ids": [2, 43934, 70859, 271, 9764, 728, 1870, 411, 494, 2433, 488, 2493, 2582, 3418, 13, 271, 550, 561, 14204, 49283, 271, 49338, 2919, 34338, 1472, 264, 13254, 13, 70859, 369, 348, 54842, 77699, 9, 1040, 421, 27090, 2993, 314, 28486, 328, 55387, 1, 421, 26565, 1472, 33850, 13, 1921, 1017, 579, 264, 1328, 6463, 25, 279, 328, 55387, 1, 421, 26565, 369, 13280, 18167, 2512, 2972, 18384, 24795, 332, 421, 488, 628, 914, 1436, 506, 660, 13, 271, 550, 14095, 5141, 73182, 271, 332, 16, 13, 2532, 579, 264, 5176, 16944, 279, 54683, 332, 271, 37405, 314, 264, 2919, 13438, 421, 39358, 2919, 1472, 264, 13254, 13, 70859, 682, 2414, 4283, 27090, 328, 8804, 286, 5176, 1149, 8586, 1562, 411, 348, 85, 25641, 19315, 357, 11269, 369, 1040, 264, 2526, 13438, 26, 264, 2279, 5819, 369, 1040, 264, 6552, 13438, 13, 271, 332, 17, 13, 561, 54683, 1144, 264, 1752, 332, 271, 27336, 628, 1132, 6195, 413, 1017, 579, 264, 4434, 13254, 13, 9591, 24795, 1144, 264, 4434, 6136, 314, 3558, 2218, 42431, 264, 2972, 34356, 332, 466, 2972, 66, 36034, 159034, 1368, 279, 6136, 369, 10548, 11, 4161, 26565, 11, 1040, 264, 13254, 440, 264, 12558, 303, 424, 13, 271, 332, 18, 13, 4188, 7009, 1042, 1070, 6195, 11, 1010, 1459, 914, 332, 271, 33525, 1091, 318, 4650, 22561, 8, 1042, 54683, 3166, 1472, 6497, 13, 11786, 11, 11840, 11, 321, 8785, 1375, 1459, 914, 13, 1061, 369, 3069, 33850, 513, 1801, 314, 9041, 321, 513, 348, 981, 639, 303, 11840, 9, 2218, 951, 2426]
+    },
+    {
+      "id": "long-017",
+      "prompt_tokens": 23,
+      "generated_tokens": 256,
+      "prefill_ms": 885.56,
+      "decode_tok_per_s": 23.199,
+      "generated_ids": [2, 61662, 997, 42506, 25, 561, 20915, 579, 21235, 1278, 35080, 271, 34, 9527, 88559, 513, 4082, 279, 1379, 31883, 321, 5843, 28390, 16315, 58801, 383, 8964, 11, 3428, 2512, 279, 328, 28142, 1278, 35080, 314, 279, 9117, 1149, 17070, 781, 3311, 2599, 1056, 220, 16, 4, 314, 279, 17415, 6220, 11, 781, 1761, 883, 220, 17, 20, 4, 314, 660, 27657, 9140, 13, 271, 550, 3437, 8448, 4315, 1091, 30, 271, 40066, 640, 310, 5243, 15915, 11, 1766, 1091, 513, 2972, 74171, 93868, 524, 10462, 466, 22317, 13, 2302, 513, 13280, 41779, 2512, 2972, 9603, 72638, 197005, 3395, 92969, 19361, 5265, 310, 49614, 17629, 321, 449, 334, 3053, 13, 8618, 1418, 1047, 18603, 2262, 264, 2503, 11, 42464, 495, 428, 26224, 421, 14971, 22433, 888, 22892, 310, 1304, 279, 67673, 5759, 13, 271, 12934, 67673, 8200, 286, 1766, 1091, 599, 264, 3175, 4864, 440, 2972, 89, 2537, 87, 30205, 598, 5734, 93868, 85928, 65562, 421, 3756, 4613, 836, 37498, 13, 4081, 65562, 25, 198, 12, 38256, 1766, 1091, 440, 35190, 1472, 7022, 71163, 198, 12, 20052, 1766, 1091, 836, 19149, 7736, 198, 12, 8448, 279, 2781, 88559, 39523, 303, 7948, 11, 24785, 11, 6797, 30596, 19895, 271, 4350, 1766, 1091, 513, 30509, 318, 1634, 7948, 2919, 11, 364, 3010, 681, 781, 1295, 300, 1439, 65562, 11, 13969, 2972, 5816, 278, 12066, 11490, 197005, 404, 286, 4022, 321, 13188, 21582, 413, 4530, 1459, 914, 7042, 13, 271, 550, 561, 73339, 11719, 271, 32, 9038, 67673, 17882, 449, 47276, 7792, 314, 2199, 25, 271, 332, 62360, 332]
+    },
+    {
+      "id": "long-018",
+      "prompt_tokens": 23,
+      "generated_tokens": 256,
+      "prefill_ms": 884.684,
+      "decode_tok_per_s": 23.2018,
+      "generated_ids": [2, 561, 17983, 11300, 314, 629, 66703, 64, 271, 760, 27491, 3294, 279, 5817, 18043, 914, 192398, 303, 2250, 1578, 11, 321, 22477, 8536, 614, 557, 6941, 310, 1683, 279, 4599, 995, 23772, 1204, 310, 10252, 14811, 13, 271, 7691, 4035, 2445, 310, 12092, 279, 10849, 11, 279, 1560, 488, 20485, 1083, 264, 75970, 948, 488, 2224, 524, 2098, 3221, 364, 3977, 13, 1921, 411, 5532, 914, 264, 75970, 13, 561, 34044, 38965, 712, 51343, 1496, 11, 836, 31352, 5384, 303, 264, 86235, 314, 2414, 421, 2493, 599, 978, 15333, 466, 2493, 599, 978, 279, 21482, 25108, 13, 1541, 279, 6265, 2218, 8884, 11, 1292, 1000, 4970, 3418, 421, 348, 11766, 9, 557, 279, 4808, 3299, 11040, 13, 271, 1, 30945, 1218, 1288, 1018, 264, 7497, 494, 14272, 5365, 4082, 279, 34044, 13, 328, 6651, 22014, 948, 781, 2224, 57080, 1149, 271, 42767, 8536, 614, 1669, 279, 2235, 855, 791, 2320, 383, 264, 19484, 34580, 11, 264, 34844, 5122, 8720, 16810, 310, 799, 7662, 13, 1216, 3105, 914, 2404, 430, 1292, 23928, 13, 271, 20860, 369, 264, 843, 4281, 1288, 1292, 1018, 11, 1024, 7497, 2166, 16850, 303, 279, 304, 50231, 3433, 13, 271, 1, 33807, 369, 843, 2980, 424, 4290, 914, 1149, 1216, 6316, 264, 2081, 440, 279, 8117, 27636, 314, 4184, 43254, 279, 36781, 888, 264, 20479, 1623, 13, 328, 2523, 2224, 279, 1118, 1637, 310, 4088, 303, 1532, 2394, 279, 12050, 11, 321, 353, 2688, 16087, 353, 2908, 978, 4598, 3743, 2724, 364, 279, 6265, 1149, 271, 1465, 5326, 6749, 506, 1024, 13]
+    },
+    {
+      "id": "long-019",
+      "prompt_tokens": 26,
+      "generated_tokens": 256,
+      "prefill_ms": 1003.35,
+      "decode_tok_per_s": 23.1586,
+      "generated_ids": [2, 16020, 71163, 271, 30729, 71163, 369, 279, 1817, 539, 864, 10462, 11, 65562, 11, 321, 1010, 22434, 5335, 3000, 4649, 1083, 11153, 4649, 9476, 430, 3487, 13, 1049, 579, 1204, 1439, 41779, 1236, 836, 1765, 3487, 321, 11, 16099, 391, 11, 18082, 279, 22817, 421, 1379, 2199, 383, 8964, 13402, 383, 13, 271, 550, 561, 14204, 81748, 271, 332, 21, 8023, 30763, 478, 220, 21, 39, 30763, 46, 478, 3000, 4649, 11069, 351, 15428, 228, 39, 29969, 30763, 46, 15428, 228, 478, 220, 21, 46, 30763, 332, 271, 623, 13983, 3665, 25, 198, 12, 2972, 35396, 38182, 318, 8023, 30763, 8, 369, 39647, 494, 279, 3594, 332, 198, 12, 2972, 27336, 318, 39, 30763, 46, 8, 369, 39647, 494, 279, 16665, 332, 198, 12, 2972, 13512, 4649, 318, 41547, 494, 279, 6797, 8, 369, 16508, 332, 198, 12, 2972, 30503, 90374, 318, 82, 8304, 8, 369, 8677, 430, 3487, 364, 279, 5819, 332, 198, 12, 2972, 46, 18365, 318, 46, 30763, 8, 369, 5698, 430, 264, 539, 2935, 332, 271, 550, 10646, 1049, 33552, 704, 271, 30729, 71163, 4829, 1925, 303, 2972, 69425, 88093, 82, 93868, 864, 6435, 2972, 69425, 4964, 23927, 197005, 1719, 5983, 73959, 421, 6486, 10462, 836, 1829, 321, 86914, 3000, 4649, 13, 271, 550, 8771, 4545, 769, 1098, 271, 16, 13, 2972, 13512, 41403, 23698, 332, 1892, 8394, 4649, 369, 16508, 321, 15625, 310, 11153, 4649, 11, 42898, 2919, 321, 26961, 22817, 13, 198, 17, 13, 2972, 8584, 9317, 10458, 318, 4009, 94411, 23698, 31230, 1892, 561, 9476, 4649, 369, 1429]
+    },
+    {
+      "id": "retr-000",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2396.66,
+      "decode_tok_per_s": 23.7362,
+      "generated_ids": [16, 15, 15, 15, 15, 15, 248046]
+    },
+    {
+      "id": "retr-001",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2402.26,
+      "decode_tok_per_s": 23.654,
+      "generated_ids": [17, 18, 22, 17, 22, 24, 248046]
+    },
+    {
+      "id": "retr-002",
+      "prompt_tokens": 62,
+      "generated_tokens": 24,
+      "prefill_ms": 2401.01,
+      "decode_tok_per_s": 23.7539,
+      "generated_ids": [40, 628, 914, 1438, 440, 411, 1622, 13, 271, 760, 56004, 1532, 369, 264, 9640, 24277, 4621, 2218, 91342, 264, 328, 14703, 1970, 1]
+    },
+    {
+      "id": "retr-003",
+      "prompt_tokens": 64,
+      "generated_tokens": 7,
+      "prefill_ms": 2477.89,
+      "decode_tok_per_s": 23.8741,
+      "generated_ids": [20, 16, 16, 23, 18, 22, 248046]
+    },
+    {
+      "id": "retr-004",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2404.85,
+      "decode_tok_per_s": 23.7958,
+      "generated_ids": [21, 19, 24, 16, 16, 21, 248046]
+    },
+    {
+      "id": "retr-005",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2398.3,
+      "decode_tok_per_s": 23.7527,
+      "generated_ids": [22, 23, 21, 18, 24, 20, 248046]
+    },
+    {
+      "id": "retr-006",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2397.87,
+      "decode_tok_per_s": 23.8502,
+      "generated_ids": [24, 17, 18, 21, 22, 19, 248046]
+    },
+    {
+      "id": "retr-007",
+      "prompt_tokens": 62,
+      "generated_tokens": 7,
+      "prefill_ms": 2395.31,
+      "decode_tok_per_s": 23.9722,
+      "generated_ids": [16, 21, 15, 24, 20, 18, 248046]
+    },
+    {
+      "id": "retr-008",
+      "prompt_tokens": 65,
+      "generated_tokens": 7,
+      "prefill_ms": 2506.26,
+      "decode_tok_per_s": 23.9248,
+      "generated_ids": [17, 24, 23, 17, 18, 17, 248046]
+    },
+    {
+      "id": "retr-009",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2432.34,
+      "decode_tok_per_s": 23.7859,
+      "generated_ids": [19, 18, 20, 20, 16, 16, 248046]
+    },
+    {
+      "id": "retr-010",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2437.51,
+      "decode_tok_per_s": 23.8622,
+      "generated_ids": [20, 22, 17, 22, 24, 15, 248046]
+    },
+    {
+      "id": "retr-011",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2430.56,
+      "decode_tok_per_s": 23.7087,
+      "generated_ids": [22, 16, 15, 15, 21, 24, 248046]
+    },
+    {
+      "id": "retr-012",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2436.73,
+      "decode_tok_per_s": 23.8521,
+      "generated_ids": [23, 19, 22, 18, 19, 23, 248046]
+    },
+    {
+      "id": "retr-013",
+      "prompt_tokens": 66,
+      "generated_tokens": 7,
+      "prefill_ms": 2557.82,
+      "decode_tok_per_s": 23.9408,
+      "generated_ids": [24, 23, 19, 21, 17, 22, 248046]
+    },
+    {
+      "id": "retr-014",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2440.49,
+      "decode_tok_per_s": 23.6657,
+      "generated_ids": [17, 17, 16, 24, 15, 21, 248046]
+    },
+    {
+      "id": "retr-015",
+      "prompt_tokens": 64,
+      "generated_tokens": 7,
+      "prefill_ms": 2480.13,
+      "decode_tok_per_s": 23.6542,
+      "generated_ids": [18, 20, 24, 16, 23, 20, 248046]
+    },
+    {
+      "id": "retr-016",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2439.83,
+      "decode_tok_per_s": 23.7933,
+      "generated_ids": [19, 24, 21, 19, 21, 19, 248046]
+    },
+    {
+      "id": "retr-017",
+      "prompt_tokens": 63,
+      "generated_tokens": 7,
+      "prefill_ms": 2436.07,
+      "decode_tok_per_s": 23.8402,
+      "generated_ids": [21, 18, 18, 22, 19, 18, 248046]
+    },
+    {
+      "id": "retr-018",
+      "prompt_tokens": 66,
+      "generated_tokens": 7,
+      "prefill_ms": 2552.54,
+      "decode_tok_per_s": 23.8907,
+      "generated_ids": [22, 22, 16, 15, 17, 17, 248046]
+    },
+    {
+      "id": "retr-019",
+      "prompt_tokens": 64,
+      "generated_tokens": 7,
+      "prefill_ms": 2475.68,
+      "decode_tok_per_s": 23.7635,
+      "generated_ids": [24, 15, 23, 18, 15, 16, 248046]
+    }
+  ]
+}

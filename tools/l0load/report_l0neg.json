@@ -1,0 +1,78 @@
+{
+ "tool": "l0load negatives",
+ "cases": {
+  "valid": {
+   "rc": 0,
+   "expect": 0,
+   "pass": true,
+   "diag": ""
+  },
+  "bad_magic": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "bad magic"
+  },
+  "bad_version": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "unsupported version 999"
+  },
+  "truncated": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "file size mismatch header=2528 actual=1248"
+  },
+  "dir_crc": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "dir CRC mismatch"
+  },
+  "unknown_layout": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "unsupported layout t0"
+  },
+  "payload_oob": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "payload span out of range: t0"
+  },
+  "payload_len_oob": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "payload span out of range: t0"
+  },
+  "bad_moe_crc": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "moe section CRC mismatch"
+  },
+  "bad_expert_count": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "moe architecture mismatch: exp=999, per_tok=8, layers=40"
+  },
+  "bad_layer_count": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "moe architecture mismatch: exp=256, per_tok=8, layers=999"
+  },
+  "bad_descriptor_index": {
+   "rc": 2,
+   "expect": 2,
+   "pass": true,
+   "diag": "invalid MoE descriptor index on layer 0"
+  }
+ },
+ "all_pass": true
+}

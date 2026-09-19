@@ -1,0 +1,7 @@
+{
+  "device": "Intel(R) Arc(TM) Graphics",
+  "prompt_tokens": 8,
+  "generated_tokens": 20,
+  "prefill_ms": 49.0358,
+  "decode_tok_per_s": 24.0454
+}

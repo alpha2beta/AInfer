@@ -1,0 +1,389 @@
+{
+  "task": "T7.4",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "model": "/home/yanchun/Projects/AInfer/models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer",
+  "timestamp": "2026-09-18T21:12:00Z",
+  "status": "PASSED",
+  "summary": {
+    "baseline_idle_temp_c": 47.0,
+    "peak_package_temp_c": 74.0,
+    "steady_state_temp_c": 55.8,
+    "thermal_headroom_to_tjmax_c": 26.0,
+    "sustained_duration_s": 334.99,
+    "sustained_duration_minutes": 5.58,
+    "total_tokens_generated": 7200,
+    "cold_decode_tok_per_s": 24.37,
+    "warm_decode_tok_per_s": 24.11,
+    "sustained_5min_decode_tok_per_s": 23.39,
+    "throughput_drop_pct": 3.0,
+    "thermal_throttling_triggered": true,
+    "p50_jitter_ms": 42.7075,
+    "p95_jitter_ms": 44.4875
+  },
+  "windows_60s": [
+    {
+      "window_minutes": "0-1m",
+      "avg_package_temp_c": 63.7,
+      "avg_gpu_freq_mhz": 1806.7,
+      "throttled": true
+    },
+    {
+      "window_minutes": "1-2m",
+      "avg_package_temp_c": 56.8,
+      "avg_gpu_freq_mhz": 1925.9,
+      "throttled": true
+    },
+    {
+      "window_minutes": "2-3m",
+      "avg_package_temp_c": 56.4,
+      "avg_gpu_freq_mhz": 1941.7,
+      "throttled": true
+    },
+    {
+      "window_minutes": "3-4m",
+      "avg_package_temp_c": 56.2,
+      "avg_gpu_freq_mhz": 1950.0,
+      "throttled": false
+    },
+    {
+      "window_minutes": "4-5m",
+      "avg_package_temp_c": 56.3,
+      "avg_gpu_freq_mhz": 1950.0,
+      "throttled": false
+    }
+  ],
+  "telemetry_samples_count": 165,
+  "telemetry_sample_interval_s": 2.0,
+  "sample_records": [
+    {
+      "elapsed_s": 0.0,
+      "package_temp_c": 54.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 0,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 3254.5
+    },
+    {
+      "elapsed_s": 10.2,
+      "package_temp_c": 59.0,
+      "max_core_temp_c": 59.0,
+      "gpu_act_freq_mhz": 0,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": true,
+      "gpu_throttle_reasons": "pl2",
+      "cpu_mean_freq_mhz": 3598.2
+    },
+    {
+      "elapsed_s": 20.4,
+      "package_temp_c": 72.0,
+      "max_core_temp_c": 72.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2938.1
+    },
+    {
+      "elapsed_s": 30.6,
+      "package_temp_c": 67.0,
+      "max_core_temp_c": 66.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2610.2
+    },
+    {
+      "elapsed_s": 40.8,
+      "package_temp_c": 59.0,
+      "max_core_temp_c": 58.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 3383.6
+    },
+    {
+      "elapsed_s": 51.0,
+      "package_temp_c": 66.0,
+      "max_core_temp_c": 65.0,
+      "gpu_act_freq_mhz": 1900,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": true,
+      "gpu_throttle_reasons": "pl1",
+      "cpu_mean_freq_mhz": 3199.5
+    },
+    {
+      "elapsed_s": 61.1,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 56.0,
+      "gpu_act_freq_mhz": 1900,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": true,
+      "gpu_throttle_reasons": "pl1",
+      "cpu_mean_freq_mhz": 2315.6
+    },
+    {
+      "elapsed_s": 71.3,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 57.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2759.5
+    },
+    {
+      "elapsed_s": 81.5,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1850,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": true,
+      "gpu_throttle_reasons": "pl1",
+      "cpu_mean_freq_mhz": 2713.9
+    },
+    {
+      "elapsed_s": 91.8,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 56.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2525.2
+    },
+    {
+      "elapsed_s": 102.0,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 56.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2588.1
+    },
+    {
+      "elapsed_s": 112.2,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2259.6
+    },
+    {
+      "elapsed_s": 122.4,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 53.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2443.5
+    },
+    {
+      "elapsed_s": 132.6,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2515.4
+    },
+    {
+      "elapsed_s": 142.8,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2513.6
+    },
+    {
+      "elapsed_s": 153.0,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2318.1
+    },
+    {
+      "elapsed_s": 163.2,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2386.2
+    },
+    {
+      "elapsed_s": 173.4,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 53.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2710.9
+    },
+    {
+      "elapsed_s": 183.6,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2459.4
+    },
+    {
+      "elapsed_s": 193.7,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 57.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2687.1
+    },
+    {
+      "elapsed_s": 203.9,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2409.2
+    },
+    {
+      "elapsed_s": 214.1,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2755.5
+    },
+    {
+      "elapsed_s": 224.4,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2832.8
+    },
+    {
+      "elapsed_s": 234.6,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 3194.9
+    },
+    {
+      "elapsed_s": 244.7,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2476.0
+    },
+    {
+      "elapsed_s": 255.0,
+      "package_temp_c": 58.0,
+      "max_core_temp_c": 58.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 3144.6
+    },
+    {
+      "elapsed_s": 265.2,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2332.2
+    },
+    {
+      "elapsed_s": 275.4,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 57.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2859.9
+    },
+    {
+      "elapsed_s": 285.6,
+      "package_temp_c": 57.0,
+      "max_core_temp_c": 57.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2622.6
+    },
+    {
+      "elapsed_s": 295.8,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2431.1
+    },
+    {
+      "elapsed_s": 306.0,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 3015.9
+    },
+    {
+      "elapsed_s": 316.2,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 54.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2397.0
+    },
+    {
+      "elapsed_s": 326.4,
+      "package_temp_c": 56.0,
+      "max_core_temp_c": 55.0,
+      "gpu_act_freq_mhz": 1950,
+      "gpu_cur_freq_mhz": 1950,
+      "gpu_throttled": false,
+      "gpu_throttle_reasons": "none",
+      "cpu_mean_freq_mhz": 2478.6
+    }
+  ]
+}

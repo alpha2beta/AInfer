@@ -1,0 +1,20 @@
+{
+  "task": "T6.1",
+  "model": "Tiel-Coder-35B-A3B-Genesis-Hermes",
+  "timestamp": "2026-09-18T14:30:52Z",
+  "fixtures": {
+    "operators": {
+      "path": "/home/yanchun/Projects/AInfer/reference/operators_258v.json",
+      "sha256": "ae22ed6c77eef0bc6b710893b5cfe40d89f038f60d265e2798604e40c653beb1"
+    },
+    "layer0_deltanet_moe": {
+      "path": "/home/yanchun/Projects/AInfer/reference/block_deltanet_moe_L0_258v.json",
+      "sha256": "25ce44a67064de4fb861e092517b983bf7aa04b6098fa6d5d8eabfaa9181a08f"
+    },
+    "layer3_fullattn_moe": {
+      "path": "/home/yanchun/Projects/AInfer/reference/block_fullattn_moe_L3_258v.json",
+      "sha256": "0f504b5c548de8eca90b7c7cb7747a7b76f19a77b04608394745fa3f914c6cfd"
+    }
+  },
+  "all_captured": true
+}
