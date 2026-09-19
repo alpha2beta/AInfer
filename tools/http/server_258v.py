@@ -393,9 +393,10 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
+        self.close_connection = True
 
         def send_sse_chunk(chunk_dict):
             payload = f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")

@@ -7,27 +7,27 @@
   "decode_tokens_per_run": 64,
   "measured_runs": 3,
   "timing_fields": {
-    "model_load_time_ms": 11455.1,
-    "cold_ttft_ms": 276.936,
-    "warm_ttft_ms": 266.173,
-    "prefill_time_ms": 266.173,
-    "prefill_tok_per_s": 78.9201,
-    "first_decode_latency_ms": 28.9799,
-    "sustained_decode_tok_per_s": 34.3393,
+    "model_load_time_ms": 9883.07,
+    "cold_ttft_ms": 240.191,
+    "warm_ttft_ms": 237.328,
+    "prefill_time_ms": 237.328,
+    "prefill_tok_per_s": 88.4871,
+    "first_decode_latency_ms": 27.9334,
+    "sustained_decode_tok_per_s": 35.5391,
     "inter_token_jitter": {
-      "min_ms": 28.3791,
-      "max_ms": 32.2962,
-      "mean_ms": 29.1195,
-      "stddev_ms": 0.440854,
-      "p50_ms": 29.0822,
-      "p90_ms": 29.6548,
-      "p95_ms": 29.8121,
-      "p99_ms": 30.2084
+      "min_ms": 27.3669,
+      "max_ms": 33.2286,
+      "mean_ms": 28.1347,
+      "stddev_ms": 0.596089,
+      "p50_ms": 28.0818,
+      "p90_ms": 28.4703,
+      "p95_ms": 28.6454,
+      "p99_ms": 30.4839
     },
-    "tokenization_time_ms": 0.022339140220234793,
-    "tokenizer_load_time_ms": 508.8591030216776,
-    "e2e_cold_ttft_ms": 276.95833914022023,
-    "e2e_warm_ttft_ms": 266.19533914022026
+    "tokenization_time_ms": 0.015113373519852757,
+    "tokenizer_load_time_ms": 259.8081399919465,
+    "e2e_cold_ttft_ms": 240.20611337351986,
+    "e2e_warm_ttft_ms": 237.34311337351986
   },
   "memory_footprint": {
     "payload_arena_bytes": 18594016768,
@@ -37,46 +37,46 @@
     "workspace_bytes": 67108864,
     "total_committed_bytes": 19357343232,
     "total_committed_gib": 18.0279,
-    "rss_before_init_kb": 140120,
-    "rss_after_init_kb": 140120,
-    "rss_final_kb": 140120
+    "rss_before_init_kb": 139800,
+    "rss_after_init_kb": 139800,
+    "rss_final_kb": 139800
   },
   "raw_runs": [
     {
       "run_index": 1,
-      "warm_ttft_ms": 272.687,
-      "prefill_time_ms": 272.687,
-      "prefill_tok_per_s": 77.0114,
-      "first_decode_ms": 28.8091,
-      "sustained_decode_tok_per_s": 34.4375
+      "warm_ttft_ms": 238.735,
+      "prefill_time_ms": 238.735,
+      "prefill_tok_per_s": 87.9636,
+      "first_decode_ms": 28.0822,
+      "sustained_decode_tok_per_s": 35.4502
     },
     {
       "run_index": 2,
-      "warm_ttft_ms": 261.938,
-      "prefill_time_ms": 261.938,
-      "prefill_tok_per_s": 80.1715,
-      "first_decode_ms": 28.891,
-      "sustained_decode_tok_per_s": 34.5034
+      "warm_ttft_ms": 237.38,
+      "prefill_time_ms": 237.38,
+      "prefill_tok_per_s": 88.4656,
+      "first_decode_ms": 27.8402,
+      "sustained_decode_tok_per_s": 35.631
     },
     {
       "run_index": 3,
-      "warm_ttft_ms": 263.894,
-      "prefill_time_ms": 263.894,
-      "prefill_tok_per_s": 79.5775,
-      "first_decode_ms": 29.2396,
-      "sustained_decode_tok_per_s": 34.0768
+      "warm_ttft_ms": 235.87,
+      "prefill_time_ms": 235.87,
+      "prefill_tok_per_s": 89.0321,
+      "first_decode_ms": 27.8777,
+      "sustained_decode_tok_per_s": 35.5362
     }
   ],
   "status": "PASSED",
   "summary": {
-    "model_load_s": 11.455,
-    "prefill_tok_per_s": 78.92,
-    "warm_ttft_ms": 266.17,
-    "e2e_warm_ttft_ms": 266.2,
-    "first_decode_latency_ms": 28.98,
-    "sustained_decode_tok_per_s": 34.34,
-    "p50_jitter_ms": 29.08,
-    "p95_jitter_ms": 29.81,
+    "model_load_s": 9.883,
+    "prefill_tok_per_s": 88.49,
+    "warm_ttft_ms": 237.33,
+    "e2e_warm_ttft_ms": 237.34,
+    "first_decode_latency_ms": 27.93,
+    "sustained_decode_tok_per_s": 35.54,
+    "p50_jitter_ms": 28.08,
+    "p95_jitter_ms": 28.65,
     "total_committed_gib": 18.03
   }
 }

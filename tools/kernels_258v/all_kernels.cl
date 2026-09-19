@@ -1,6 +1,8 @@
 // AInfer Unified SPIR-V Kernel Suite for Qwen3.5-MoE on Intel Arc 140V (Xe2)
 // Contains all kernels for both DeltaNet (30 layers) and Full-Attention (10 layers) blocks.
 
+#pragma OPENCL EXTENSION cl_intel_subgroup_matrix_multiply_accumulate : enable
+
 #define GROUP_SIZE 128
 #define HIDDEN_DIM 2048
 #define NUM_EXPERTS 256
@@ -146,8 +148,9 @@ __kernel void int4_gemv_m1(
 }
 
 // =========================================================================
-// 1b. INT4 Symmetric Group-128 Batched Prefill GEMM (Batch B <= 32)
+// 1b. INT4 Symmetric Group-128 Batched Prefill GEMM (DPAS Systolic Xe2)
 // =========================================================================
+__attribute__((intel_reqd_sub_group_size(16)))
 __kernel void int4_gemm_prefill(
     __global float * restrict Y,              // [B, M] row-major: Y[b * M + m]
     __global const uchar * restrict w_packed, // [M, K / 2]
@@ -157,106 +160,82 @@ __kernel void int4_gemm_prefill(
     int K,
     int B
 ) {
-    int m = get_global_id(0);
-    if (m >= M) return;
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_id = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
 
+    // Each subgroup computes an M_tile of 16 output channels
+    int m_tile_idx = grp_id * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (m_base >= M) return;
+
+    int m = m_base + lid;
+    int safe_m = (m < M) ? m : 0;
     int num_groups = K / GROUP_SIZE;
-    __global const uchar *row_w = w_packed + (size_t)m * (K / 2);
-    __global const ushort *row_s = w_scale + (size_t)m * num_groups;
 
-    float total_sums[32];
-    #pragma unroll
-    for (int b = 0; b < 32; ++b) {
-        total_sums[b] = 0.0f;
-    }
+    __global const uchar *row_w = w_packed + (size_t)safe_m * (K / 2);
+    __global const ushort *row_s = w_scale + (size_t)safe_m * num_groups;
 
-    for (int g = 0; g < num_groups; ++g) {
-        float scale = bf16_to_fp32(row_s[g]);
-        __global const uchar *grp_w = row_w + g * (GROUP_SIZE / 2);
+    // Loop over batch tiles of size 8
+    for (int b_base = 0; b_base < B; b_base += 8) {
+        int cur_B = (B - b_base < 8) ? (B - b_base) : 8;
 
-        float grp_acc[32];
-        #pragma unroll
-        for (int b = 0; b < 32; ++b) {
-            grp_acc[b] = 0.0f;
-        }
+        float8 acc = (float8)(0.0f);
 
-        __global const uchar16 *w_vec16 = (__global const uchar16 *)grp_w;
+        for (int g = 0; g < num_groups; ++g) {
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
 
-        #pragma unroll
-        for (int v = 0; v < 4; ++v) {
-            uchar16 wb = w_vec16[v];
+            __global const uchar *grp_w = row_w + g * (GROUP_SIZE / 2);
 
-            float4 w0, w1, w2, w3, w4, w5, w6, w7;
+            // In group-128, there are 8 steps of K=16
+            for (int step = 0; step < 8; ++step) {
+                int k_base = g * GROUP_SIZE + step * 16;
 
-            int n0 = (int)((char)(wb.s0 << 4)) >> 4;
-            int n1 = (int)((char)wb.s0) >> 4;
-            int n2 = (int)((char)(wb.s1 << 4)) >> 4;
-            int n3 = (int)((char)wb.s1) >> 4;
-            int n4 = (int)((char)(wb.s2 << 4)) >> 4;
-            int n5 = (int)((char)wb.s2) >> 4;
-            int n6 = (int)((char)(wb.s3 << 4)) >> 4;
-            int n7 = (int)((char)wb.s3) >> 4;
-            w0 = (float4)((float)n0, (float)n1, (float)n2, (float)n3);
-            w1 = (float4)((float)n4, (float)n5, (float)n6, (float)n7);
+                // 1. Thread lid loads 16 weights (8 bytes) for its row safe_m
+                __global const uchar *w_ptr = grp_w + step * 8;
+                uchar8 raw_w = *((__global const uchar8 *)w_ptr);
 
-            int n8  = (int)((char)(wb.s4 << 4)) >> 4;
-            int n9  = (int)((char)wb.s4) >> 4;
-            int n10 = (int)((char)(wb.s5 << 4)) >> 4;
-            int n11 = (int)((char)wb.s5) >> 4;
-            int n12 = (int)((char)(wb.s6 << 4)) >> 4;
-            int n13 = (int)((char)wb.s6) >> 4;
-            int n14 = (int)((char)(wb.s7 << 4)) >> 4;
-            int n15 = (int)((char)wb.s7) >> 4;
-            w2 = (float4)((float)n8,  (float)n9,  (float)n10, (float)n11);
-            w3 = (float4)((float)n12, (float)n13, (float)n14, (float)n15);
+                // Unpack 16 nibbles to 16 halves and scale
+                half w_deq[16];
+                #pragma unroll
+                for (int i = 0; i < 8; ++i) {
+                    uchar byte_val = ((uchar *)&raw_w)[i];
+                    int n0 = (int)((char)(byte_val << 4)) >> 4;
+                    int n1 = (int)((char)byte_val) >> 4;
+                    w_deq[2 * i]     = (half)((float)n0) * s_half;
+                    w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+                }
 
-            int n16 = (int)((char)(wb.s8 << 4)) >> 4;
-            int n17 = (int)((char)wb.s8) >> 4;
-            int n18 = (int)((char)(wb.s9 << 4)) >> 4;
-            int n19 = (int)((char)wb.s9) >> 4;
-            int n20 = (int)((char)(wb.sa << 4)) >> 4;
-            int n21 = (int)((char)wb.sa) >> 4;
-            int n22 = (int)((char)(wb.sb << 4)) >> 4;
-            int n23 = (int)((char)wb.sb) >> 4;
-            w4 = (float4)((float)n16, (float)n17, (float)n18, (float)n19);
-            w5 = (float4)((float)n20, (float)n21, (float)n22, (float)n23);
+                int8 b_mat;
+                __builtin_memcpy(&b_mat, w_deq, 32);
 
-            int n24 = (int)((char)(wb.sc << 4)) >> 4;
-            int n25 = (int)((char)wb.sc) >> 4;
-            int n26 = (int)((char)(wb.sd << 4)) >> 4;
-            int n27 = (int)((char)wb.sd) >> 4;
-            int n28 = (int)((char)(wb.se << 4)) >> 4;
-            int n29 = (int)((char)wb.se) >> 4;
-            int n30 = (int)((char)(wb.sf << 4)) >> 4;
-            int n31 = (int)((char)wb.sf) >> 4;
-            w6 = (float4)((float)n24, (float)n25, (float)n26, (float)n27);
-            w7 = (float4)((float)n28, (float)n29, (float)n30, (float)n31);
+                // 2. Load activation slice for each batch row
+                short8 a_mat = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B) {
+                        float x_val = X[(size_t)(b_base + bi) * K + k_base + lid];
+                        half x_half = (half)x_val;
+                        ((short *)&a_mat)[bi] = as_short(x_half);
+                    }
+                }
 
-            int k_sub = g * GROUP_SIZE + v * 32;
-
-            for (int b = 0; b < B; ++b) {
-                __global const float4 *x_vec4 = (__global const float4 *)(X + (size_t)b * K + k_sub);
-                float4 x0 = x_vec4[0];
-                float4 x1 = x_vec4[1];
-                float4 x2 = x_vec4[2];
-                float4 x3 = x_vec4[3];
-                float4 x4 = x_vec4[4];
-                float4 x5 = x_vec4[5];
-                float4 x6 = x_vec4[6];
-                float4 x7 = x_vec4[7];
-
-                grp_acc[b] += dot(w0, x0) + dot(w1, x1) + dot(w2, x2) + dot(w3, x3)
-                            + dot(w4, x4) + dot(w5, x5) + dot(w6, x6) + dot(w7, x7);
+                // 3. Hardware DPAS operation (8x16x16 with FP32 accumulation)
+                acc = intel_sub_group_f16_f16_matrix_mad_k16(a_mat, b_mat, acc);
             }
         }
 
-        for (int b = 0; b < B; ++b) {
-            total_sums[b] += grp_acc[b] * scale;
+        // Store outputs: thread lid writes output channel m = m_base + lid for each batch row
+        if (m < M) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B) {
+                    Y[(size_t)(b_base + bi) * M + m] = ((float *)&acc)[bi];
+                }
+            }
         }
-    }
-
-    for (int b = 0; b < B; ++b) {
-        Y[(size_t)b * M + m] = total_sums[b];
     }
 }
 

@@ -42,6 +42,8 @@ tools/l0probe/build/
 # Compiled test/bench binaries, shared libs & SPIR-V (rebuilt from committed .cpp/.cl)
 *.spv
 *.so
+*.bin
+tools/bench_gemv/bench_dpas_prototype
 tools/bench_258v/bench_258v
 tools/bench_258v/bench_deltanet
 tools/bench_258v/bench_prefill

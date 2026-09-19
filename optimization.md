@@ -152,30 +152,35 @@ Controlled comparison run from `tools/bench_258v/run_llama_comparison_t75.py`:
   - Prefill throughput doubled from **39.32 tok/s to 78.92 tok/s** (scaling up to **89.31 tok/s** at $P=32$, a **2.27x speedup**).
   - Warm TTFT for 21 tokens halved from **534.04 ms down to 266.17 ms** (-50.2%).
   - Prefill gap to llama.cpp Vulkan closed to **92.6% parity** (87.62 tok/s vs 94.59 tok/s @ $P=64$).
-  - Decode throughput remains unaffected at **34.34–34.88 tok/s** (**1.17x faster than llama.cpp Vulkan**).
+### Pillar 7: Hardware DPAS Systolic Array INT4 GEMM Tiling
+- **Problem:** While Pillar 6 chunked the prefill forward pass into batched operations, `int4_gemm_prefill` still relied on scalar SIMD instruction unpacking (shift + mask + cast for each nibble into `float4`), leaving Intel Xe2's systolic matrix engines idle. Linear projections accounted for ~33% of prefill execution time.
+- **Optimization:**
+  - Audited Intel Arc 140V Xe2 matrix architecture via `ocloc` / `iga64`, identifying hardware support for native INT4 DPAS (`dpas.8x1 ... :s4 :s4`) and `dpas.8x8` SIMD16 FP16/BF16 matrix operations (`intel_sub_group_f16_f16_matrix_mad_k16`).
+  - Redesigned `int4_gemm_prefill` into a subgroup-tiled systolic GEMM kernel:
+    - Subgroup tile: $M_{tile} = 16, B_{tile} = 8, K_{step} = 16$ with FP32 accumulation.
+    - Weights unpacked on-the-fly to FP16 in registers; activations loaded as FP16.
+    - Workgroup: 256 threads (16 subgroups) computing 256 output channels concurrently.
+    - Full coverage across all model projection shapes ($M \in \{32, 512, 2048, 4096, 8192\}, K \in \{512, 2048, 4096\}$).
+- **Impact:**
+  - On the dominant DeltaNet projection shape ($M=8192, K=2048$, across 30 layers), GEMM latency dropped from **2395.71 µs to 1257.97 µs** at $B=32$ (**1.90x speedup**, saving **34.2 ms per 32-token chunk** across all 30 DeltaNet layers).
+  - Standard 21-token prefill throughput increased to **88.49 tok/s** (with peak scaling reaching **89.73 tok/s**).
+  - Warm TTFT reduced further to **237.33 ms** (down from 266.17 ms, a total **55.6% reduction** vs initial 534 ms).
+  - Sustained decode throughput reached an all-time record of **35.54 tok/s** (**+21.2% faster than llama.cpp Vulkan**).
+  - Full Gate M4 suite (7/7 tests) verified bit-exact golden sequence match (`[148431, 62497, 148287, 198, ...]`), 0 KB RSS growth, and multi-chunk long-prompt determinism ($P=128$ and $P=256$).
 
 ---
 
 ## 5. Verification & Numerical Fidelity
 
 1. **Gate M4 Unit Test (`test_runtime_258v`):**
-   - 6/6 tests passed cleanly.
+   - 7/7 tests passed cleanly (T5.1–T5.7).
    - Bit-exact golden token sequence: `[148431, 62497, 148287, 198, 220, 16, 13, 198, 220, 17, 13, 198, 220, 18, 13, 198]`.
    - Deterministic reset: 10 repeated generation runs produced identical outputs with 0 KB RSS growth.
+   - Long-prompt verification: $P=128$ (4 chunks) and $P=256$ (8 chunks) verified bit-exact and position-consistent across chunk boundaries.
 
-2. **End-to-End Generation Sample (`decode_258v`):**
-   - **Prompt:** `"Hello"`
-   - **Throughput:** 34.34 tok/s
-   - **Output:**
-     > *"Hello! 😊\n\nHow can I help you today? Whether you have a question, need help with a task, want to learn something new, or just"*
+2. **Persistent HTTP Server (Phase 8):**
+   - Persistent resident daemon (`server_258v.py` on port 8088) verified with resident 18.03 GiB model.
+   - SSE chunked streaming (`/v1/chat/completions`) and full JSON responses verified with immediate client-side socket closure on stream completion (`data: [DONE]`).
+   - Abrupt client disconnect cancellation verified: state cleanly reset with zero device memory leak.
 
----
-
-## 6. Next Optimization Directions
-
-1. **Persistent HTTP Server (Phase 8):**
-   - Maintain the resident model and pre-recorded Level Zero command lists across requests in an in-process daemon.
-   - Expose OpenAI-compatible SSE streaming endpoints (`/v1/chat/completions`) with zero initialization overhead.
-2. **Dynamic Workgroup Tiling for Prefill (B > 32):**
-   - For long-context prefill ($P > 256$), explore multi-tile matrix multiplication (e.g. subgroup block reads or DPAS INT4 GEMM) to reach 150+ tok/s.
 

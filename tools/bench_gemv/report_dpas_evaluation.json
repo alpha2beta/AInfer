@@ -1,0 +1,46 @@
+{
+  "task": "T1.4 / Prefill GEMM DPAS Prototype",
+  "device": "Intel(R) Arc(TM) Graphics (Xe2, Lunar Lake 258V)",
+  "instruction_set": "Intel Xe Matrix Extensions (XMX / DPAS.8x8 SIMD16)",
+  "status": "GO",
+  "summary": {
+    "decision": "GO",
+    "recommendation": "Adopt DPAS GEMM for prefill linear projections. Delivers up to 1.90x speedup on dominant M=8192 projection.",
+    "numerical_parity": "PASSED (max diff < 4.2e-3 against float32 reference)"
+  },
+  "benchmarks": [
+    {
+      "shape": { "M": 8192, "K": 2048, "description": "DeltaNet QKV Projection (30 layers)" },
+      "results": [
+        { "B": 1,  "scalar_simd_us": 347.34,  "dpas_systolic_us": 229.70,  "speedup": 1.51 },
+        { "B": 2,  "scalar_simd_us": 348.51,  "dpas_systolic_us": 235.55,  "speedup": 1.48 },
+        { "B": 4,  "scalar_simd_us": 368.62,  "dpas_systolic_us": 273.53,  "speedup": 1.35 },
+        { "B": 8,  "scalar_simd_us": 654.21,  "dpas_systolic_us": 362.14,  "speedup": 1.81 },
+        { "B": 16, "scalar_simd_us": 1211.57, "dpas_systolic_us": 667.46,  "speedup": 1.82 },
+        { "B": 32, "scalar_simd_us": 2395.71, "dpas_systolic_us": 1257.97, "speedup": 1.90 }
+      ]
+    },
+    {
+      "shape": { "M": 4096, "K": 2048, "description": "Full-Attention Q Projection (10 layers)" },
+      "results": [
+        { "B": 1,  "scalar_simd_us": 171.22,  "dpas_systolic_us": 168.24,  "speedup": 1.02 },
+        { "B": 2,  "scalar_simd_us": 183.77,  "dpas_systolic_us": 157.81,  "speedup": 1.16 },
+        { "B": 4,  "scalar_simd_us": 244.77,  "dpas_systolic_us": 214.69,  "speedup": 1.14 },
+        { "B": 8,  "scalar_simd_us": 351.56,  "dpas_systolic_us": 289.99,  "speedup": 1.21 },
+        { "B": 16, "scalar_simd_us": 646.54,  "dpas_systolic_us": 529.94,  "speedup": 1.22 },
+        { "B": 32, "scalar_simd_us": 1318.76, "dpas_systolic_us": 1216.74, "speedup": 1.08 }
+      ]
+    },
+    {
+      "shape": { "M": 2048, "K": 2048, "description": "Square Attention / Intermediate Projection" },
+      "results": [
+        { "B": 1,  "scalar_simd_us": 172.63,  "dpas_systolic_us": 362.66,  "speedup": 0.48 },
+        { "B": 2,  "scalar_simd_us": 188.88,  "dpas_systolic_us": 202.55,  "speedup": 0.93 },
+        { "B": 4,  "scalar_simd_us": 379.27,  "dpas_systolic_us": 189.78,  "speedup": 2.00 },
+        { "B": 8,  "scalar_simd_us": 315.41,  "dpas_systolic_us": 250.33,  "speedup": 1.26 },
+        { "B": 16, "scalar_simd_us": 583.70,  "dpas_systolic_us": 525.12,  "speedup": 1.11 },
+        { "B": 32, "scalar_simd_us": 1162.56, "dpas_systolic_us": 999.50,  "speedup": 1.16 }
+      ]
+    }
+  ]
+}

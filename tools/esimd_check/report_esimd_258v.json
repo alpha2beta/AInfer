@@ -1,0 +1,23 @@
+{
+  "device": "Intel(R) Arc(TM) Graphics (8086:64a0, Lunar Lake 258V)",
+  "driver": "Intel Level Zero 1.17 / libze_intel_gpu.so.1.17.39395",
+  "esimd": {
+    "sg16": true,
+    "sg32": true
+  },
+  "xmx": {
+    "dpas_module_flag": true,
+    "int8_8x16x32": true,
+    "fp16_8x16x16": true,
+    "bf16_8x16x16": true,
+    "int4_native": true,
+    "dpas_instruction": "dpas.8x8 (16|M0)"
+  },
+  "benchmarks": {
+    "dpas_prototype_evaluation": "tools/bench_gemv/report_dpas_evaluation.json",
+    "m8192_k2048_b32_scalar_us": 2395.71,
+    "m8192_k2048_b32_dpas_us": 1257.97,
+    "m8192_k2048_b32_speedup": 1.90,
+    "status": "GO"
+  }
+}

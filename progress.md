@@ -89,7 +89,7 @@
 | Phase | Milestone | Scope | Status | Done / Total |
 |---|---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ **Done** | 6 / 6 |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 2 / 8 |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 3 / 8 |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[~]` In Progress | 4 / 5 |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ validation, rejection | ✅ **Done** | 6 / 6 |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet, Attn | ✅ **Done** | 7 / 7 |
@@ -100,7 +100,7 @@
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[ ]` Pending | 0 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[-]` Deferred | 0 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **46 / 62** |
+| **Total** | | | | **47 / 62** |
 
 ---
 
@@ -124,7 +124,7 @@
 | **T1.1** | Toolchain pinning and package snapshotting | `[x]` | Pinned packages cached in `tools/toolchain/cache/`, extracted to sysroot |
 | **T1.2** | Reproducible container/chroot & rollback | `[ ]` | Requires package cache snapshot |
 | **T1.3** | Level Zero device probe on Arc 140V | `[x]` | Ported `probe.cpp` to Arc 140V (`8086:64a0`), emitted `tools/l0probe/report_258v.json` |
-| **T1.4** | ESIMD, DP4A, and DPAS / XMX audit | `[ ]` | Will emit `report_esimd_258v.json` |
+| **T1.4** | ESIMD, DP4A, and DPAS / XMX audit | `[x]` | Audited DPAS/XMX on Arc 140V (Xe2); discovered native INT4 DPAS (`dpas.8x1 ...:s4 :s4`) and `dpas.8x8` SIMD16; prototype achieved 1.90x speedup on M=8192; emitted `tools/esimd_check/report_esimd_258v.json` & `tools/bench_gemv/report_dpas_evaluation.json` (status: GO) |
 | **T1.5** | Unified memory allocation benchmarking | `[ ]` | `zeMemAllocDevice` vs `Shared` comparison |
 | **T1.6** | Dedicated CPU/GPU memory contention benchmark | `[ ]` | Critical gated benchmark for MoE on shared RAM |
 | **T1.7** | Sustainable bandwidth and dispatch profiling | `[ ]` | Profile steady-state vs cold launch |
@@ -362,6 +362,12 @@
     - Latency per prompt token reduced from 25.5 ms/tok down to **11.20 ms/tok**.
     - Prefill gap to llama.cpp Vulkan closed from 41.5% to **92.6% parity** (87.62 tok/s vs 94.59 tok/s @ $P=64$).
     - Sustained decode remains at **34.34–34.88 tok/s** (**1.17x faster than llama.cpp Vulkan**).
-
-
-
+- **2026-09-19 (T5.7 Long-Prompt Multi-Chunk Verification & T1.4 DPAS Prototype):**
+  - **T5.7 Multi-Chunk Long-Prompt Verification:** Added Test 5 to `tools/decode/test_runtime_258v.cpp` to verify multi-chunk prompt execution across chunk boundaries. Evaluated $P=128$ (4 chunks of 32) and $P=256$ (8 chunks of 32). Verified: (1) bit-exact output determinism across multiple runs from reset (`seq128_run1 == seq128_run2`, `seq256_run1 == seq256_run2`), (2) position bookkeeping accuracy ($pos = 134$ for $128+6$, $pos = 262$ for $256+6$), and (3) valid first-token prediction (`151644`). Full Gate M4 suite (7/7 tests) passed cleanly, updating `tools/decode/report_phase5.json`.
+  - **T1.4 DPAS / XMX Capability Audit & INT4 GEMM Prototype (Verdict: GO):** Audited hardware matrix capabilities of Intel Arc 140V (Xe2, Lunar Lake 258V). Verified device module flag supports DPAS, and discovered native INT4 DPAS (`dpas.8x1 (16|M0) ... :s4 :s4`) as well as `dpas.8x8` SIMD16 FP16/BF16/INT8. Implemented prototype kernel `dpas_int4_gemm_m16_b8` (`tools/bench_gemv/dpas_gemm_prototype.cl`) and microbenchmark harness (`tools/bench_gemv/bench_dpas_prototype.cpp`).
+  - **DPAS Benchmark Results (`tools/bench_gemv/report_dpas_evaluation.json`):**
+    - On $M=8192, K=2048$ (DeltaNet `qkv_proj`), at $B=32$, DPAS latency reached **1257.97 µs** vs scalar SIMD **2395.71 µs** (**1.90x speedup**, -47.5% latency, saving **34.2 ms** per 32-token chunk across 30 DeltaNet layers).
+    - At $B=8$, DPAS achieved **362.14 µs** vs scalar SIMD **654.21 µs** (**1.81x speedup**).
+    - On $M=4096, K=2048$ (Full-Attn `q_proj`), DPAS achieved **1.08x–1.22x speedup** across batches.
+    - Numerical parity verified: max absolute difference $< 4.2 \times 10^{-3}$ against CPU FP32 reference.
+    - Emitted `tools/esimd_check/report_esimd_258v.json` and `tools/bench_gemv/report_dpas_evaluation.json`. T1.4 closed as `[x]`.

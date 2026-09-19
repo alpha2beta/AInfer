@@ -27,7 +27,6 @@ static inline float bf16_to_fp32(uint16_t b) {
   return f;
 }
 
-// CPU reference for INT4 symmetric GEMM with batch B
 void cpu_gemm_reference(float *Y, const uint8_t *w_packed, const uint16_t *w_scale,
                          const float *X, int M, int K, int B) {
   int num_groups = K / 128;
@@ -65,12 +64,12 @@ void cpu_gemm_reference(float *Y, const uint8_t *w_packed, const uint16_t *w_sca
 }
 
 int main(int argc, char **argv) {
-  const char *spv_path = (argc > 1) ? argv[1] : "tools/bench_gemv/gemm_prefill.spv";
+  const char *spv_path = (argc > 1) ? argv[1] : "tools/bench_gemv/dpas_gemm_prototype_lnl.spv";
   const int M = (argc > 2) ? std::atoi(argv[2]) : 2048;
   const int K = (argc > 3) ? std::atoi(argv[3]) : 2048;
 
   std::printf("=================================================================\n");
-  std::printf("--- AInfer Batched Prefill GEMM Evaluation on Arc 140V (Xe2) ---\n");
+  std::printf("--- AInfer DPAS INT4 GEMM Evaluation on Arc 140V (Xe2) ---------\n");
   std::printf("=================================================================\n");
   std::printf("  Matrix Shape:   M = %d, K = %d\n", M, K);
   std::printf("  SPIR-V Kernel:  %s\n", spv_path);
@@ -83,8 +82,8 @@ int main(int argc, char **argv) {
   if (drv_cnt == 0) return 1;
   std::vector<ze_driver_handle_t> drvs(drv_cnt);
   CHECK(zeDriverGet(&drv_cnt, drvs.data()));
-
   ze_driver_handle_t drv = drvs[0];
+
   uint32_t dev_cnt = 0;
   CHECK(zeDeviceGet(drv, &dev_cnt, nullptr));
   if (dev_cnt == 0) return 1;
@@ -123,7 +122,7 @@ int main(int argc, char **argv) {
   ze_module_handle_t mod = nullptr;
   CHECK(zeModuleCreate(ctx, dev, &mdesc, &mod, nullptr));
 
-  ze_kernel_desc_t kdesc{ZE_STRUCTURE_TYPE_KERNEL_DESC, nullptr, 0, "int4_gemm_prefill"};
+  ze_kernel_desc_t kdesc{ZE_STRUCTURE_TYPE_KERNEL_DESC, nullptr, 0, "dpas_int4_gemm_m16_b8"};
   ze_kernel_handle_t kernel = nullptr;
   CHECK(zeKernelCreate(mod, &kdesc, &kernel));
 
@@ -179,10 +178,8 @@ int main(int argc, char **argv) {
   std::printf("---------|--------------|----------------|--------------|--------------|-----------\n");
 
   for (int B : batch_sizes) {
-    // 1. Compute CPU reference for parity check
     cpu_gemm_reference(h_y_ref.data(), h_w_packed.data(), h_w_scale.data(), h_x.data(), M, K, B);
 
-    // 2. Setup kernel arguments
     CHECK(zeKernelSetArgumentValue(kernel, 0, sizeof(void *), &d_y));
     CHECK(zeKernelSetArgumentValue(kernel, 1, sizeof(void *), &d_w_packed));
     CHECK(zeKernelSetArgumentValue(kernel, 2, sizeof(void *), &d_w_scale));
@@ -191,22 +188,20 @@ int main(int argc, char **argv) {
     CHECK(zeKernelSetArgumentValue(kernel, 5, sizeof(int), &K));
     CHECK(zeKernelSetArgumentValue(kernel, 6, sizeof(int), &B));
 
+    // 256 threads per workgroup = 16 subgroups (each subgroup handles M_tile = 16 -> 256 rows per workgroup)
     CHECK(zeKernelSetGroupSize(kernel, 256, 1, 1));
     ze_group_count_t gcnt{(uint32_t)((M + 255) / 256), 1, 1};
 
-    // 3. Record command list
     ze_command_list_handle_t cmd_exec = nullptr;
     CHECK(zeCommandListCreate(ctx, dev, &ldesc, &cmd_exec));
     CHECK(zeCommandListAppendLaunchKernel(cmd_exec, kernel, &gcnt, nullptr, 0, nullptr));
     CHECK(zeCommandListClose(cmd_exec));
 
-    // 4. Warmup
     for (int w = 0; w < 5; ++w) {
       CHECK(zeCommandQueueExecuteCommandLists(queue, 1, &cmd_exec, nullptr));
       CHECK(zeCommandQueueSynchronize(queue, UINT64_MAX));
     }
 
-    // 5. Timed iterations
     const int ITERS = 50;
     auto t0 = std::chrono::steady_clock::now();
     for (int it = 0; it < ITERS; ++it) {
@@ -220,7 +215,6 @@ int main(int argc, char **argv) {
     if (B == 1) baseline_us = avg_us;
     double speedup = (baseline_us * B) / avg_us;
 
-    // 6. Check parity
     ze_command_list_handle_t cmd_read = nullptr;
     CHECK(zeCommandListCreate(ctx, dev, &ldesc, &cmd_read));
     CHECK(zeCommandListAppendMemoryCopy(cmd_read, h_y_dev.data(), d_y, (size_t)B * M * sizeof(float), nullptr, 0, nullptr));
@@ -235,7 +229,7 @@ int main(int argc, char **argv) {
       if (diff > max_diff) max_diff = diff;
     }
 
-    bool pass = (max_diff < 1e-4);
+    bool pass = (max_diff < 0.05f); // Half-precision accumulation tolerance vs FP32 ref
     std::printf("B = %-4d | %8.2f us  | %8.2f us/tok | %8.2fx     | %10.2e   | %s\n",
                 B, avg_us, lat_per_tok_us, speedup, max_diff, pass ? "PASS" : "FAIL");
 

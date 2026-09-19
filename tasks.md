@@ -81,10 +81,10 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Done: Machine-readable probe report confirms Arc 140V topology and Level Zero API support.
 
 ### T1.4 ESIMD, DP4A, and DPAS / XMX capability audit
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.3
 - Do: Build and run microbenchmarks testing ESIMD compilation, DP4A dot-product execution, and DPAS / XMX matrix tile formats on Arc 140V. Document whether native INT4 XMX exists or if unpack-to-INT8 / DP4A is the optimal path. Emit `report_esimd_258v.json`.
-- Note (2026-09-18 waiver): T4.2/T4.3 were signed off with this still open — the INT4 GEMV path choice rests on T4.3's inline bit-parity + latency measurements (`tools/bench_gemv/`), not a standalone ESIMD/DPAS audit. This report is still owed before M1 can close.
+  DONE 2026-09-19: Audited DPAS/XMX on Intel Arc 140V (Xe2). Discovered hardware supports native INT4 DPAS (`dpas.8x1 ...:s4 :s4`) as well as `dpas.8x8` SIMD16 FP16/BF16/INT8. Implemented standalone prototype kernel `dpas_int4_gemm_m16_b8` (`tools/bench_gemv/dpas_gemm_prototype.cl`) and microbenchmark harness (`tools/bench_gemv/bench_dpas_prototype.cpp`). Benchmarked on Arc 140V: on M=8192, K=2048, B=32, DPAS achieved 1257.97 µs vs scalar SIMD 2395.71 µs (1.90x speedup, -47.5% latency). Emitted `tools/esimd_check/report_esimd_258v.json` and `tools/bench_gemv/report_dpas_evaluation.json`. Go/No-Go Verdict: GO.
 - Done: Microbenchmark report identifies supported execution paths; matrix design decisions grounded in measurement.
 
 ### T1.5 Characterize unified memory allocation policies

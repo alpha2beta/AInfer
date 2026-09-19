@@ -110,7 +110,20 @@ def run_stress_test(base_url, total_requests=100, concurrency=2, server_pid=None
         print(f"  Server PID:        {server_pid}")
     print("-----------------------------------------------------------------")
 
-    # Initial telemetry
+    # Warmup request to stabilize Python interpreter thread structures and buffers
+    print("[Warmup] Sending single warmup request to stabilize interpreter heap...")
+    try:
+        warmup_req = urllib.request.Request(
+            f"{base_url}/v1/chat/completions",
+            data=json.dumps({"messages": [{"role": "user", "content": "Hello"}], "max_tokens": 4}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(warmup_req, timeout=15.0) as resp:
+            resp.read()
+    except Exception as e:
+        print(f"  Warmup request warning: {e}")
+
+    # Initial telemetry after interpreter stabilization
     initial_rss = get_process_rss_kb(server_pid) if server_pid else None
     if initial_rss:
         print(f"Initial Server RSS: {initial_rss} KB ({initial_rss / 1024.0:.2f} MB)")

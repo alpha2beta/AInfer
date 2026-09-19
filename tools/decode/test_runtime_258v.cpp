@@ -189,9 +189,94 @@ int main(int argc, char **argv) {
   std::printf("  Result: [%s]\n\n", pass_t56 ? "PASS" : "FAIL");
 
   // -------------------------------------------------------------------------
+  // TEST 5: T5.7 Multi-Chunk Long-Prompt Verification (P=128 & P=256)
+  // -------------------------------------------------------------------------
+  std::printf("[TEST 5/5] T5.7 Multi-Chunk Long-Prompt Verification (P=128 & P=256)...\n");
+
+  auto make_prompt = [&](int target_len) {
+    std::vector<int> p;
+    p.reserve(target_len);
+    while ((int)p.size() < target_len) {
+      for (int t : prompt) {
+        if ((int)p.size() < target_len) p.push_back(t);
+      }
+    }
+    return p;
+  };
+
+  // 1. Verify P=128 (4 chunks of 32)
+  std::vector<int> prompt128 = make_prompt(128);
+  runtime.reset_state();
+  int first_tok128_run1 = 0;
+  bool pref128_run1_ok = runtime.prefill(prompt128, &first_tok128_run1);
+  std::vector<int> seq128_run1 = {first_tok128_run1};
+  for (int i = 1; i < 8; ++i) {
+    int tok = 0;
+    runtime.decode_step(&tok);
+    seq128_run1.push_back(tok);
+  }
+  int pos128_end = runtime.get_current_position();
+
+  runtime.reset_state();
+  int first_tok128_run2 = 0;
+  bool pref128_run2_ok = runtime.prefill(prompt128, &first_tok128_run2);
+  std::vector<int> seq128_run2 = {first_tok128_run2};
+  for (int i = 1; i < 8; ++i) {
+    int tok = 0;
+    runtime.decode_step(&tok);
+    seq128_run2.push_back(tok);
+  }
+
+  bool pass_p128 = pref128_run1_ok && pref128_run2_ok &&
+                   (seq128_run1 == seq128_run2) &&
+                   (pos128_end == 128 + 6) &&
+                   (first_tok128_run1 > 0);
+
+  std::printf("  P=128 Prefill (4 chunks): Run 1 token=%d, Run 2 token=%d [%s]\n",
+              first_tok128_run1, first_tok128_run2, (seq128_run1 == seq128_run2) ? "MATCH" : "MISMATCH");
+  std::printf("  P=128 Pos Bookkeeping:    pos=%d (expected %d) [%s]\n",
+              pos128_end, 128 + 6, (pos128_end == 128 + 6) ? "OK" : "MISMATCH");
+
+  // 2. Verify P=256 (8 chunks of 32)
+  std::vector<int> prompt256 = make_prompt(256);
+  runtime.reset_state();
+  int first_tok256_run1 = 0;
+  bool pref256_run1_ok = runtime.prefill(prompt256, &first_tok256_run1);
+  std::vector<int> seq256_run1 = {first_tok256_run1};
+  for (int i = 1; i < 8; ++i) {
+    int tok = 0;
+    runtime.decode_step(&tok);
+    seq256_run1.push_back(tok);
+  }
+  int pos256_end = runtime.get_current_position();
+
+  runtime.reset_state();
+  int first_tok256_run2 = 0;
+  bool pref256_run2_ok = runtime.prefill(prompt256, &first_tok256_run2);
+  std::vector<int> seq256_run2 = {first_tok256_run2};
+  for (int i = 1; i < 8; ++i) {
+    int tok = 0;
+    runtime.decode_step(&tok);
+    seq256_run2.push_back(tok);
+  }
+
+  bool pass_p256 = pref256_run1_ok && pref256_run2_ok &&
+                   (seq256_run1 == seq256_run2) &&
+                   (pos256_end == 256 + 6) &&
+                   (first_tok256_run1 > 0);
+
+  std::printf("  P=256 Prefill (8 chunks): Run 1 token=%d, Run 2 token=%d [%s]\n",
+              first_tok256_run1, first_tok256_run2, (seq256_run1 == seq256_run2) ? "MATCH" : "MISMATCH");
+  std::printf("  P=256 Pos Bookkeeping:    pos=%d (expected %d) [%s]\n",
+              pos256_end, 256 + 6, (pos256_end == 256 + 6) ? "OK" : "MISMATCH");
+
+  bool pass_long_prompt = pass_p128 && pass_p256;
+  std::printf("  Result: [%s]\n\n", pass_long_prompt ? "PASS" : "FAIL");
+
+  // -------------------------------------------------------------------------
   // MILESTONE 4 GATE EVALUATION
   // -------------------------------------------------------------------------
-  bool all_passed = pass_t51 && pass_t52 && pass_t55 && pass_t56;
+  bool all_passed = pass_t51 && pass_t52 && pass_t55 && pass_t56 && pass_long_prompt;
 
   std::printf("=================================================================\n");
   std::printf("--- Phase Gate M4 Evaluation: %s ---\n", all_passed ? "PASSED" : "FAILED");
@@ -202,6 +287,7 @@ int main(int argc, char **argv) {
   std::printf("  T5.4 Zero-Reallocation Loop:   %s\n", pass_t52 ? "PASS" : "FAIL");
   std::printf("  T5.5 Diagnostic Cache:         %s\n", pass_t55 ? "PASS" : "FAIL");
   std::printf("  T5.6 Deterministic Reset:      %s\n", pass_t56 ? "PASS" : "FAIL");
+  std::printf("  T5.7 Long-Prompt Verification: %s\n", pass_long_prompt ? "PASS" : "FAIL");
   std::printf("=================================================================\n");
 
   // Emit report_phase5.json
@@ -234,7 +320,8 @@ int main(int argc, char **argv) {
   rpt << "    \"T5.3\": \"" << (pass_t52 ? "PASS" : "FAIL") << "\",\n";
   rpt << "    \"T5.4\": \"" << (pass_t52 ? "PASS" : "FAIL") << "\",\n";
   rpt << "    \"T5.5\": \"" << (pass_t55 ? "PASS" : "FAIL") << "\",\n";
-  rpt << "    \"T5.6\": \"" << (pass_t56 ? "PASS" : "FAIL") << "\"\n";
+  rpt << "    \"T5.6\": \"" << (pass_t56 ? "PASS" : "FAIL") << "\",\n";
+  rpt << "    \"T5.7\": \"" << (pass_long_prompt ? "PASS" : "FAIL") << "\"\n";
   rpt << "  }\n";
   rpt << "}\n";
   rpt.close();
