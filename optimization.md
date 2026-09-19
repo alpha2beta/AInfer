@@ -181,6 +181,67 @@ Controlled comparison run from `tools/bench_258v/run_llama_comparison_t75.py`:
 2. **Persistent HTTP Server (Phase 8):**
    - Persistent resident daemon (`server_258v.py` on port 8088) verified with resident 18.03 GiB model.
    - SSE chunked streaming (`/v1/chat/completions`) and full JSON responses verified with immediate client-side socket closure on stream completion (`data: [DONE]`).
-   - Abrupt client disconnect cancellation verified: state cleanly reset with zero device memory leak.
+    - Abrupt client disconnect cancellation verified: state cleanly reset with zero device memory leak.
+
+---
+
+## 6. External Reference: Intel Arc Pro B70 Inference Cookbook (transferable hints)
+
+**Source (reviewed 2026-09-19):** `SergiioB/intel-arc-pro-b70-inference-cookbook` — vLLM-XPU + llama.cpp-SYCL recipes on discrete Arc Pro B60/B70 (Battlemage, 32 GB VRAM, ~437 GB/s). Most relevant pages: the 35B-MoE vLLM-XPU recipe (MTP1/2/4 tables, 170.9 tok/s MTP4) and the fused multi-token `MUL_MAT_ID` MoE kernel write-up (+42% decode).
+
+**Applicability caveat:** absolute tok/s figures do **not** transfer to Arc 140V (shared 32 GB LPDDR5X, ~90–115 GB/s sustained). The techniques and methodology below do. Each item cites the AInfer task it attaches to.
+
+### 6.1 Fused multi-token MoE GEMV (follow-up to Pillar 2 / T4.2)
+- **Cookbook finding:** multi-row MoE verify batches fell into a counting-sort path (D2H expert-ID readback + host sort + grouped GEMM, ~144 ops/round) because the 3D tensor form hid behind a single-row fast-path gate. Fusing into one multi-token GEMV (M=2..8, gate-up + grouped down forms) cut verify-round cost 118→85 ms (**+42% decode**).
+- **AInfer status:** Pillar 2 already batches 8 experts per layer for single-token decode. The prefill-chunk path (Pillar 6, cached $B \in [1, 32]$) is the candidate: a fused M-token expert GEMV would remove per-row dispatch overhead across 8 experts × 40 layers.
+- **Action:** prototype fused M-token expert GEMV for prefill chunks, gated by an env kill-switch A/B (their `GGML_SYCL_MT_OFF=1` pattern) so acceptance stays measurable against the current path.
+
+### 6.2 On-device expert-ID grouping (corroborates T4.2 Strategy 3)
+- **Cookbook finding:** fused `MUL_MAT_ID` plus on-device expert-ID grouping exists precisely to avoid the D2H-readback path; grouping toggle is env-gated for A/B.
+- **AInfer status:** consistent with our Strategy 3 (Batched Device-Driven Dispatch, 4.84 µs/layer, zero host syncs). Direction confirmed — keep grouping device-side; no change required.
+
+### 6.3 MTP mode selection per context tier (extends T10.1)
+- **Cookbook finding:** MTP2 is the long-context sweet spot (85.8% accept @128K, 101.64 tok/s); MTP4 wins short responses (178.34 tok/s @p512/g32) but accept collapses to ~60% at 128K. Mixed long-prefill + short-request traffic should use no-spec.
+- **AInfer status:** T10.1 closed with dual-token ($B=2$) verification (51.36 tok/s @α=93.75%, break-even @α=39%).
+- **Action:** score wider draft/verify fan-out per context tier rather than one global gate. Fallback recorded: DFlash-style speculation (their Nemotron recipe hits 186 tok/s with zero native MTP) if MTP weights ever prove unusable.
+
+### 6.4 Prefill chunk-budget sweep (extends T5.2 / T7.2)
+- **Cookbook finding:** raising the token budget 8192→16384 gave **+17.6% prefill and +12.0% decode** at the same 128K recipe; ubatch sweet spots are non-monotonic per context (512 @8K, 3072 @16K, 1024 @128K). Prefill rate itself is essentially flat across context lengths.
+- **AInfer status:** cached chunk lists cover $B \in [1, 32]$; $B$ was never swept beyond 32.
+- **Action:** sweep cached chunk sizes beyond $B=32$ per context tier (T7.2 matrix), watching workspace-arena pressure (currently 64 MiB).
+
+### 6.5 Quantized KV precedent + RoPE ordering caution (corroborates T6.6)
+- **Cookbook finding:** `q8_0` K + `q4_1` V (llama.cpp) and FP8 KV (vLLM) ship in production recipes — INT8 KV is viable. But quantized KV required a rotation workaround upstream (`LLAMA_ATTN_ROT_DISABLE=1`, load/decode crash otherwise).
+- **AInfer status:** BF16 KV qualified as production default (only 640 MiB @32K; INT8 saves just 320 MiB). Decision stands.
+- **Action:** keep an explicit RoPE-before-vs-after-quantization ordering test in the attention suite so a future INT8-KV revival cannot regress silently.
+
+### 6.6 Phase-split math precision (follow-up to T4.4 / T4.5)
+- **Cookbook finding:** F16-math binary wins prefill (594 tok/s) while FP32-math wins decode (23.38 tok/s) — same weights, compile-time flag, two binaries served per phase.
+- **AInfer status:** FP32 SSM state already kept; GEMV/attention accumulation policy is currently uniform.
+- **Action:** A/B accumulator precision (FP16 vs FP32) separately for prefill vs decode kernels; adopt per-phase policy only on measured win with parity intact.
+
+### 6.7 Level Zero environment knobs (open T1.7)
+- **Cookbook finding:** `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`, `SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=0`, `SYCL_DEVICE_FILTER=level_zero`; graph capture (`VLLM_XPU_ENABLE_XPU_GRAPH=1`) is their equivalent of our recorded command lists — independent validation of the approach.
+- **Action:** add `ZE_FLAT_DEVICE_HIERARCHY` and immediate-vs-regular command-list A/B to the T1.7 dispatch profile before M1 closes.
+
+### 6.8 Benchmark discipline (extends T7.1)
+- **Cookbook finding:** n=5 medians after one discarded warmup, exact token counts, zero cache reuse, entropy-first cold prefixes, matched natural prompts (not filler), client monotonic SSE timing; prefill proxy explicitly labeled as including scheduling (not isolated engine prefill).
+- **AInfer status:** isolated timing fields already separate load/tokenize/prefill/decode (ahead here).
+- **Action:** codify discarded-warmup + cold-prefix rules in the harness driver so future numbers stay comparable.
+
+### 6.9 Power-cap sweeps (extends T7.4)
+- **Cookbook finding:** 150W eco vs 230W stock characterized via `power1_cap` hwmon; per-card draw and package thermals reported per cell.
+- **AInfer status:** 5.58-min steady-state run done (55.8°C settle, 97.0% retention) but no power-cap sweep.
+- **Action:** add PL1-cap sweep × perf/W table — the constraint matters more on Lunar Lake (17W PL1 / 37W PL2) than on B70.
+
+### 6.10 Watchdog and speculation hazards (extends T8.3 / T9.5)
+- **Cookbook finding:** Xe driver ring wedge (hung `/health`) recovered via `dmesg`-pattern detection + auto-restart watchdog. Separately: prefix-caching × MTP causes **silent** token corruption — they hard-disable prefix caching whenever MTP is on.
+- **Action (T8.3):** add `dmesg` ring-wedge pattern detection to health monitoring with restart policy.
+- **Recorded hazard (T9.5):** if prefix caching or speculation is ever added, the two must never be enabled together without a corruption battery.
+
+### 6.11 Mixed quantization by tensor class (follow-up to T3.3)
+- **Cookbook finding:** gate/up at IQ3_S with down at IQ4_NL (folder name not uniform) — per-class bit-width is normal practice.
+- **AInfer status:** shared `down_proj` shows the worst container error (max 0.0222).
+- **Action:** if quality ever needs it, promote just `down_proj` tensors to INT8; precedent exists, cost is bounded to one tensor class.
 
 

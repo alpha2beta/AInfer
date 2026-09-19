@@ -30,6 +30,27 @@ int ainfer_decode_step(void *handle, int *out_next_token) {
   return rt->decode_step(out_next_token) ? 0 : -1;
 }
 
+int ainfer_init_speculative(void *handle) {
+  if (!handle) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  return rt->init_speculative_verification() ? 0 : -1;
+}
+
+int ainfer_speculative_step(void *handle, int *out_tok1, int *out_tok2, int *out_num_emitted, int *out_accepted) {
+  if (!handle || !out_tok1 || !out_tok2 || !out_num_emitted || !out_accepted) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  bool acc = false;
+  bool ok = rt->speculative_step(out_tok1, out_tok2, out_num_emitted, &acc);
+  *out_accepted = acc ? 1 : 0;
+  return ok ? 0 : -1;
+}
+
+int ainfer_has_speculative(void *handle) {
+  if (!handle) return 0;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  return rt->has_speculative() ? 1 : 0;
+}
+
 int ainfer_reset_state(void *handle) {
   if (!handle) return -1;
   auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);

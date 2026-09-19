@@ -70,6 +70,18 @@ class AInferCtypesBinding:
         self.lib.ainfer_get_device_name.restype = ctypes.c_char_p
         self.lib.ainfer_get_total_memory_bytes.argtypes = [ctypes.c_void_p]
         self.lib.ainfer_get_total_memory_bytes.restype = ctypes.c_uint64
+        self.lib.ainfer_init_speculative.argtypes = [ctypes.c_void_p]
+        self.lib.ainfer_init_speculative.restype = ctypes.c_int
+        self.lib.ainfer_speculative_step.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.POINTER(ctypes.c_int),
+        ]
+        self.lib.ainfer_speculative_step.restype = ctypes.c_int
+        self.lib.ainfer_has_speculative.argtypes = [ctypes.c_void_p]
+        self.lib.ainfer_has_speculative.restype = ctypes.c_int
         self.lib.ainfer_destroy.argtypes = [ctypes.c_void_p]
 
         self.handle = self.lib.ainfer_create()
@@ -79,6 +91,12 @@ class AInferCtypesBinding:
     def init(self, model_file, spv_file, max_ctx=4096):
         rc = self.lib.ainfer_init(self.handle, model_file.encode(), spv_file.encode(), max_ctx)
         return rc == 0
+
+    def init_speculative(self):
+        return self.lib.ainfer_init_speculative(self.handle) == 0
+
+    def has_speculative(self):
+        return bool(self.lib.ainfer_has_speculative(self.handle))
 
     def prefill(self, prompt_ids):
         c_prompt = (ctypes.c_int * len(prompt_ids))(*prompt_ids)
@@ -94,6 +112,22 @@ class AInferCtypesBinding:
         if rc != 0:
             return None
         return out_next.value
+
+    def speculative_step(self):
+        t1 = ctypes.c_int(0)
+        t2 = ctypes.c_int(0)
+        nem = ctypes.c_int(0)
+        acc = ctypes.c_int(0)
+        rc = self.lib.ainfer_speculative_step(
+            self.handle,
+            ctypes.byref(t1),
+            ctypes.byref(t2),
+            ctypes.byref(nem),
+            ctypes.byref(acc),
+        )
+        if rc != 0:
+            return None
+        return (t1.value, t2.value, nem.value, bool(acc.value))
 
     def reset_state(self):
         return self.lib.ainfer_reset_state(self.handle) == 0
@@ -330,13 +364,27 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             if time.perf_counter() - t_start > timeout_s:
                 sys.stderr.write(f"[Server] Execution timeout ({timeout_s}s) exceeded for {req_id}\n")
                 break
-            nxt = STATE.binding.decode_step()
-            if nxt is None:
-                break
-            generated_ids.append(nxt)
-            # Break on EOS tokens (248044, 248046)
-            if nxt in (248044, 248046):
-                break
+            if STATE.binding.has_speculative():
+                res = STATE.binding.speculative_step()
+                if res is None:
+                    break
+                t1, t2, nem, _ = res
+                if nem >= 1:
+                    generated_ids.append(t1)
+                    if t1 in (248044, 248046) or len(generated_ids) >= max_tokens:
+                        break
+                if nem == 2:
+                    generated_ids.append(t2)
+                    if t2 in (248044, 248046) or len(generated_ids) >= max_tokens:
+                        break
+            else:
+                nxt = STATE.binding.decode_step()
+                if nxt is None:
+                    break
+                generated_ids.append(nxt)
+                # Break on EOS tokens (248044, 248046)
+                if nxt in (248044, 248046):
+                    break
 
         t_end = time.perf_counter()
         STATE.total_tokens_generated += len(generated_ids)
@@ -434,33 +482,51 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 sys.stderr.write(f"[Server] Stream timeout exceeded for {req_id}\n")
                 break
 
-            nxt = STATE.binding.decode_step()
-            if nxt is None:
-                break
-            cur_tok = nxt
-            gen_count += 1
-            STATE.total_tokens_generated += 1
-
-            if cur_tok in (248044, 248046):
-                break
-
-            chunk_text = tokenizer_tool.decode(STATE.tokenizer, [cur_tok], skip_special_tokens=False)
-            if is_chat:
-                send_sse_chunk({
-                    "id": req_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_time,
-                    "model": MODEL_ID,
-                    "choices": [{"index": 0, "delta": {"content": chunk_text}, "finish_reason": None}],
-                })
+            if STATE.binding.has_speculative():
+                res = STATE.binding.speculative_step()
+                if res is None:
+                    break
+                t1, t2, nem, _ = res
+                tokens_to_emit = [t1] if nem == 1 else [t1, t2]
             else:
-                send_sse_chunk({
-                    "id": req_id,
-                    "object": "text_completion.chunk",
-                    "created": created_time,
-                    "model": MODEL_ID,
-                    "choices": [{"index": 0, "text": chunk_text, "finish_reason": None}],
-                })
+                nxt = STATE.binding.decode_step()
+                if nxt is None:
+                    break
+                tokens_to_emit = [nxt]
+
+            stopped = False
+            for nxt in tokens_to_emit:
+                cur_tok = nxt
+                gen_count += 1
+                STATE.total_tokens_generated += 1
+
+                if cur_tok in (248044, 248046):
+                    stopped = True
+                    break
+
+                chunk_text = tokenizer_tool.decode(STATE.tokenizer, [cur_tok], skip_special_tokens=False)
+                if is_chat:
+                    send_sse_chunk({
+                        "id": req_id,
+                        "object": "chat.completion.chunk",
+                        "created": created_time,
+                        "model": MODEL_ID,
+                        "choices": [{"index": 0, "delta": {"content": chunk_text}, "finish_reason": None}],
+                    })
+                else:
+                    send_sse_chunk({
+                        "id": req_id,
+                        "object": "text_completion.chunk",
+                        "created": created_time,
+                        "model": MODEL_ID,
+                        "choices": [{"index": 0, "text": chunk_text, "finish_reason": None}],
+                    })
+                if gen_count >= max_tokens:
+                    stopped = True
+                    break
+
+            if stopped:
+                break
 
         # Emit terminal SSE chunk + [DONE]
         finish_reason = "stop" if cur_tok in (248044, 248046) else "length"
@@ -494,6 +560,7 @@ def main():
     parser.add_argument("--max-ctx", type=int, default=4096, help="Maximum context tokens (default: 4096)")
     parser.add_argument("--queue-size", type=int, default=16, help="Max waiting queue depth (default: 16)")
     parser.add_argument("--timeout", type=float, default=60.0, help="Execution timeout in seconds (default: 60)")
+    parser.add_argument("--speculative", action=argparse.BooleanOptionalAction, default=True, help="Enable dual-token MTP speculative decoding verification (default: True)")
     args = parser.parse_args()
 
     print("=================================================================")
@@ -502,6 +569,7 @@ def main():
     print(f"  Model Container:   {args.model}")
     print(f"  SPIR-V Module:     {args.spv}")
     print(f"  Max Context:       {args.max_ctx} tokens")
+    print(f"  Speculative Mode:  {'Enabled' if args.speculative else 'Disabled'}")
     print(f"  Queue Capacity:    {args.queue_size} concurrent requests")
     print(f"  Default Timeout:   {args.timeout} s")
     print(f"  Binding Address:   http://{args.host}:{args.port}")
@@ -522,6 +590,13 @@ def main():
     if not success:
         print("FATAL: Failed to initialize AInfer Level Zero runtime")
         sys.exit(1)
+
+    if args.speculative:
+        print("  Initializing MTP speculative verification engine (T10.1)...")
+        if STATE.binding.init_speculative():
+            print("  Speculative verification: ENABLED (Dual-token verification active)")
+        else:
+            print("  WARNING: Failed to initialize speculative verification; falling back to autoregressive decode")
 
     print(f"  Device:            {STATE.binding.get_device_name()}")
     print(f"  Resident Memory:   {STATE.binding.get_total_memory_gib():.2f} GiB")

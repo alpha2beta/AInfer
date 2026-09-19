@@ -240,6 +240,7 @@ public:
   // Performance profiling breakdown
   bool profile_step_breakdown(double &embed_ms, double &layers_ms, double &tail_ms,
                               double &step_ms, std::vector<double> &layer_times_ms);
+  bool profile_prefill_breakdown(int B);
 
   // T5.5: Save / restore offline diagnostic cache
   bool export_diagnostic_cache(const std::string &cache_file, uint32_t pos);
@@ -263,10 +264,17 @@ public:
     return (zeDeviceGetStatus(dev_) == ZE_RESULT_SUCCESS);
   }
 
-  // T10.1: Multi-Token Prediction (MTP) Speculative Drafting
+  // T10.1: Multi-Token Prediction (MTP) Speculative Drafting & Verification
   bool init_mtp();
   bool mtp_draft_step(int *out_draft_token, double *out_latency_us = nullptr);
   bool has_mtp() const { return mtp_.initialized; }
+
+  bool init_speculative_verification();
+  bool speculative_step(int *out_tok1, int *out_tok2, int *out_num_emitted, bool *out_accepted, double *out_round_us = nullptr);
+  bool generate_speculative(const std::vector<int> &prompt_ids, int max_new_tokens,
+                            std::vector<int> &generated_ids, double *out_prefill_ms = nullptr,
+                            double *out_spec_tok_per_s = nullptr, double *out_acceptance_rate = nullptr);
+  bool has_speculative() const { return verify_initialized_; }
 
 private:
   static uint32_t crc32_compute(uint32_t crc, const uint8_t *p, size_t n) {
@@ -414,7 +422,7 @@ private:
   std::vector<ze_command_list_handle_t> all_step_lists_; // embed + 40 layers + tail
 
   // Chunked Prefill Acceleration (T3.1 / T5.2)
-  static constexpr int MAX_PREFILL_CHUNK = 32;
+  static constexpr int MAX_PREFILL_CHUNK = 256;
 
   float *d_x_chunk_ = nullptr;            // [32, 2048]
   float *d_x_norm_chunk_ = nullptr;       // [32, 2048]
@@ -451,8 +459,13 @@ private:
 
   float *d_exp_gu_chunk_ = nullptr;      // [32, 8, 1024]
   float *d_exp_act_chunk_ = nullptr;     // [32, 8, 512]
+  float *d_exp_down_chunk_ = nullptr;    // [MAX_PREFILL_CHUNK, 8, 2048]
   float *d_moe_acc_chunk_ = nullptr;     // [32, 2048]
   int *d_tokens_chunk_ = nullptr;        // [32] shared memory
+  int *d_expert_counts_ = nullptr;       // [256]
+  int *d_expert_offsets_ = nullptr;      // [256]
+  int *d_sorted_tokens_ = nullptr;       // [MAX_PREFILL_CHUNK * 8]
+  int *d_sorted_slots_ = nullptr;        // [MAX_PREFILL_CHUNK * 8]
 
   // Batch Kernel Handles
   ze_kernel_handle_t k_gemm_prefill_ = nullptr;
@@ -467,6 +480,10 @@ private:
   ze_kernel_handle_t k_rope_batch_ = nullptr;
   ze_kernel_handle_t k_attn_batch_ = nullptr;
   ze_kernel_handle_t k_router_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_build_expert_bins_ = nullptr;
+  ze_kernel_handle_t k_moe_gateup_grouped_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_down_grouped_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_accum_down_batch_ = nullptr;
   ze_kernel_handle_t k_exp_gu_all_batch_ = nullptr;
   ze_kernel_handle_t k_silu_all_batch_ = nullptr;
   ze_kernel_handle_t k_exp_dn_accum_all_batch_ = nullptr;
@@ -485,6 +502,24 @@ private:
   MtpBinding mtp_{};
   ze_kernel_handle_t k_concat2_ = nullptr;
   ze_kernel_handle_t k_argmax2_mtp_ = nullptr;
+
+  // Speculative Verification (T10.1 Dual-Token Verification)
+  bool verify_initialized_ = false;
+  int pending_draft_token_ = -1;
+
+  void *d_conv_snap_ = nullptr;        // [30 * 8192 * 3 * sizeof(float)]
+  void *d_ssm_snap_ = nullptr;         // [30 * 32 * 128 * 128 * sizeof(float)]
+  float *d_stage1_vals_1_ = nullptr;   // [1024]
+  uint32_t *d_stage1_idxs_1_ = nullptr;// [1024]
+  int *d_verify_tokens_ = nullptr;     // [2] USM shared
+
+  ze_kernel_handle_t k_conv_m2_spec_ = nullptr;
+  ze_kernel_handle_t k_recr_m2_spec_ = nullptr;
+  ze_kernel_handle_t k_lm_head_m2_argmax1_ = nullptr;
+  ze_kernel_handle_t k_gemv_m2_ = nullptr;
+
+  ze_command_list_handle_t cmd_verify_m2_ = nullptr;
+  ze_command_list_handle_t cmd_rollback_ = nullptr;
 };
 
 } // namespace ainfer

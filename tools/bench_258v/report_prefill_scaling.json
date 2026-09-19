@@ -3,39 +3,39 @@
   "results": [
     {
       "prompt_tokens": 8,
-      "prefill_latency_ms": 99.3275,
-      "prefill_tok_per_s": 80.5417,
-      "ms_per_tok": 12.4159
+      "prefill_latency_ms": 114.3,
+      "prefill_tok_per_s": 69.9914,
+      "ms_per_tok": 14.2875
     },
     {
       "prompt_tokens": 16,
-      "prefill_latency_ms": 183.392,
-      "prefill_tok_per_s": 87.2446,
-      "ms_per_tok": 11.462
+      "prefill_latency_ms": 145.328,
+      "prefill_tok_per_s": 110.096,
+      "ms_per_tok": 9.08302
     },
     {
       "prompt_tokens": 32,
-      "prefill_latency_ms": 356.634,
-      "prefill_tok_per_s": 89.7278,
-      "ms_per_tok": 11.1448
+      "prefill_latency_ms": 197.151,
+      "prefill_tok_per_s": 162.312,
+      "ms_per_tok": 6.16098
     },
     {
       "prompt_tokens": 64,
-      "prefill_latency_ms": 721.302,
-      "prefill_tok_per_s": 88.7284,
-      "ms_per_tok": 11.2703
+      "prefill_latency_ms": 295.921,
+      "prefill_tok_per_s": 216.274,
+      "ms_per_tok": 4.62376
     },
     {
       "prompt_tokens": 128,
-      "prefill_latency_ms": 1459.73,
-      "prefill_tok_per_s": 87.6877,
-      "ms_per_tok": 11.4041
+      "prefill_latency_ms": 465.862,
+      "prefill_tok_per_s": 274.76,
+      "ms_per_tok": 3.63955
     },
     {
       "prompt_tokens": 256,
-      "prefill_latency_ms": 2976.12,
-      "prefill_tok_per_s": 86.018,
-      "ms_per_tok": 11.6255
+      "prefill_latency_ms": 856.066,
+      "prefill_tok_per_s": 299.042,
+      "ms_per_tok": 3.34401
     }
   ]
 }

@@ -148,6 +148,149 @@ __kernel void int4_gemv_m1(
 }
 
 // =========================================================================
+// 1a. INT4 Symmetric Group-128 Dual-Token GEMV (Speculative Verification)
+// Evaluates 2 tokens simultaneously in registers with a single pass over weights.
+// =========================================================================
+__kernel void int4_gemv_m2(
+    __global float * restrict y,              // [2, M] row-major: y[0 * M + m], y[1 * M + m]
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict x,        // [2, K] row-major: x[0 * K + k], x[1 * K + k]
+    int M,
+    int K
+) {
+    int m = get_global_id(0);
+    if (m >= M) return;
+
+    int num_groups = K / GROUP_SIZE;
+    __global const uchar *row_w = w_packed + (size_t)m * (K / 2);
+    __global const ushort *row_s = w_scale + (size_t)m * num_groups;
+
+    float total_sum0 = 0.0f;
+    float total_sum1 = 0.0f;
+
+    for (int g = 0; g < num_groups; ++g) {
+        float scale = bf16_to_fp32(row_s[g]);
+        __global const uchar *grp_w = row_w + g * (GROUP_SIZE / 2);
+        __global const float *grp_x0 = x + g * GROUP_SIZE;
+        __global const float *grp_x1 = x + (size_t)K + g * GROUP_SIZE;
+
+        // GROUP_SIZE = 128 elements = 64 bytes of packed weights
+        // Read as 4 x uchar16 (16 bytes = 32 weights per vector load)
+        __global const uchar16 *w_vec16 = (__global const uchar16 *)grp_w;
+        __global const float8 *x0_vec8 = (__global const float8 *)grp_x0;
+        __global const float8 *x1_vec8 = (__global const float8 *)grp_x1;
+
+        float acc0_0 = 0.0f;
+        float acc1_0 = 0.0f;
+        float acc0_1 = 0.0f;
+        float acc1_1 = 0.0f;
+
+        #pragma unroll
+        for (int v = 0; v < 4; ++v) {
+            uchar16 wb = w_vec16[v];
+
+            // 32 weights = 4 float8 chunks
+            float8 x0_0 = x0_vec8[v * 4 + 0];
+            float8 x1_0 = x0_vec8[v * 4 + 1];
+            float8 x2_0 = x0_vec8[v * 4 + 2];
+            float8 x3_0 = x0_vec8[v * 4 + 3];
+
+            float8 x0_1 = x1_vec8[v * 4 + 0];
+            float8 x1_1 = x1_vec8[v * 4 + 1];
+            float8 x2_1 = x1_vec8[v * 4 + 2];
+            float8 x3_1 = x1_vec8[v * 4 + 3];
+
+            // Byte 0..3 -> 8 weights for x0
+            int n0  = (int)((char)(wb.s0 << 4)) >> 4;
+            int n1  = (int)((char)wb.s0) >> 4;
+            int n2  = (int)((char)(wb.s1 << 4)) >> 4;
+            int n3  = (int)((char)wb.s1) >> 4;
+            int n4  = (int)((char)(wb.s2 << 4)) >> 4;
+            int n5  = (int)((char)wb.s2) >> 4;
+            int n6  = (int)((char)(wb.s3 << 4)) >> 4;
+            int n7  = (int)((char)wb.s3) >> 4;
+
+            acc0_0 += (float)n0 * x0_0.s0 + (float)n1 * x0_0.s1
+                    + (float)n2 * x0_0.s2 + (float)n3 * x0_0.s3
+                    + (float)n4 * x0_0.s4 + (float)n5 * x0_0.s5
+                    + (float)n6 * x0_0.s6 + (float)n7 * x0_0.s7;
+
+            acc0_1 += (float)n0 * x0_1.s0 + (float)n1 * x0_1.s1
+                    + (float)n2 * x0_1.s2 + (float)n3 * x0_1.s3
+                    + (float)n4 * x0_1.s4 + (float)n5 * x0_1.s5
+                    + (float)n6 * x0_1.s6 + (float)n7 * x0_1.s7;
+
+            // Byte 4..7 -> 8 weights for x1
+            int n8  = (int)((char)(wb.s4 << 4)) >> 4;
+            int n9  = (int)((char)wb.s4) >> 4;
+            int n10 = (int)((char)(wb.s5 << 4)) >> 4;
+            int n11 = (int)((char)wb.s5) >> 4;
+            int n12 = (int)((char)(wb.s6 << 4)) >> 4;
+            int n13 = (int)((char)wb.s6) >> 4;
+            int n14 = (int)((char)(wb.s7 << 4)) >> 4;
+            int n15 = (int)((char)wb.s7) >> 4;
+
+            acc1_0 += (float)n8  * x1_0.s0 + (float)n9  * x1_0.s1
+                    + (float)n10 * x1_0.s2 + (float)n11 * x1_0.s3
+                    + (float)n12 * x1_0.s4 + (float)n13 * x1_0.s5
+                    + (float)n14 * x1_0.s6 + (float)n15 * x1_0.s7;
+
+            acc1_1 += (float)n8  * x1_1.s0 + (float)n9  * x1_1.s1
+                    + (float)n10 * x1_1.s2 + (float)n11 * x1_1.s3
+                    + (float)n12 * x1_1.s4 + (float)n13 * x1_1.s5
+                    + (float)n14 * x1_1.s6 + (float)n15 * x1_1.s7;
+
+            // Byte 8..11 -> 8 weights for x2
+            int n16 = (int)((char)(wb.s8 << 4)) >> 4;
+            int n17 = (int)((char)wb.s8) >> 4;
+            int n18 = (int)((char)(wb.s9 << 4)) >> 4;
+            int n19 = (int)((char)wb.s9) >> 4;
+            int n20 = (int)((char)(wb.sa << 4)) >> 4;
+            int n21 = (int)((char)wb.sa) >> 4;
+            int n22 = (int)((char)(wb.sb << 4)) >> 4;
+            int n23 = (int)((char)wb.sb) >> 4;
+
+            acc0_0 += (float)n16 * x2_0.s0 + (float)n17 * x2_0.s1
+                    + (float)n18 * x2_0.s2 + (float)n19 * x2_0.s3
+                    + (float)n20 * x2_0.s4 + (float)n21 * x2_0.s5
+                    + (float)n22 * x2_0.s6 + (float)n23 * x2_0.s7;
+
+            acc0_1 += (float)n16 * x2_1.s0 + (float)n17 * x2_1.s1
+                    + (float)n18 * x2_1.s2 + (float)n19 * x2_1.s3
+                    + (float)n20 * x2_1.s4 + (float)n21 * x2_1.s5
+                    + (float)n22 * x2_1.s6 + (float)n23 * x2_1.s7;
+
+            // Byte 12..15 -> 8 weights for x3
+            int n24 = (int)((char)(wb.sc << 4)) >> 4;
+            int n25 = (int)((char)wb.sc) >> 4;
+            int n26 = (int)((char)(wb.sd << 4)) >> 4;
+            int n27 = (int)((char)wb.sd) >> 4;
+            int n28 = (int)((char)(wb.se << 4)) >> 4;
+            int n29 = (int)((char)wb.se) >> 4;
+            int n30 = (int)((char)(wb.sf << 4)) >> 4;
+            int n31 = (int)((char)wb.sf) >> 4;
+
+            acc1_0 += (float)n24 * x3_0.s0 + (float)n25 * x3_0.s1
+                    + (float)n26 * x3_0.s2 + (float)n27 * x3_0.s3
+                    + (float)n28 * x3_0.s4 + (float)n29 * x3_0.s5
+                    + (float)n30 * x3_0.s6 + (float)n31 * x3_0.s7;
+
+            acc1_1 += (float)n24 * x3_1.s0 + (float)n25 * x3_1.s1
+                    + (float)n26 * x3_1.s2 + (float)n27 * x3_1.s3
+                    + (float)n28 * x3_1.s4 + (float)n29 * x3_1.s5
+                    + (float)n30 * x3_1.s6 + (float)n31 * x3_1.s7;
+        }
+
+        total_sum0 += (acc0_0 + acc1_0) * scale;
+        total_sum1 += (acc0_1 + acc1_1) * scale;
+    }
+
+    y[m] = total_sum0;
+    y[(size_t)M + m] = total_sum1;
+}
+
+// =========================================================================
 // 1b. INT4 Symmetric Group-128 Batched Prefill GEMM (DPAS Systolic Xe2)
 // =========================================================================
 __attribute__((intel_reqd_sub_group_size(16)))
@@ -162,13 +305,14 @@ __kernel void int4_gemm_prefill(
 ) {
     int sg_id = get_sub_group_id();
     int num_sg = get_num_sub_groups();
-    int grp_id = get_group_id(0);
+    int grp_m = get_group_id(0);
+    int grp_b = get_group_id(1);
     int lid = get_sub_group_local_id(); // 0..15
 
     // Each subgroup computes an M_tile of 16 output channels
-    int m_tile_idx = grp_id * num_sg + sg_id;
+    int m_tile_idx = grp_m * num_sg + sg_id;
     int m_base = m_tile_idx * 16;
-    if (m_base >= M) return;
+    if (grp_m * 128 >= M) return;
 
     int m = m_base + lid;
     int safe_m = (m < M) ? m : 0;
@@ -177,63 +321,132 @@ __kernel void int4_gemm_prefill(
     __global const uchar *row_w = w_packed + (size_t)safe_m * (K / 2);
     __global const ushort *row_s = w_scale + (size_t)safe_m * num_groups;
 
-    // Loop over batch tiles of size 8
-    for (int b_base = 0; b_base < B; b_base += 8) {
-        int cur_B = (B - b_base < 8) ? (B - b_base) : 8;
+    int b_base = grp_b * 32;
+    if (b_base >= B) return;
 
-        float8 acc = (float8)(0.0f);
+    int cur_B0 = (B - b_base > 0) ? min(8, B - b_base) : 0;
+    int cur_B1 = (B - (b_base + 8) > 0) ? min(8, B - (b_base + 8)) : 0;
+    int cur_B2 = (B - (b_base + 16) > 0) ? min(8, B - (b_base + 16)) : 0;
+    int cur_B3 = (B - (b_base + 24) > 0) ? min(8, B - (b_base + 24)) : 0;
 
-        for (int g = 0; g < num_groups; ++g) {
-            float s_val = bf16_to_fp32(row_s[g]);
-            half s_half = (half)s_val;
+    float8 acc0 = (float8)(0.0f);
+    float8 acc1 = (float8)(0.0f);
+    float8 acc2 = (float8)(0.0f);
+    float8 acc3 = (float8)(0.0f);
 
-            __global const uchar *grp_w = row_w + g * (GROUP_SIZE / 2);
+    int tid = get_local_id(0); // 0..127
+    int tok_idx = tid / 4;      // 0..31
+    int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+    int b_curr = b_base + tok_idx;
 
-            // In group-128, there are 8 steps of K=16
-            for (int step = 0; step < 8; ++step) {
-                int k_base = g * GROUP_SIZE + step * 16;
+    __local half s_x[2][32][16];
 
-                // 1. Thread lid loads 16 weights (8 bytes) for its row safe_m
-                __global const uchar *w_ptr = grp_w + step * 8;
-                uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+    int total_steps = num_groups * 8; // (K / 128) * 8
 
-                // Unpack 16 nibbles to 16 halves and scale
-                half w_deq[16];
-                #pragma unroll
-                for (int i = 0; i < 8; ++i) {
-                    uchar byte_val = ((uchar *)&raw_w)[i];
-                    int n0 = (int)((char)(byte_val << 4)) >> 4;
-                    int n1 = (int)((char)byte_val) >> 4;
-                    w_deq[2 * i]     = (half)((float)n0) * s_half;
-                    w_deq[2 * i + 1] = (half)((float)n1) * s_half;
-                }
+    // Prefetch step 0 into s_x[0]
+    float4 xv0 = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + k_sub) : (float4)(0.0f);
+    s_x[0][tok_idx][k_sub + 0] = (half)xv0.x;
+    s_x[0][tok_idx][k_sub + 1] = (half)xv0.y;
+    s_x[0][tok_idx][k_sub + 2] = (half)xv0.z;
+    s_x[0][tok_idx][k_sub + 3] = (half)xv0.w;
+    barrier(CLK_LOCAL_MEM_FENCE);
 
-                int8 b_mat;
-                __builtin_memcpy(&b_mat, w_deq, 32);
+    for (int s = 0; s < total_steps; ++s) {
+        int cur_buf = s & 1;
+        int next_buf = (s + 1) & 1;
+        int g = s / 8;
 
-                // 2. Load activation slice for each batch row
-                short8 a_mat = (short8)(0);
-                #pragma unroll
-                for (int bi = 0; bi < 8; ++bi) {
-                    if (bi < cur_B) {
-                        float x_val = X[(size_t)(b_base + bi) * K + k_base + lid];
-                        half x_half = (half)x_val;
-                        ((short *)&a_mat)[bi] = as_short(x_half);
-                    }
-                }
-
-                // 3. Hardware DPAS operation (8x16x16 with FP32 accumulation)
-                acc = intel_sub_group_f16_f16_matrix_mad_k16(a_mat, b_mat, acc);
-            }
+        // Asynchronously prefetch step s + 1 into s_x[next_buf]
+        if (s + 1 < total_steps) {
+            int next_k = (s + 1) * 16;
+            float4 xv_next = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + next_k + k_sub) : (float4)(0.0f);
+            s_x[next_buf][tok_idx][k_sub + 0] = (half)xv_next.x;
+            s_x[next_buf][tok_idx][k_sub + 1] = (half)xv_next.y;
+            s_x[next_buf][tok_idx][k_sub + 2] = (half)xv_next.z;
+            s_x[next_buf][tok_idx][k_sub + 3] = (half)xv_next.w;
         }
 
-        // Store outputs: thread lid writes output channel m = m_base + lid for each batch row
-        if (m < M) {
+        // 1. Thread lid loads 16 weights (8 bytes) for its row safe_m ONCE
+        float s_val = bf16_to_fp32(row_s[g]);
+        half s_half = (half)s_val;
+
+        __global const uchar *w_ptr = row_w + (size_t)s * 8;
+        uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+        // Unpack 16 nibbles to 16 halves and scale ONCE
+        half w_deq[16];
+        #pragma unroll
+        for (int i = 0; i < 8; ++i) {
+            uchar byte_val = ((uchar *)&raw_w)[i];
+            int n0 = (int)((char)(byte_val << 4)) >> 4;
+            int n1 = (int)((char)byte_val) >> 4;
+            w_deq[2 * i]     = (half)((float)n0) * s_half;
+            w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+        }
+
+        int8 b_mat;
+        __builtin_memcpy(&b_mat, w_deq, 32);
+
+        // 2. Load activation slices from SLM and issue DPAS
+        short8 a_mat0 = (short8)(0);
+        #pragma unroll
+        for (int bi = 0; bi < 8; ++bi) {
+            if (bi < cur_B0) ((short *)&a_mat0)[bi] = as_short(s_x[cur_buf][bi][lid]);
+        }
+        acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+        if (cur_B1 > 0) {
+            short8 a_mat1 = (short8)(0);
             #pragma unroll
             for (int bi = 0; bi < 8; ++bi) {
-                if (bi < cur_B) {
-                    Y[(size_t)(b_base + bi) * M + m] = ((float *)&acc)[bi];
-                }
+                if (bi < cur_B1) ((short *)&a_mat1)[bi] = as_short(s_x[cur_buf][8 + bi][lid]);
+            }
+            acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+        }
+
+        if (cur_B2 > 0) {
+            short8 a_mat2 = (short8)(0);
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B2) ((short *)&a_mat2)[bi] = as_short(s_x[cur_buf][16 + bi][lid]);
+            }
+            acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+        }
+
+        if (cur_B3 > 0) {
+            short8 a_mat3 = (short8)(0);
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B3) ((short *)&a_mat3)[bi] = as_short(s_x[cur_buf][24 + bi][lid]);
+            }
+            acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // Store outputs: thread lid writes output channel m = m_base + lid for each batch row
+    if (m < M) {
+        #pragma unroll
+        for (int bi = 0; bi < 8; ++bi) {
+            if (bi < cur_B0) Y[(size_t)(b_base + bi) * M + m] = ((float *)&acc0)[bi];
+        }
+        if (cur_B1 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B1) Y[(size_t)(b_base + 8 + bi) * M + m] = ((float *)&acc1)[bi];
+            }
+        }
+        if (cur_B2 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B2) Y[(size_t)(b_base + 16 + bi) * M + m] = ((float *)&acc2)[bi];
+            }
+        }
+        if (cur_B3 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B3) Y[(size_t)(b_base + 24 + bi) * M + m] = ((float *)&acc3)[bi];
             }
         }
     }
@@ -1974,38 +2187,62 @@ __kernel void deltanet_recurrent_batch(
     if (h >= H_V) return;
     int j = get_local_id(0);
 
-    __local float s_q[S_V];
-    __local float s_k[S_V];
+    __local float s_q[2][S_V];
+    __local float s_k[2][S_V];
 
     int kh = h / 2;
     __global float * S_h = state + (size_t)h * (S_V * S_V);
 
+    // Load entire column j of state matrix into private registers once
+    float s_col[S_V];
+    #pragma unroll 4
+    for (int i = 0; i < S_V; ++i) {
+        s_col[i] = S_h[i * S_V + j];
+    }
+
+    // Prefetch token 0
+    s_q[0][j] = q[kh * S_V + j];
+    s_k[0][j] = k[kh * S_V + j];
+    barrier(CLK_LOCAL_MEM_FENCE);
+
     for (int b = 0; b < B; ++b) {
-        s_q[j] = q[(size_t)b * (H_K * S_V) + kh * S_V + j];
-        s_k[j] = k[(size_t)b * (H_K * S_V) + kh * S_V + j];
-        barrier(CLK_LOCAL_MEM_FENCE);
+        int buf_cur = b & 1;
+        int buf_next = (b + 1) & 1;
 
         float v_val = v[(size_t)b * C_QKV + 4096 + h * S_V + j];
         float g_val = g[(size_t)b * H_V + h];
         float b_val = beta[(size_t)b * H_V + h];
 
         float kv_acc = 0.0f;
+        #pragma unroll 4
         for (int i = 0; i < S_V; ++i) {
-            kv_acc += S_h[i * S_V + j] * s_k[i];
+            kv_acc += s_col[i] * s_k[buf_cur][i];
         }
         float kv_j = kv_acc * g_val;
         float delta_j = (v_val - kv_j) * b_val;
 
         float o_acc = 0.0f;
+        #pragma unroll 4
         for (int i = 0; i < S_V; ++i) {
-            float s_old = S_h[i * S_V + j];
-            float s_new = g_val * s_old + s_k[i] * delta_j;
-            S_h[i * S_V + j] = s_new;
-            o_acc += s_new * s_q[i];
+            float s_old = s_col[i];
+            float s_new = g_val * s_old + s_k[buf_cur][i] * delta_j;
+            s_col[i] = s_new;
+            o_acc += s_new * s_q[buf_cur][i];
         }
 
         out[(size_t)b * (H_V * S_V) + h * S_V + j] = o_acc * SCALE_128;
+
+        if (b + 1 < B) {
+            s_q[buf_next][j] = q[(size_t)(b + 1) * (H_K * S_V) + kh * S_V + j];
+            s_k[buf_next][j] = k[(size_t)(b + 1) * (H_K * S_V) + kh * S_V + j];
+        }
         barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // Write final accumulated state back to global memory once
+    #pragma unroll 4
+    for (int i = 0; i < S_V; ++i) {
+        S_h[i * S_V + j] = s_col[i];
     }
 }
 
@@ -2322,6 +2559,235 @@ __kernel void moe_topk_router_batch(
     }
 }
 
+__kernel void moe_build_expert_bins(
+    __global int * restrict expert_counts,    // [256]
+    __global int * restrict expert_offsets,   // [256]
+    __global int * restrict sorted_tokens,    // [B * 8]
+    __global int * restrict sorted_slots,     // [B * 8]
+    __global const uint * restrict top_idx,   // [B * 8]
+    int B
+) {
+    int lid = get_local_id(0); // 0..255 (1 workgroup of 256 threads)
+    if (get_group_id(0) > 0) return;
+
+    __local int local_counts[256];
+    __local int local_offsets[256];
+
+    // 1. Thread lid counts how many times expert lid appears across all (b, k)
+    int total_items = B * 8;
+    int count = 0;
+    for (int idx = 0; idx < total_items; ++idx) {
+        if (top_idx[idx] == (uint)lid) {
+            count++;
+        }
+    }
+    local_counts[lid] = count;
+    expert_counts[lid] = count;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // 2. Parallel prefix sum (exclusive scan) in local memory
+    int my_val = count;
+    local_offsets[lid] = my_val;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int offset = 1; offset < 256; offset <<= 1) {
+        int temp = 0;
+        if (lid >= offset) {
+            temp = local_offsets[lid - offset];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        local_offsets[lid] += temp;
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    int exclusive_offset = (lid == 0) ? 0 : local_offsets[lid - 1];
+    expert_offsets[lid] = exclusive_offset;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // 3. Scatter token and slot indices into sorted order
+    int cur = exclusive_offset;
+    for (int idx = 0; idx < total_items; ++idx) {
+        if (top_idx[idx] == (uint)lid) {
+            sorted_tokens[cur] = idx / 8;
+            sorted_slots[cur] = idx % 8;
+            cur++;
+        }
+    }
+}
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void moe_gateup_grouped_batch(
+    __global float * restrict all_gu,
+    __global const uchar * restrict w_bank,
+    __global const ushort * restrict s_bank,
+    __global const float * restrict x,
+    __global const int * restrict expert_counts,
+    __global const int * restrict expert_offsets,
+    __global const int * restrict sorted_tokens,
+    __global const int * restrict sorted_slots,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_id = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    __local half s_x[2][32][16];
+    __local int s_tok[32];
+    __local int s_slot[32];
+
+    // Total workgroups = 256 experts * 8 workgroups = 2048 workgroups (128 threads/group)
+    int expert_id = grp_id / 8;
+    if (expert_id >= NUM_EXPERTS) return;
+
+    int num_tokens = expert_counts[expert_id];
+    if (num_tokens <= 0) return;
+
+    int chunk_m = grp_id % 8;
+    int m_tile_idx = chunk_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (m_base >= 1024) return;
+
+    int m = m_base + lid;
+    size_t row_idx = (size_t)expert_id * 1024 + m;
+    int num_groups = K / GROUP_SIZE; // 16 for K=2048
+
+    __global const uchar *row_w = w_bank + row_idx * (K / 2);
+    __global const ushort *row_s = s_bank + row_idx * num_groups;
+    int start_idx = expert_offsets[expert_id];
+
+    // Loop over tokens routed to this expert in macro-tiles of 32 (4 systolic DPAS tiles of 8)
+    for (int t_base = 0; t_base < num_tokens; t_base += 32) {
+        int cur_T0 = (num_tokens - t_base > 0) ? min(8, num_tokens - t_base) : 0;
+        int cur_T1 = (num_tokens - (t_base + 8) > 0) ? min(8, num_tokens - (t_base + 8)) : 0;
+        int cur_T2 = (num_tokens - (t_base + 16) > 0) ? min(8, num_tokens - (t_base + 16)) : 0;
+        int cur_T3 = (num_tokens - (t_base + 24) > 0) ? min(8, num_tokens - (t_base + 24)) : 0;
+        int total_cur_T = cur_T0 + cur_T1 + cur_T2 + cur_T3;
+
+        float8 acc0 = (float8)(0.0f);
+        float8 acc1 = (float8)(0.0f);
+        float8 acc2 = (float8)(0.0f);
+        float8 acc3 = (float8)(0.0f);
+
+        int tid = get_local_id(0); // 0..127
+        int tok_idx = tid / 4;      // 0..31
+        int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+        bool valid_tok = (tok_idx < total_cur_T);
+
+        int b_tok = valid_tok ? sorted_tokens[start_idx + t_base + tok_idx] : 0;
+
+        if (tid < 32) {
+            s_tok[tid]  = (tid < total_cur_T) ? sorted_tokens[start_idx + t_base + tid] : 0;
+            s_slot[tid] = (tid < total_cur_T) ? sorted_slots[start_idx + t_base + tid] : 0;
+        }
+
+        int total_steps = num_groups * 8; // (K / 128) * 8
+
+        // Prefetch step 0 into s_x[0] using 128-bit aligned float4 vector loads
+        float4 xv0 = valid_tok ? vload4(0, x + (size_t)b_tok * K + k_sub) : (float4)(0.0f);
+        s_x[0][tok_idx][k_sub + 0] = (half)xv0.x;
+        s_x[0][tok_idx][k_sub + 1] = (half)xv0.y;
+        s_x[0][tok_idx][k_sub + 2] = (half)xv0.z;
+        s_x[0][tok_idx][k_sub + 3] = (half)xv0.w;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int s = 0; s < total_steps; ++s) {
+            int cur_buf = s & 1;
+            int next_buf = (s + 1) & 1;
+            int g = s / 8;
+
+            // Asynchronously prefetch step s + 1
+            if (s + 1 < total_steps) {
+                int next_k = (s + 1) * 16;
+                float4 xv_next = valid_tok ? vload4(0, x + (size_t)b_tok * K + next_k + k_sub) : (float4)(0.0f);
+                s_x[next_buf][tok_idx][k_sub + 0] = (half)xv_next.x;
+                s_x[next_buf][tok_idx][k_sub + 1] = (half)xv_next.y;
+                s_x[next_buf][tok_idx][k_sub + 2] = (half)xv_next.z;
+                s_x[next_buf][tok_idx][k_sub + 3] = (half)xv_next.w;
+            }
+
+            // 1. Thread lid loads 16 weights (8 bytes) for row m ONCE
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
+
+            __global const uchar *w_ptr = row_w + (size_t)s * 8;
+            uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+            // Unpack 16 nibbles to 16 halves and scale ONCE
+            half w_deq[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq[2 * i]     = (half)((float)n0) * s_half;
+                w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+            }
+
+            int8 b_mat;
+            __builtin_memcpy(&b_mat, w_deq, 32);
+
+            // 2. Load activation slice from SLM and issue DPAS for up to 4 systolic tiles (32 tokens)
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) ((short *)&a_mat0)[ti] = as_short(s_x[cur_buf][ti][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+            if (cur_T1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T1) ((short *)&a_mat1)[ti] = as_short(s_x[cur_buf][8 + ti][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+            }
+
+            if (cur_T2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T2) ((short *)&a_mat2)[ti] = as_short(s_x[cur_buf][16 + ti][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+            }
+
+            if (cur_T3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T3) ((short *)&a_mat3)[ti] = as_short(s_x[cur_buf][24 + ti][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+            }
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        // Store outputs directly into all_gu for each token and slot
+        if (m < 1024) {
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) {
+                    all_gu[(size_t)s_tok[ti] * (8 * 1024) + s_slot[ti] * 1024 + m] = ((float *)&acc0)[ti];
+                }
+                if (ti < cur_T1) {
+                    all_gu[(size_t)s_tok[8 + ti] * (8 * 1024) + s_slot[8 + ti] * 1024 + m] = ((float *)&acc1)[ti];
+                }
+                if (ti < cur_T2) {
+                    all_gu[(size_t)s_tok[16 + ti] * (8 * 1024) + s_slot[16 + ti] * 1024 + m] = ((float *)&acc2)[ti];
+                }
+                if (ti < cur_T3) {
+                    all_gu[(size_t)s_tok[24 + ti] * (8 * 1024) + s_slot[24 + ti] * 1024 + m] = ((float *)&acc3)[ti];
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+}
+
 __kernel void moe_gateup_all8_batch(
     __global float * restrict all_gu,
     __global const uchar * restrict w_bank,
@@ -2451,6 +2917,201 @@ __kernel void silu_mul_all8_batch(
 
     float silu_g = g_val / (1.0f + exp(-g_val));
     all_act[gid] = silu_g * u_val;
+}
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void moe_down_grouped_batch(
+    __global float * restrict down_out,
+    __global const uchar * restrict w_bank,
+    __global const ushort * restrict s_bank,
+    __global const float * restrict all_act,
+    __global const int * restrict expert_counts,
+    __global const int * restrict expert_offsets,
+    __global const int * restrict sorted_tokens,
+    __global const int * restrict sorted_slots,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_id = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    __local half s_act[2][32][16];
+    __local int s_tok[32];
+    __local int s_slot[32];
+
+    // Total workgroups = 256 experts * 16 workgroups = 4096 workgroups (128 threads/group)
+    int expert_id = grp_id / 16;
+    if (expert_id >= NUM_EXPERTS) return;
+
+    int num_tokens = expert_counts[expert_id];
+    if (num_tokens <= 0) return;
+
+    int chunk_m = grp_id % 16; // covers 128 rows
+    int m_tile_idx = chunk_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (m_base >= 2048) return;
+
+    int m = m_base + lid;
+    size_t row_idx = (size_t)expert_id * 2048 + m;
+    int num_groups = K / GROUP_SIZE; // 4 for K=512
+
+    __global const uchar *row_w = w_bank + row_idx * (K / 2);
+    __global const ushort *row_s = s_bank + row_idx * num_groups;
+    int start_idx = expert_offsets[expert_id];
+
+    // Loop over tokens routed to this expert in macro-tiles of 32 (4 systolic DPAS tiles of 8)
+    for (int t_base = 0; t_base < num_tokens; t_base += 32) {
+        int cur_T0 = (num_tokens - t_base > 0) ? min(8, num_tokens - t_base) : 0;
+        int cur_T1 = (num_tokens - (t_base + 8) > 0) ? min(8, num_tokens - (t_base + 8)) : 0;
+        int cur_T2 = (num_tokens - (t_base + 16) > 0) ? min(8, num_tokens - (t_base + 16)) : 0;
+        int cur_T3 = (num_tokens - (t_base + 24) > 0) ? min(8, num_tokens - (t_base + 24)) : 0;
+        int total_cur_T = cur_T0 + cur_T1 + cur_T2 + cur_T3;
+
+        float8 acc0 = (float8)(0.0f);
+        float8 acc1 = (float8)(0.0f);
+        float8 acc2 = (float8)(0.0f);
+        float8 acc3 = (float8)(0.0f);
+
+        int tid = get_local_id(0); // 0..127
+        int tok_idx = tid / 4;      // 0..31
+        int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+        bool valid_tok = (tok_idx < total_cur_T);
+
+        int b_tok = valid_tok ? sorted_tokens[start_idx + t_base + tok_idx] : 0;
+        int slot  = valid_tok ? sorted_slots[start_idx + t_base + tok_idx] : 0;
+
+        if (tid < 32) {
+            s_tok[tid]  = (tid < total_cur_T) ? sorted_tokens[start_idx + t_base + tid] : 0;
+            s_slot[tid] = (tid < total_cur_T) ? sorted_slots[start_idx + t_base + tid] : 0;
+        }
+
+        int total_steps = num_groups * 8; // (K / 128) * 8
+
+        // Prefetch step 0 into s_act[0] using 128-bit aligned float4 vector loads
+        float4 av0 = valid_tok ? vload4(0, all_act + (size_t)b_tok * (8 * 512) + slot * 512 + k_sub) : (float4)(0.0f);
+        s_act[0][tok_idx][k_sub + 0] = (half)av0.x;
+        s_act[0][tok_idx][k_sub + 1] = (half)av0.y;
+        s_act[0][tok_idx][k_sub + 2] = (half)av0.z;
+        s_act[0][tok_idx][k_sub + 3] = (half)av0.w;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int s = 0; s < total_steps; ++s) {
+            int cur_buf = s & 1;
+            int next_buf = (s + 1) & 1;
+            int g = s / 8;
+
+            // Asynchronously prefetch step s + 1
+            if (s + 1 < total_steps) {
+                int next_k = (s + 1) * 16;
+                float4 av_next = valid_tok ? vload4(0, all_act + (size_t)b_tok * (8 * 512) + slot * 512 + next_k + k_sub) : (float4)(0.0f);
+                s_act[next_buf][tok_idx][k_sub + 0] = (half)av_next.x;
+                s_act[next_buf][tok_idx][k_sub + 1] = (half)av_next.y;
+                s_act[next_buf][tok_idx][k_sub + 2] = (half)av_next.z;
+                s_act[next_buf][tok_idx][k_sub + 3] = (half)av_next.w;
+            }
+
+            // 1. Thread lid loads 16 weights (8 bytes) for row m ONCE
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
+
+            __global const uchar *w_ptr = row_w + (size_t)s * 8;
+            uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+            // Unpack 16 nibbles to 16 halves and scale ONCE
+            half w_deq[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq[2 * i]     = (half)((float)n0) * s_half;
+                w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+            }
+
+            int8 b_mat;
+            __builtin_memcpy(&b_mat, w_deq, 32);
+
+            // 2. Load activation slice from SLM and issue DPAS for up to 4 systolic tiles (32 tokens)
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) ((short *)&a_mat0)[ti] = as_short(s_act[cur_buf][ti][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+            if (cur_T1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T1) ((short *)&a_mat1)[ti] = as_short(s_act[cur_buf][8 + ti][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+            }
+
+            if (cur_T2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T2) ((short *)&a_mat2)[ti] = as_short(s_act[cur_buf][16 + ti][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+            }
+
+            if (cur_T3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T3) ((short *)&a_mat3)[ti] = as_short(s_act[cur_buf][24 + ti][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+            }
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        // Store outputs directly into down_out for each token and slot
+        if (m < 2048) {
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) {
+                    down_out[(size_t)s_tok[ti] * (8 * 2048) + s_slot[ti] * 2048 + m] = ((float *)&acc0)[ti];
+                }
+                if (ti < cur_T1) {
+                    down_out[(size_t)s_tok[8 + ti] * (8 * 2048) + s_slot[8 + ti] * 2048 + m] = ((float *)&acc1)[ti];
+                }
+                if (ti < cur_T2) {
+                    down_out[(size_t)s_tok[16 + ti] * (8 * 2048) + s_slot[16 + ti] * 2048 + m] = ((float *)&acc2)[ti];
+                }
+                if (ti < cur_T3) {
+                    down_out[(size_t)s_tok[24 + ti] * (8 * 2048) + s_slot[24 + ti] * 2048 + m] = ((float *)&acc3)[ti];
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+}
+
+__kernel void moe_accum_down_batch(
+    __global float * restrict moe_acc,
+    __global const float * restrict down_out,
+    __global const float * restrict top_wt,
+    int B
+) {
+    int gid = get_global_id(0);
+    if (gid >= B * HIDDEN_DIM) return;
+    int b = gid / HIDDEN_DIM;
+    int m = gid % HIDDEN_DIM;
+
+    float sum = 0.0f;
+    #pragma unroll
+    for (int k = 0; k < 8; ++k) {
+        float wt = top_wt[b * 8 + k];
+        float val = down_out[(size_t)b * (8 * HIDDEN_DIM) + k * HIDDEN_DIM + m];
+        sum += wt * val;
+    }
+    moe_acc[gid] = sum;
 }
 
 __kernel void moe_down_accum_all8_batch(
@@ -2623,6 +3284,307 @@ __kernel void concat2(
         out[gid] = b[gid - N];
     }
 }
+
+// =========================================================================
+// 9. MTP Dual-Token Verification Kernels (T10.1 Speculative Decoding)
+// =========================================================================
+
+__kernel void conv1d_update_silu_m2_spec(
+    __global float * restrict qkv_out,
+    __global const float * restrict qkv_in,
+    __global float * restrict conv_state,
+    __global float * restrict conv_snap,
+    __global const float * restrict conv_weight
+) {
+    int c = get_global_id(0);
+    if (c >= C_QKV) return;
+
+    int s_base = c * 3;
+    float s0 = conv_state[s_base + 0];
+    float s1 = conv_state[s_base + 1];
+    float s2 = conv_state[s_base + 2];
+
+    int w_base = c * 4;
+    float w0 = conv_weight[w_base + 0];
+    float w1 = conv_weight[w_base + 1];
+    float w2 = conv_weight[w_base + 2];
+    float w3 = conv_weight[w_base + 3];
+
+    // Token 0 (b = 0)
+    float x0 = qkv_in[c];
+    float sum0 = s0 * w0 + s1 * w1 + s2 * w2 + x0 * w3;
+    float silu0 = sum0 / (1.0f + exp(-sum0));
+    qkv_out[c] = silu0;
+
+    // Snapshot intermediate conv state after Token 0
+    float snap0 = s1;
+    float snap1 = s2;
+    float snap2 = x0;
+    conv_snap[s_base + 0] = snap0;
+    conv_snap[s_base + 1] = snap1;
+    conv_snap[s_base + 2] = snap2;
+
+    // Token 1 (b = 1)
+    float x1 = qkv_in[(size_t)C_QKV + c];
+    float sum1 = snap0 * w0 + snap1 * w1 + snap2 * w2 + x1 * w3;
+    float silu1 = sum1 / (1.0f + exp(-sum1));
+    qkv_out[(size_t)C_QKV + c] = silu1;
+
+    // Final live state after Token 1 (used if Token 1 accepted)
+    conv_state[s_base + 0] = snap1;
+    conv_state[s_base + 1] = snap2;
+    conv_state[s_base + 2] = x1;
+}
+
+__kernel void deltanet_recurrent_m2_spec(
+    __global float * restrict out,
+    __global float * restrict state,
+    __global float * restrict state_snap,
+    __global const float * restrict q,
+    __global const float * restrict k,
+    __global const float * restrict v,
+    __global const float * restrict g,
+    __global const float * restrict beta
+) {
+    int h = get_group_id(0);
+    if (h >= H_V) return;
+    int j = get_local_id(0);
+
+    __local float s_q[S_V];
+    __local float s_k[S_V];
+
+    int kh = h / 2;
+    __global float * S_h = state + (size_t)h * (S_V * S_V);
+    __global float * S_snap_h = state_snap + (size_t)h * (S_V * S_V);
+
+    // --- Token 0 (b = 0) ---
+    s_q[j] = q[(size_t)kh * S_V + j];
+    s_k[j] = k[(size_t)kh * S_V + j];
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    float v_val0 = v[(size_t)4096 + h * S_V + j];
+    float g_val0 = g[h];
+    float b_val0 = beta[h];
+
+    float kv_acc0 = 0.0f;
+    for (int i = 0; i < S_V; ++i) {
+        kv_acc0 += S_h[i * S_V + j] * s_k[i];
+    }
+    float kv_j0 = kv_acc0 * g_val0;
+    float delta_j0 = (v_val0 - kv_j0) * b_val0;
+
+    float o_acc0 = 0.0f;
+    for (int i = 0; i < S_V; ++i) {
+        float s_old = S_h[i * S_V + j];
+        float s_new = g_val0 * s_old + s_k[i] * delta_j0;
+        S_h[i * S_V + j] = s_new;
+        S_snap_h[i * S_V + j] = s_new; // Snapshot intermediate recurrent state
+        o_acc0 += s_new * s_q[i];
+    }
+    out[(size_t)h * S_V + j] = o_acc0 * SCALE_128;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // --- Token 1 (b = 1) ---
+    s_q[j] = q[(size_t)(H_K * S_V) + kh * S_V + j];
+    s_k[j] = k[(size_t)(H_K * S_V) + kh * S_V + j];
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    float v_val1 = v[(size_t)C_QKV + 4096 + h * S_V + j];
+    float g_val1 = g[(size_t)H_V + h];
+    float b_val1 = beta[(size_t)H_V + h];
+
+    float kv_acc1 = 0.0f;
+    for (int i = 0; i < S_V; ++i) {
+        kv_acc1 += S_h[i * S_V + j] * s_k[i];
+    }
+    float kv_j1 = kv_acc1 * g_val1;
+    float delta_j1 = (v_val1 - kv_j1) * b_val1;
+
+    float o_acc1 = 0.0f;
+    for (int i = 0; i < S_V; ++i) {
+        float s_old = S_h[i * S_V + j];
+        float s_new = g_val1 * s_old + s_k[i] * delta_j1;
+        S_h[i * S_V + j] = s_new;
+        o_acc1 += s_new * s_q[i];
+    }
+    out[(size_t)(H_V * S_V) + h * S_V + j] = o_acc1 * SCALE_128;
+}
+
+__kernel void int4_gemv_m2_lm_head_argmax1(
+    __global float * restrict y,              // [2 * M] (optional, can be NULL)
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict x,        // [2 * K] (Token 0 at x, Token 1 at x + K)
+    __global float * restrict stage1_vals_0,  // [970]
+    __global uint * restrict stage1_idxs_0,   // [970]
+    __global float * restrict stage1_vals_1,  // [970]
+    __global uint * restrict stage1_idxs_1,   // [970]
+    int M,
+    int K
+) {
+    int m = get_global_id(0);
+    int lid = get_local_id(0);
+    int gid = get_group_id(0);
+
+    float total_sum0 = -1e30f;
+    float total_sum1 = -1e30f;
+    uint my_idx = (m < M) ? (uint)m : 0xFFFFFFFF;
+
+    if (m < M) {
+        int num_groups = K / GROUP_SIZE;
+        __global const uchar *row_w = w_packed + (size_t)m * (K / 2);
+        __global const ushort *row_s = w_scale + (size_t)m * num_groups;
+
+        total_sum0 = 0.0f;
+        total_sum1 = 0.0f;
+
+        for (int g = 0; g < num_groups; ++g) {
+            float scale = bf16_to_fp32(row_s[g]);
+            __global const uchar *grp_w = row_w + g * (GROUP_SIZE / 2);
+            __global const float *grp_x0 = x + g * GROUP_SIZE;
+            __global const float *grp_x1 = x + K + g * GROUP_SIZE;
+
+            __global const uchar16 *w_vec16 = (__global const uchar16 *)grp_w;
+            __global const float8 *x0_vec8 = (__global const float8 *)grp_x0;
+            __global const float8 *x1_vec8 = (__global const float8 *)grp_x1;
+
+            float acc0_0 = 0.0f, acc1_0 = 0.0f;
+            float acc0_1 = 0.0f, acc1_1 = 0.0f;
+
+            #pragma unroll
+            for (int v = 0; v < 4; ++v) {
+                uchar16 wb = w_vec16[v];
+
+                float8 x0_0 = x0_vec8[v * 4 + 0];
+                float8 x1_0 = x0_vec8[v * 4 + 1];
+                float8 x2_0 = x0_vec8[v * 4 + 2];
+                float8 x3_0 = x0_vec8[v * 4 + 3];
+
+                float8 x0_1 = x1_vec8[v * 4 + 0];
+                float8 x1_1 = x1_vec8[v * 4 + 1];
+                float8 x2_1 = x1_vec8[v * 4 + 2];
+                float8 x3_1 = x1_vec8[v * 4 + 3];
+
+                int n0  = (int)((char)(wb.s0 << 4)) >> 4;
+                int n1  = (int)((char)wb.s0) >> 4;
+                int n2  = (int)((char)(wb.s1 << 4)) >> 4;
+                int n3  = (int)((char)wb.s1) >> 4;
+                int n4  = (int)((char)(wb.s2 << 4)) >> 4;
+                int n5  = (int)((char)wb.s2) >> 4;
+                int n6  = (int)((char)(wb.s3 << 4)) >> 4;
+                int n7  = (int)((char)wb.s3) >> 4;
+
+                acc0_0 += (float)n0 * x0_0.s0 + (float)n1 * x0_0.s1
+                        + (float)n2 * x0_0.s2 + (float)n3 * x0_0.s3
+                        + (float)n4 * x0_0.s4 + (float)n5 * x0_0.s5
+                        + (float)n6 * x0_0.s6 + (float)n7 * x0_0.s7;
+
+                acc0_1 += (float)n0 * x0_1.s0 + (float)n1 * x0_1.s1
+                        + (float)n2 * x0_1.s2 + (float)n3 * x0_1.s3
+                        + (float)n4 * x0_1.s4 + (float)n5 * x0_1.s5
+                        + (float)n6 * x0_1.s6 + (float)n7 * x0_1.s7;
+
+                int n8  = (int)((char)(wb.s4 << 4)) >> 4;
+                int n9  = (int)((char)wb.s4) >> 4;
+                int n10 = (int)((char)(wb.s5 << 4)) >> 4;
+                int n11 = (int)((char)wb.s5) >> 4;
+                int n12 = (int)((char)(wb.s6 << 4)) >> 4;
+                int n13 = (int)((char)wb.s6) >> 4;
+                int n14 = (int)((char)(wb.s7 << 4)) >> 4;
+                int n15 = (int)((char)wb.s7) >> 4;
+
+                acc1_0 += (float)n8  * x1_0.s0 + (float)n9  * x1_0.s1
+                        + (float)n10 * x1_0.s2 + (float)n11 * x1_0.s3
+                        + (float)n12 * x1_0.s4 + (float)n13 * x1_0.s5
+                        + (float)n14 * x1_0.s6 + (float)n15 * x1_0.s7;
+
+                acc1_1 += (float)n8  * x1_1.s0 + (float)n9  * x1_1.s1
+                        + (float)n10 * x1_1.s2 + (float)n11 * x1_1.s3
+                        + (float)n12 * x1_1.s4 + (float)n13 * x1_1.s5
+                        + (float)n14 * x1_1.s6 + (float)n15 * x1_1.s7;
+
+                int n16 = (int)((char)(wb.s8 << 4)) >> 4;
+                int n17 = (int)((char)wb.s8) >> 4;
+                int n18 = (int)((char)(wb.s9 << 4)) >> 4;
+                int n19 = (int)((char)wb.s9) >> 4;
+                int n20 = (int)((char)(wb.sa << 4)) >> 4;
+                int n21 = (int)((char)wb.sa) >> 4;
+                int n22 = (int)((char)(wb.sb << 4)) >> 4;
+                int n23 = (int)((char)wb.sb) >> 4;
+
+                acc0_0 += (float)n16 * x2_0.s0 + (float)n17 * x2_0.s1
+                        + (float)n18 * x2_0.s2 + (float)n19 * x2_0.s3
+                        + (float)n20 * x2_0.s4 + (float)n21 * x2_0.s5
+                        + (float)n22 * x2_0.s6 + (float)n23 * x2_0.s7;
+
+                acc0_1 += (float)n16 * x2_1.s0 + (float)n17 * x2_1.s1
+                        + (float)n18 * x2_1.s2 + (float)n19 * x2_1.s3
+                        + (float)n20 * x2_1.s4 + (float)n21 * x2_1.s5
+                        + (float)n22 * x2_1.s6 + (float)n23 * x2_1.s7;
+
+                int n24 = (int)((char)(wb.sc << 4)) >> 4;
+                int n25 = (int)((char)wb.sc) >> 4;
+                int n26 = (int)((char)(wb.sd << 4)) >> 4;
+                int n27 = (int)((char)wb.sd) >> 4;
+                int n28 = (int)((char)(wb.se << 4)) >> 4;
+                int n29 = (int)((char)wb.se) >> 4;
+                int n30 = (int)((char)(wb.sf << 4)) >> 4;
+                int n31 = (int)((char)wb.sf) >> 4;
+
+                acc1_0 += (float)n24 * x3_0.s0 + (float)n25 * x3_0.s1
+                        + (float)n26 * x3_0.s2 + (float)n27 * x3_0.s3
+                        + (float)n28 * x3_0.s4 + (float)n29 * x3_0.s5
+                        + (float)n30 * x3_0.s6 + (float)n31 * x3_0.s7;
+
+                acc1_1 += (float)n24 * x3_1.s0 + (float)n25 * x3_1.s1
+                        + (float)n26 * x3_1.s2 + (float)n27 * x3_1.s3
+                        + (float)n28 * x3_1.s4 + (float)n29 * x3_1.s5
+                        + (float)n30 * x3_1.s6 + (float)n31 * x3_1.s7;
+            }
+
+            total_sum0 += (acc0_0 + acc1_0) * scale;
+            total_sum1 += (acc0_1 + acc1_1) * scale;
+        }
+
+        if (y != NULL) {
+            y[m] = total_sum0;
+            y[(size_t)M + m] = total_sum1;
+        }
+    }
+
+    __local float s_val0[256];
+    __local uint s_idx0[256];
+    __local float s_val1[256];
+    __local uint s_idx1[256];
+
+    s_val0[lid] = total_sum0;
+    s_idx0[lid] = my_idx;
+    s_val1[lid] = total_sum1;
+    s_idx1[lid] = my_idx;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lid < s) {
+            if (s_val0[lid + s] > s_val0[lid] || (s_val0[lid + s] == s_val0[lid] && s_idx0[lid + s] < s_idx0[lid])) {
+                s_val0[lid] = s_val0[lid + s];
+                s_idx0[lid] = s_idx0[lid + s];
+            }
+            if (s_val1[lid + s] > s_val1[lid] || (s_val1[lid + s] == s_val1[lid] && s_idx1[lid + s] < s_idx1[lid])) {
+                s_val1[lid] = s_val1[lid + s];
+                s_idx1[lid] = s_idx1[lid + s];
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (lid == 0) {
+        stage1_vals_0[gid] = s_val0[0];
+        stage1_idxs_0[gid] = s_idx0[0];
+        stage1_vals_1[gid] = s_val1[0];
+        stage1_idxs_1[gid] = s_idx1[0];
+    }
+}
+
 
 
 

@@ -66,3 +66,6 @@ tools/router/shootout
 tools/router/test_router
 tools/mtp/bench_mtp_258v
 tools/mtp/debug_mtp
+tools/mtp/bench_speculative_258v
+tools/mtp/profile_spec
+tools/mtp/profile_verify_layers

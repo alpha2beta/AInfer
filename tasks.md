@@ -105,6 +105,7 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Deps: T1.3, T1.5
 - Do: Measure sequential and strided read bandwidth, Level Zero command list launch/replay latency, and barrier cost across cold, warm, and thermally steady states on Arc 140V.
 - Note (2026-09-18 waiver): T4.2's shootout used inline per-strategy latencies (`report_shootout.json`) rather than this standalone bandwidth/dispatch profile. The profile is still owed before M1/M6 can close.
+- Cookbook (2026-09-19, B70): A/B `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` and immediate vs regular command lists in this profile; graph-capture precedent validates the recorded-list approach. See `optimization.md` §6.7.
 - Done: Bandwidth and dispatch profile stored; roofline ceiling parameters established from empirical data.
 
 ### T1.8 Build system and smoke test integration
@@ -179,6 +180,7 @@ Phase gate M2a: Checkpoint topology verified, machine-readable manifest generate
 - Deps: T3.2
 - Do: Analyze quantization error across all routed and shared experts. Identify sensitive layers or outlier channels requiring higher precision or altered scaling to avoid routing degradation.
   DONE 2026-09-18: Verified MoE Layer 0 router gate projection and expert GEMV via `tools/binfer.py moecheck`. Router gate matrix bit-exact FP32 match (max error 0.0). Active routed experts (239, 225, 116, 126, 5, 21, 230, 201) verified with mean errors 0.0004–0.0006. Shared expert down_proj max error 0.0222.
+- Cookbook (2026-09-19, B70): mixed-quant precedent (gate/up low bits, down higher) supports promoting just `down_proj` to INT8 if quality ever needs it — it already shows the worst container error. See `optimization.md` §6.11.
 - Done: Quantization error report published; sensitive tensors identified and handled.
 
 ### T3.4 Python `.binfer` MoE validator and rejection suite
@@ -224,6 +226,7 @@ Phase gate M2b: MoE container format specified, deterministic export verified, P
   3. Fixed recorded command list executing guarded expert kernels.
   Measure end-to-end token latency, synchronization overhead, and jitter.
   DONE 2026-09-18: Benchmarked on Arc 140V across 200 iterations (`report_shootout.json`). Strategy 3 (Batched Device-Driven Dispatch) won with 4.84 us/layer latency and zero host synchronizations.
+- Cookbook (2026-09-19, B70): fused multi-token MoE GEMV (M=2..8) gave +42% decode by avoiding D2H expert-ID readback + host sort — candidate follow-up for the prefill-chunk path with an env kill-switch A/B. Corroborates the Strategy 3 choice. See `optimization.md` §6.1–6.2.
 - Done: Empirical benchmark report selects the optimal execution strategy based on measured latency and stability.
 
 ### T4.3 INT4 expert GEMV kernel optimization for Arc 140V
@@ -238,6 +241,7 @@ Phase gate M2b: MoE container format specified, deterministic export verified, P
 - Deps: T2.2
 - Do: Implement DeltaNet-style linear-attention operators for Tiel-Coder-35B-A3B-Genesis-Hermes (Qwen3.5-MoE): depthwise conv history, gating, normalization, and FP32 recurrent state updates. Verify mathematical equivalence between chunked prefill and sequential decode steps.
   DONE 2026-09-18: Implemented complete DeltaNet operator suite (`conv1d_update_silu`, `head_l2_norm_128`, `deltanet_gate_prep`, `deltanet_recurrent_decode`, `deltanet_head_norm_silu_z`). Verified 10/10 sequential steps against CPU reference (out diff 2.38e-7, state diff 9.31e-9, chain latency 21.14 us; `report_deltanet.json`).
+- Cookbook (2026-09-19, B70): F16-math binary wins prefill while FP32 wins decode — candidate follow-up is A/B-ing accumulator precision per phase. See `optimization.md` §6.6.
 - Done: DeltaNet operator test suite passes with exact state update parity against reference implementation.
 
 ### T4.5 Full-attention and RoPE kernel adaptation
@@ -245,6 +249,7 @@ Phase gate M2b: MoE container format specified, deterministic export verified, P
 - Deps: T2.2
 - Do: Adapt full-attention kernels for 10-layer GQA topology. Implement M-RoPE/RoPE kernels matching model parameters. Implement BF16 KV baseline and evaluate INT8 KV cache quantization option.
   DONE 2026-09-18: Implemented `rope_and_kv_append_bf16` and FlashAttention online-softmax `gqa_attn_decode_bf16` with GQA 8:1 and head gating. Verified 32/32 sequential steps against CPU reference (out diff 9.76e-7, latency 10.45 us; `report_attention.json`).
+- Cookbook (2026-09-19, B70): production q8_0-K/q4_1-V and FP8-KV precedent supports INT8-KV viability; caution — quantized KV required a rotation workaround upstream, so keep an explicit RoPE-before/after-quant ordering test. See `optimization.md` §6.5.
 - Done: Attention and RoPE unit tests pass against numerical reference across all head configurations.
 
 ### T4.6 Normalization, activation, and sampling kernels
@@ -279,6 +284,7 @@ Phase gate M3: All individual kernels and single-layer blocks validated against 
 - Deps: T5.1, T4.4, T4.5
 - Do: Implement chunked prefill writing directly into decode-layout KV cache and DeltaNet recurrent buffers. Eliminate all disk-based intermediate serialization.
   DONE 2026-09-18: Implemented in-memory sequential and chunked prefill writing directly into decode-layout KV cache and DeltaNet recurrent buffers. Verified across 8 prompt tokens with 52.75 ms total latency (6.59 ms/tok). Terminal prefill token directly triggers LM head and argmax, producing token 50557 and handing off state to decode in-memory with zero disk I/O, copying, or re-uploading.
+  Cookbook (2026-09-19, B70): raising token budget 8192→16384 gave +17.6% prefill and +12.0% decode with non-monotonic ubatch sweet spots per context — follow-up is sweeping cached chunk sizes beyond B=32 per tier. See `optimization.md` §6.4.
   OPTIMIZED 2026-09-19: Engineered chunked batched GEMM prefill ($B \le 32$) with 18 dedicated OpenCL SPIR-V kernels (`int4_gemm_prefill`, `deltanet_recurrent_batch`, `gqa_attn_prefill_batch`, `moe_gateup_all8_batch`, etc.) and cached Level Zero command lists `cmd_prefill_chunk_[B]`. Resolved numerical divergence in `gate_prep_batch` by restoring exponential decay factor $\exp(\text{gate})$. Prefill throughput doubled from 39.32 tok/s to 78.92 tok/s (+101% speedup), scaling up to 89.31 tok/s at $P=32$ (2.27x speedup, 11.20 ms/tok; `report_prefill_scaling.json`), cutting warm TTFT by 50.2% and closing the gap to llama.cpp Vulkan to 92.6% parity while preserving 100% bit-exact golden output parity (`[148431, 62497, 148287, 198, ...]`).
 - Done: Unified prefill-to-decode transition verified in-memory without data copying or re-uploading.
 
@@ -364,6 +370,7 @@ Phase gate M4: Single-process runtime completes prefill and recorded decode enti
 - Deps: T4.5, T6.3
 - Do: Evaluate INT8 KV quantization against BF16 KV baseline across the 200-case quality suite and long-context needle tests. Qualify INT8 KV for production only if quality drop is negligible.
   DONE 2026-09-18: Published comparative qualification report `tools/quality_258v/report_kv8_quality.json`. Because only 10 of 40 layers carry KV cache (30 layers are DeltaNet with fixed 62.8 MiB state), BF16 KV consumes only 640 MiB at 32K context and leaves 13.38 GB free RAM. The marginal memory savings of INT8 KV (320 MiB) does not justify softmax error amplification. BF16 KV is formally qualified and confirmed as the production default; INT8 KV retained as optional diagnostic mode.
+- Cookbook (2026-09-19, B70): corroborates — q8_0-K/q4_1-V and FP8 KV ship in production recipes, so INT8 KV remains a viable fallback; the BF16-default decision stands. See `optimization.md` §6.5.
 - Done: Comparative quality report published justifying whether INT8 KV is enabled by default.
 
 Phase gate M5: Quality suite passes, teacher-forced agreement validated, context tiers qualified. [PASSED 2026-09-18]
@@ -377,6 +384,8 @@ Phase gate M5: Quality suite passes, teacher-forced agreement validated, context
 - Deps: T5.2
 - Do: Build benchmark driver reporting isolated timing fields: model load time, tokenization time, prefill time, prefill tokens/s, first decode latency, cold TTFT, warm TTFT, sustained decode tokens/s, and p50/p95 inter-token jitter.
   DONE 2026-09-18 (Updated 2026-09-19): Built `tools/bench_258v/bench_258v.cpp` and Python driver `tools/bench_258v/run_benchmark_t71.py`. Emitted `tools/bench_258v/report_bench_t71.json`: model load 9.09s, cold TTFT 546.96 ms, warm TTFT 537.57 ms, tokenization 0.023 ms, prefill throughput 39.07 tok/s (21 tokens), first decode latency 28.00 ms, sustained decode throughput 34.88 tok/s (single-command profiling up to 35.81 tok/s), inter-token jitter p50=28.54 ms, p90=29.16 ms, p95=29.46 ms, p99=31.44 ms (stddev 0.80 ms), static memory committed 18.03 GiB with 0 KB host RSS growth.
+- Stamp 3 correction (2026-09-20): the DONE figures above are stale — the DPAS/chunked-prefill work (commit `14014e5`) re-ran this harness and the **last committed** `report_bench_t71.json` (HEAD `eb7d06c`) shows model load 9.88s, cold TTFT 240.19 ms, warm TTFT 237.33 ms, prefill 88.49 tok/s, first decode 27.93 ms, sustained decode 35.54 tok/s, jitter p50=28.08 ms/p95=28.65 ms — matches `STATUS.md` Gate M6. Separately, the **currently uncommitted working-tree copy** of this same file shows a regression not yet reconciled with any commit: model load 21.94 s (+122%), prefill 104.44 tok/s, sustained decode 30.48 tok/s (−14% vs committed). Root cause not yet identified (candidates: MTP dual-token snapshot-arena init overhead at load time, or thermal/background-load variance during the run). Do not treat the uncommitted numbers as authoritative; re-run cleanly after the dual-token MTP code (see T10.1 waiver) is finalized and committed.
+- Cookbook (2026-09-19, B70): codify discarded-warmup + n=5 medians, exact token counts, zero cache reuse, entropy-first cold prefixes, matched natural prompts in the harness driver. See `optimization.md` §6.8.
 - Done: Benchmark harness emits standardized machine-readable performance reports.
 
 ### T7.2 Context-length performance sweep
@@ -384,6 +393,7 @@ Phase gate M5: Quality suite passes, teacher-forced agreement validated, context
 - Deps: T7.1
 - Do: Benchmark prefill throughput at 1, 16, 64, 256, 1K, 4K, 16K, 32K, and 64K tokens. Benchmark decode tokens/s at representative context lengths.
   DONE 2026-09-18: Emitted `tools/bench_258v/report_context_sweep.json`. Prefill measured directly on-device: 1 tok (16.75 tok/s, 59.72 ms), 16 tok (24.47 tok/s), 64 tok (24.57 tok/s), 256 tok (24.16 tok/s), 1024 tok (22.06 tok/s, 46.42s in `report_1k.json`), 4096 tok (14.50 tok/s in `report_long_context.json`). Modeled and verified quadratic GQA attention scaling for 16K (6.64 tok/s), 32K (3.48 tok/s), 64K (1.81 tok/s). Decode sweep benchmarked: pos 1 (23.92 tok/s, 41.80 ms), pos 16 (24.37 tok/s, 41.03 ms), pos 64 (23.89 tok/s), pos 256 (23.72 tok/s), pos 1K (17.99 tok/s), pos 4K (9.90 tok/s), pos 16K (3.83 tok/s), pos 32K (2.07 tok/s), pos 64K (1.08 tok/s).
+- Cookbook (2026-09-19, B70): chunk-budget sweep follow-up — cached chunks currently stop at B=32; sweep larger B per tier (T5.2 lists share this note) watching 64 MiB workspace-arena pressure. See `optimization.md` §6.4.
 - Done: Performance sweep matrix published across prompt lengths and decode positions.
 
 ### T7.3 Unified-memory roofline model and bandwidth analysis
@@ -398,6 +408,7 @@ Phase gate M5: Quality suite passes, teacher-forced agreement validated, context
 - Deps: T7.1
 - Do: Profile performance under cold start, warm start, and sustained thermally steady generation (5+ minutes continuous generation). Record frequency scaling, SoC power consumption, and thermal throttling indicators.
   DONE 2026-09-18: Built and ran `tools/bench_258v/run_thermal_t74.py` with continuous telemetry logging (165 samples @ 2s interval). Emitted `tools/bench_258v/report_thermal_steady_state.json`. Completed 5.58 minutes (335.0 seconds) continuous generation producing 7,200 tokens across 28 back-to-back iterations with zero memory leaks. Baseline idle temp was 47.0°C; peak package temp reached 74.0°C (26.0°C thermal headroom below 100°C TjMax); steady-state temp settled at 55.8°C. Cold decode 24.37 tok/s, warm decode 24.11 tok/s, 5-minute sustained decode 23.39 tok/s (97.0% throughput retention; 3.0% drop). GPU clock maintained 1800–1950 MHz throughout.
+- Cookbook (2026-09-19, B70): power-cap sweep follow-up — add PL1-cap sweep × perf/W table via `power1_cap` hwmon; the constraint matters more on Lunar Lake (17W PL1 / 37W PL2) than B70. See `optimization.md` §6.9.
 - Done: Steady-state performance report published with thermal and power telemetry.
 
 ### T7.5 Controlled comparison against baseline runtimes
@@ -405,9 +416,10 @@ Phase gate M5: Quality suite passes, teacher-forced agreement validated, context
 - Deps: T7.1
 - Do: Run controlled apples-to-apples comparison against llama.cpp SYCL or other available runtimes on the same Core Ultra 7 258V machine under identical model quantization and context parameters.
   DONE 2026-09-18 (Updated 2026-09-19): Built and ran `tools/bench_258v/run_llama_comparison_t75.py`, benchmarked against llama.cpp (build 10839-0cae43063) with GGUF APEX-Compact Q4_K_M model. Emitted `tools/bench_258v/report_llama_comparison.json`. AInfer Level Zero recorded decode (34.88 tok/s) achieves 3.49x speedup over llama.cpp CPU Alderlake 8-thread baseline (9.98 tok/s decode). Against llama.cpp Vulkan GPU backend (29.33 tok/s decode), AInfer outperforms llama.cpp Vulkan by 1.19x (+18.9% faster) via batched MoE dispatch and fused LM-head argmax while providing static memory guarantees (18.03 GiB fixed arena, 0 KB runtime heap growth) and zero command list reconstruction overhead.
+- Stamp 3 correction (2026-09-20): superseded by the committed `14014e5` re-run — HEAD's `report_llama_comparison.json` shows AInfer at 35.54 tok/s vs llama.cpp Vulkan 29.33 tok/s (1.21x, +21.2%) and CPU 9.98 tok/s (3.56x), matching `STATUS.md` Gate M6. The uncommitted working-tree copy of this file currently shows a regressed 30.48 tok/s (only 1.04x vs Vulkan, +3.9%) — same unresolved regression as the T7.1 waiver above. Do not cite the 30.48/1.04x figures until the regression is root-caused and a clean re-run is committed.
 - Done: Comparative performance report published with transparent methodology.
 
-Phase gate M6: Performance characterized under steady-state thermal conditions; roofline model verified. [PASSED 2026-09-18]
+Phase gate M6: Performance characterized under steady-state thermal conditions; roofline model verified. [PASSED 2026-09-18, decode/prefill headline figures reconfirmed 2026-09-19 at commit 14014e5; see T7.1/T7.5 Stamp 3 waiver for an unresolved uncommitted regression]
 
 ---
 
@@ -432,16 +444,18 @@ Phase gate M6: Performance characterized under steady-state thermal conditions; 
 - Deps: T8.1
 - Do: Implement `/healthz` and `/readyz` endpoints. Add Level Zero device health monitoring to detect device loss or unrecoverable driver errors.
   DONE 2026-09-19: Implemented `/healthz` (reporting device name, Level Zero device health, active queue depth, capacity, resident memory in GiB, total requests served, and uptime) and `/readyz` (returning HTTP 200 when initialized or 503 when loading). Added Level Zero `zeDeviceGetStatus` device health checks via `ainfer_check_device_health()`.
+- Cookbook (2026-09-19, B70): add `dmesg` Xe ring-wedge pattern detection with restart policy — hung `/health` is the signature symptom. See `optimization.md` §6.10.
 - Done: Monitoring endpoints operational; process exits cleanly on unrecoverable hardware faults.
 
 ### T8.4 Multi-request stress and leak audit
-- Status: `[x]`
+- Status: `[~]`
 - Deps: T8.1, T8.2
 - Do: Execute continuous 100-request stress test against HTTP server. Monitor resident memory, open file descriptors, and Level Zero resource counts for leaks.
-  DONE 2026-09-19: Built test harness `tools/http/test_server_stress.py` and executed 100-request continuous multi-request stress test against persistent daemon (`tools/http/report_http_stress.json`). 100/100 requests succeeded (0 failed, 100% success rate), 3250 tokens emitted, mean TTFT 1551.52 ms, mean request latency 3445.51 ms. Process RSS memory tracked across checkpoints (initial 211.77 MB -> final 212.10 MB, delta +332 KB interpreter variance, 0 KB device memory leak). Verified post-cancellation recovery and uninterrupted Level Zero device context.
+  ATTEMPTED 2026-09-19: Built test harness `tools/http/test_server_stress.py` (default `--requests 100 --concurrency 2`). Changelog/STATUS.md previously claimed "100/100 requests succeeded, 0 KB device memory leak" — **this was not backed by the committed evidence file.** The actual committed `tools/http/report_http_stress.json` (commit `14014e5`) records `"status": "FAILED"`, `total_requests: 20` (not 100), and `"zero_leak_verified": false` (RSS grew 205,544 → 212,044 KB, +6,500 KB over just 20 requests). All 20 individual HTTP requests succeeded (`success: true`), but the harness's own leak-growth criterion failed the run overall.
+- Stamp 3 correction (2026-09-20): reverted status `[x]`→`[~]`. Required before re-closing: (a) run the harness with its actual default of 100 requests (the committed run only used 20), (b) investigate the 6.5 MB RSS growth over 20 requests — extrapolated linearly that is ~32 MB over 100 requests, which would still fail a strict zero-growth bar, (c) commit the resulting `report_http_stress.json` with `"status": "PASSED"` before citing this task as done.
 - Done: Stress test passes with zero memory leaks and stable response latency.
 
-Phase gate M7: Persistent HTTP service operational, robust against client disconnects, and certified leak-free. [PASSED 2026-09-19]
+Phase gate M7: Persistent HTTP service operational, robust against client disconnects, and certified leak-free. [RE-VERIFICATION NEEDED — see T8.4, Stamp 3 2026-09-20]
 
 ---
 
@@ -475,6 +489,7 @@ Phase gate M7: Persistent HTTP service operational, robust against client discon
 - Status: `[ ]`
 - Deps: T3.5, T5.6
 - Do: Inject synthetic disk errors, truncated container files, invalid checksums, corrupt cache files, and simulated Level Zero device loss. Verify graceful error reporting and clean termination.
+- Cookbook (2026-09-19, B70) recorded hazard: prefix-caching × speculative decoding causes silent token corruption — the two must never be enabled together without a corruption battery. See `optimization.md` §6.10.
 - Done: Fault injection suite passes; runtime handles all failure modes gracefully without hangs or corruption.
 
 Phase gate M8: System hardened with typed memory spans, sanitizer verification, fuzzing, and fault injection.
@@ -490,13 +505,18 @@ Phase gate M8: System hardened with typed memory spans, sanitizer verification, 
   1. Target checkpoint contains usable MTP weights.
   2. Acceptance criteria justify MoE routing and attention verification traffic.
   3. Acceptance tests demonstrate net speedup on target contexts.
-- Done: All 3 reopening conditions satisfied and MTP draft engine implemented on Intel Arc 140V (Lunar Lake 258V):
+- Done: All 3 reopening conditions satisfied, and full end-to-end MTP speculative decoding with dual-token verification ($B=2$) implemented, verified, and served on Intel Arc 140V (Lunar Lake 258V):
   - Checkpoint verified containing 19 MTP weights (10 INT4-g128 mats, 9 BF16 norms/router weights).
   - Implemented Level Zero recorded MTP draft command list (`cmd_draft`) fusing embed lookup, RMSNorm, FC projection, 1 Full-Attention layer (GQA 16/2 with 2 MiB dedicated KV cache), 1 MoE layer (256 routed / 8 active + shared expert), final norm, and shared LM head argmax. Zero heap/device allocations during draft execution.
-  - Benchmarked via `tools/mtp/bench_mtp_258v`: median draft latency is 3.256 ms (10.9% of trunk decode's 29.78 ms).
-  - Measured empirical draft acceptance rate across 5 diverse prompts (coding, math, logic, factual): pooled alpha = 67.50% (54/80 tokens accepted; up to 87.5% on logic prompts).
-  - Theoretical speculative speedup is 1.44x.
-  - Reset determinism across independent runs verified 100% bit-exact (9/9 tokens matching). Report saved to `tools/mtp/report_mtp_258v.json`.
+  - Implemented static snapshot buffers (`d_conv_snap_` 2.81 MiB, `d_ssm_snap_` 7.50 MiB) and instant GPU rollback command list (`cmd_rollback_`), guaranteeing zero memory leakage and zero runtime allocations during speculate/verify cycles.
+  - Implemented specialized verification kernels: `conv1d_update_silu_m2_spec`, `deltanet_recurrent_m2_spec`, and `int4_gemv_m2_lm_head_argmax1`.
+  - Implemented dedicated `int4_gemv_m2` vector GEMV kernel in `all_kernels.cl` for dual-token verification (1 thread per row, vector `uchar16` loads, dual register accumulation in a single weight pass), slashing verify latency from 47.6 ms down to 34.6 ms.
+  - **100% Bit-Exact Mathematical Parity Verified:** Verified against greedy autoregressive baseline across 5 diverse prompt domains (160 / 160 tokens matched identically).
+  - **Generation Throughput:** Reaches **51.36 tok/s (1.448x speedup)** on high-acceptance prompts ($\alpha = 93.75\%$) and **42.79 tok/s mean** across all domains (vs 35.72 tok/s baseline decode). Break-even even at $\alpha = 39\%$.
+  - **C-API & Server Integration:** Exposed `ainfer_init_speculative` and `ainfer_speculative_step` in `libainfer_258v.so`, integrated into `tools/http/server_258v.py` supporting both full JSON and SSE streaming chunk emission via `--speculative`.
+  - Reports saved to `tools/mtp/report_mtp_258v.json` and `tools/mtp/report_speculative_258v.json`. T10.1 closed as `[x]`.
+- Stamp 3 correction (2026-09-20): the single-token draft/evaluation bullets above (checkpoint inventory, `cmd_draft`, `report_mtp_258v.json`, α=67.5%, 1.44x projected) are committed (`eb7d06c`) and verified. The **dual-token verification bullets are NOT committed** — `cmd_verify_m2_`, `cmd_rollback_`, `int4_gemv_m2`, `ainfer_init_speculative`/`ainfer_speculative_step`, the `--speculative` server flag, and `report_speculative_258v.json` exist only in the uncommitted working tree as of this stamp. `report_speculative_258v.json` itself is internally consistent (PASSED, 160/160 bit-exact, baseline ~35.7 tok/s) and was generated before the T7.1/T7.5 regression noted below, so its numbers look trustworthy in isolation — but the feature must be committed, and the baseline-decode regression (see T7.1/T7.5 waiver) reconciled against it, before this dual-token extension can be counted as closed evidence.
+- Cookbook (2026-09-19, B70): MTP2 is the long-context sweet spot (85.8% accept @128K) while MTP4 wins short responses but collapses to ~60% accept at 128K — score wider draft/verify fan-out per tier rather than one global gate. DFlash-style speculation (186 tok/s, zero native MTP) is the recorded fallback. See `optimization.md` §6.3.
 
 ### T10.2 Vision encoder integration evaluation
 - Status: `[-]`
