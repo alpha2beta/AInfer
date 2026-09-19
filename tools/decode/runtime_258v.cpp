@@ -529,10 +529,25 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
 
   // Batch prefill kernels
   // v2 processes 2 K-slices per iteration (halved barriers, denser DPAS);
-  // AINFER_GEMM_V1=1 restores the v1 kernel.
-  k_gemm_prefill_ = std::getenv("AINFER_GEMM_V1")
-                        ? get_k("int4_gemm_prefill")
-                        : get_k("int4_gemm_prefill_v2");
+  // AINFER_GEMM_V1=1 restores the v1 kernel. (A v3 without SLM staging
+  // was tried and reverted: -38% without prefetch, -50% with register
+  // prefetch (spill). SLM double-buffering is load-bearing latency
+  // hiding, not overhead.)
+  // v4 widens M_tile to 32 rows/subgroup (a_mat shared across 2 rows'
+  // DPAS); verified +7.1% over v2, bit-exact (M4 7/7). (A v5 at M_tile=64
+  // was tried and reverted: consistently slower than v4 despite no spills
+  // — likely I-cache/occupancy from the 2x loop body. M_tile=32 stands.)
+  // AINFER_GEMM_V1/V2 restore older kernels.
+  if (std::getenv("AINFER_GEMM_V1")) {
+    k_gemm_prefill_ = get_k("int4_gemm_prefill");
+    gemm_rows_per_group_ = 128;
+  } else if (std::getenv("AINFER_GEMM_V2")) {
+    k_gemm_prefill_ = get_k("int4_gemm_prefill_v2");
+    gemm_rows_per_group_ = 128;
+  } else {
+    k_gemm_prefill_ = get_k("int4_gemm_prefill_v4");
+    gemm_rows_per_group_ = 256;
+  }
   k_embed_batch_ = get_k("embed_gather_batch");
   k_norm2048_batch_ = get_k("rmsnorm_2048_batch");
   k_conv_batch_ = get_k("conv1d_update_silu_batch");
@@ -1025,7 +1040,7 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_chunk_list(int
     CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 5, sizeof(int), &K));
     CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 6, sizeof(int), &B));
     CHECK_L0_VOID(zeKernelSetGroupSize(k_gemm_prefill_, 128, 1, 1));
-    ze_group_count_t gc{(uint32_t)((M + 127) / 128), (uint32_t)((B + 31) / 32), 1};
+    ze_group_count_t gc{(uint32_t)((M + gemm_rows_per_group_ - 1) / gemm_rows_per_group_), (uint32_t)((B + 31) / 32), 1};
     CHECK_L0_VOID(zeCommandListAppendLaunchKernel(list, k_gemm_prefill_, &gc, nullptr, 0, nullptr));
   };
 
@@ -1591,7 +1606,7 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
     zeKernelSetArgumentValue(k_gemm_prefill_, 5, sizeof(int), &K);
     zeKernelSetArgumentValue(k_gemm_prefill_, 6, sizeof(int), &B);
     zeKernelSetGroupSize(k_gemm_prefill_, 128, 1, 1);
-    ze_group_count_t gc{(uint32_t)((M + 127) / 128), (uint32_t)((B + 31) / 32), 1};
+    ze_group_count_t gc{(uint32_t)((M + gemm_rows_per_group_ - 1) / gemm_rows_per_group_), (uint32_t)((B + 31) / 32), 1};
     zeCommandListAppendLaunchKernel(list, k_gemm_prefill_, &gc, nullptr, 0, nullptr);
   };
 

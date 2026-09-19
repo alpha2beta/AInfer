@@ -474,6 +474,7 @@ private:
 
   // Batch Kernel Handles
   ze_kernel_handle_t k_gemm_prefill_ = nullptr;
+  int gemm_rows_per_group_ = 128; // 128: v1/v2 (M_tile=16); 256: v4 (M_tile=32)
   ze_kernel_handle_t k_embed_batch_ = nullptr;
   ze_kernel_handle_t k_norm2048_batch_ = nullptr;
   ze_kernel_handle_t k_conv_batch_ = nullptr;

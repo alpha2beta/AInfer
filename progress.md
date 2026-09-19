@@ -439,3 +439,14 @@
   - Measured `int4_gemm_prefill` at ~1.3 TFLOPS (single-digit % of XMX peak) → DPAS density is the bound; QKV+ZAB fusion (~1% prize) deprioritized on the numbers.
   - New `int4_gemm_prefill_v2` (2 K-slices/iteration, 8 back-to-back DPAS per barrier, env-gated `AINFER_GEMM_V1`): P=441 →**328.29 tok/s** (+6.9%); sweep P=256 →335.52, P=512 →328.39, P=1024 →280.58, P=2048 →207.78. M4 7/7 bit-exact.
   - Running total at P=441: 294.80→328.29 (+11.4%); remaining gap to 525 is 1.6x. See `optimization.md` Pillar 9.
+- **2026-09-19 (GEMM v4 M_tile=32 — 352 tok/s @P=441):**
+  - New `int4_gemm_prefill_v4` (M_tile=32, `a_mat` shared across 2 rows' DPAS, `gemm_rows_per_group_` halves m-groups; no-SLM v3 detour tried and reverted: -38%/-50%). Now default (`AINFER_GEMM_V1`/`V2` fall back).
+  - P=441 →**351.62 tok/s** (+7.1%); sweep P=256 →362.48 (+8.0%), P=512 →351.94 (+7.2%), P=1024 →293.89, P=2048 →222.20. M4 7/7 bit-exact.
+  - Running total at P=441: 294.80→351.62 (+19.3%); remaining gap to 525 is 1.49x. See `optimization.md` Pillar 10.
+- **2026-09-19 (GEMM v5 M_tile=64 — negative, reverted):**
+  - 4 rows/lane, 16 DPAS per shared `a_mat`, asm-confirmed no spills. Measured worse than v4 in every run (best 272 vs v4's worst 328 @P=441) — I-cache/occupancy suspected. Fully reverted (kernel removed, switch restored); M4 7/7 bit-exact on v4 default.
+  - Methodology note: ±7% run variance this session (long-uptime shared box) — treat small deltas with suspicion, repeat runs.
+- **2026-09-19 (Integer-DPAS path B — closed without code changes):**
+  - Probed IGC builtins: `s8_s8`/`u8_s8` matrix builtins don't exist; only `int8 u8_u8_matrix_mad_k32(uint, uint8, int)` (compile-confirmed). It computes 8 length-8 dots/lane (64 MACs) vs 1024 for FP16 k16, is unsigned-only, and still needs nibble unpacking — loses three ways. Path B closed; s4 emission would need ESIMD/inline-asm. See Pillar 10 verdict.
+- **2026-09-19 (GEMM v3 negative result — reverted):**
+  - Removed SLM staging from the prefill GEMM (direct X loads, zero barriers): **-38%** (315→196 tok/s @P=441). Register-prefetch variant: **-50%** (spill). Asm diagnosis (8 DPAS vs ~1000 scalar/mem ops, no spills) stands, but the SLM double-buffer is load-bearing latency hiding. Reverted to v2 (327.94 tok/s confirmed, M4 7/7 bit-exact). Lesson recorded in Pillar 9: attack M-tiles/occupancy or integer DPAS next, never staging removal.

@@ -2861,6 +2861,233 @@ __kernel void gqa_attn_prefill_batch_v2(
     out[(size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid] = attn_val * sig_g;
 }
 
+// =========================================================================
+// =========================================================================
+// 1e. INT4 Group-128 Batched Prefill GEMM v4: identical numerics to v2,
+// but M_tile=32 rows per subgroup (each lane handles 2 rows) instead of
+// 16. The costly a_mat SLM-gather is built ONCE per token-tile and shared
+// across both rows' DPAS (8 DPAS per slice-pair instead of 4 for the same
+// setup cost). Group x-dim is (M+255)/256 (256 rows/group); the runtime
+// sizes it accordingly when v4 is active. Env-gated (v1/v2 fallbacks kept).
+// =========================================================================
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void int4_gemm_prefill_v4(
+    __global float * restrict Y,              // [B, M] row-major: Y[b * M + m]
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict X,        // [B, K] row-major: X[b * K + k]
+    int M,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_m = get_group_id(0);
+    int grp_b = get_group_id(1);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    // 32 rows per subgroup (256 rows per 128-thread group)
+    int m_tile_idx = grp_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 32;
+    if (grp_m * 256 >= M) return;
+
+    int m0 = m_base + lid;
+    int m1 = m_base + 16 + lid;
+    int safe_m0 = (m0 < M) ? m0 : 0;
+    int safe_m1 = (m1 < M) ? m1 : 0;
+    int num_groups = K / GROUP_SIZE;
+
+    __global const uchar *row_w0 = w_packed + (size_t)safe_m0 * (K / 2);
+    __global const uchar *row_w1 = w_packed + (size_t)safe_m1 * (K / 2);
+    __global const ushort *row_s0 = w_scale + (size_t)safe_m0 * num_groups;
+    __global const ushort *row_s1 = w_scale + (size_t)safe_m1 * num_groups;
+
+    int b_base = grp_b * 32;
+    if (b_base >= B) return;
+
+    int cur_B0 = (B - b_base > 0) ? min(8, B - b_base) : 0;
+    int cur_B1 = (B - (b_base + 8) > 0) ? min(8, B - (b_base + 8)) : 0;
+    int cur_B2 = (B - (b_base + 16) > 0) ? min(8, B - (b_base + 16)) : 0;
+    int cur_B3 = (B - (b_base + 24) > 0) ? min(8, B - (b_base + 24)) : 0;
+
+    float8 acc0 = (float8)(0.0f);
+    float8 acc1 = (float8)(0.0f);
+    float8 acc2 = (float8)(0.0f);
+    float8 acc3 = (float8)(0.0f);
+    float8 acc4 = (float8)(0.0f);
+    float8 acc5 = (float8)(0.0f);
+    float8 acc6 = (float8)(0.0f);
+    float8 acc7 = (float8)(0.0f);
+
+    int tid = get_local_id(0); // 0..127
+    int tok_idx = tid / 4;      // 0..31
+    int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+    int b_curr = b_base + tok_idx;
+
+    __local half s_x[2][2][32][16]; // [buf][slice-in-pair][tok][k]
+
+    int total_steps = num_groups * 8; // (K / 128) * 8, always even
+    int total_pairs = total_steps / 2;
+
+    // Prologue: stage pair 0 (slices 0,1)
+    #pragma unroll
+    for (int ps = 0; ps < 2; ++ps) {
+        float4 xv0 = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + ps * 16 + k_sub) : (float4)(0.0f);
+        s_x[0][ps][tok_idx][k_sub + 0] = (half)xv0.x;
+        s_x[0][ps][tok_idx][k_sub + 1] = (half)xv0.y;
+        s_x[0][ps][tok_idx][k_sub + 2] = (half)xv0.z;
+        s_x[0][ps][tok_idx][k_sub + 3] = (half)xv0.w;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int pr = 0; pr < total_pairs; ++pr) {
+        int cur_buf = pr & 1;
+        int next_buf = (pr + 1) & 1;
+
+        if (pr + 1 < total_pairs) {
+            #pragma unroll
+            for (int ps = 0; ps < 2; ++ps) {
+                int next_k = (pr * 2 + 2 + ps) * 16;
+                float4 xv_next = (b_curr < B) ? vload4(0, X + (size_t)b_curr * K + next_k + k_sub) : (float4)(0.0f);
+                s_x[next_buf][ps][tok_idx][k_sub + 0] = (half)xv_next.x;
+                s_x[next_buf][ps][tok_idx][k_sub + 1] = (half)xv_next.y;
+                s_x[next_buf][ps][tok_idx][k_sub + 2] = (half)xv_next.z;
+                s_x[next_buf][ps][tok_idx][k_sub + 3] = (half)xv_next.w;
+            }
+        }
+
+        #pragma unroll
+        for (int ps = 0; ps < 2; ++ps) {
+            int sl = pr * 2 + ps;
+            int g = sl / 8;
+
+            // Unpack row 0
+            float s_val0 = bf16_to_fp32(row_s0[g]);
+            half s_half0 = (half)s_val0;
+            __global const uchar *w_ptr0 = row_w0 + (size_t)sl * 8;
+            uchar8 raw_w0 = *((__global const uchar8 *)w_ptr0);
+            half w_deq0[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w0)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq0[2 * i]     = (half)((float)n0) * s_half0;
+                w_deq0[2 * i + 1] = (half)((float)n1) * s_half0;
+            }
+            int8 b_mat0;
+            __builtin_memcpy(&b_mat0, w_deq0, 32);
+
+            // Unpack row 1
+            float s_val1 = bf16_to_fp32(row_s1[g]);
+            half s_half1 = (half)s_val1;
+            __global const uchar *w_ptr1 = row_w1 + (size_t)sl * 8;
+            uchar8 raw_w1 = *((__global const uchar8 *)w_ptr1);
+            half w_deq1[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w1)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq1[2 * i]     = (half)((float)n0) * s_half1;
+                w_deq1[2 * i + 1] = (half)((float)n1) * s_half1;
+            }
+            int8 b_mat1;
+            __builtin_memcpy(&b_mat1, w_deq1, 32);
+
+            // a_mat built ONCE, shared by both rows' DPAS
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B0) ((short *)&a_mat0)[bi] = as_short(s_x[cur_buf][ps][bi][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat0, acc0);
+            acc4 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat1, acc4);
+
+            if (cur_B1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B1) ((short *)&a_mat1)[bi] = as_short(s_x[cur_buf][ps][8 + bi][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat0, acc1);
+                acc5 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat1, acc5);
+            }
+
+            if (cur_B2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B2) ((short *)&a_mat2)[bi] = as_short(s_x[cur_buf][ps][16 + bi][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat0, acc2);
+                acc6 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat1, acc6);
+            }
+
+            if (cur_B3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int bi = 0; bi < 8; ++bi) {
+                    if (bi < cur_B3) ((short *)&a_mat3)[bi] = as_short(s_x[cur_buf][ps][24 + bi][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat0, acc3);
+                acc7 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat1, acc7);
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // Store both rows (each guarded independently)
+    if (m0 < M) {
+        #pragma unroll
+        for (int bi = 0; bi < 8; ++bi) {
+            if (bi < cur_B0) Y[(size_t)(b_base + bi) * M + m0] = ((float *)&acc0)[bi];
+        }
+        if (cur_B1 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B1) Y[(size_t)(b_base + 8 + bi) * M + m0] = ((float *)&acc1)[bi];
+            }
+        }
+        if (cur_B2 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B2) Y[(size_t)(b_base + 16 + bi) * M + m0] = ((float *)&acc2)[bi];
+            }
+        }
+        if (cur_B3 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B3) Y[(size_t)(b_base + 24 + bi) * M + m0] = ((float *)&acc3)[bi];
+            }
+        }
+    }
+    if (m1 < M) {
+        #pragma unroll
+        for (int bi = 0; bi < 8; ++bi) {
+            if (bi < cur_B0) Y[(size_t)(b_base + bi) * M + m1] = ((float *)&acc4)[bi];
+        }
+        if (cur_B1 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B1) Y[(size_t)(b_base + 8 + bi) * M + m1] = ((float *)&acc5)[bi];
+            }
+        }
+        if (cur_B2 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B2) Y[(size_t)(b_base + 16 + bi) * M + m1] = ((float *)&acc6)[bi];
+            }
+        }
+        if (cur_B3 > 0) {
+            #pragma unroll
+            for (int bi = 0; bi < 8; ++bi) {
+                if (bi < cur_B3) Y[(size_t)(b_base + 24 + bi) * M + m1] = ((float *)&acc7)[bi];
+            }
+        }
+    }
+}
+
 __kernel void moe_topk_router_batch(
     __global const float * restrict x,
     __global const float * restrict w_gate,
