@@ -2,6 +2,7 @@
 // Contains all kernels for both DeltaNet (30 layers) and Full-Attention (10 layers) blocks.
 
 #pragma OPENCL EXTENSION cl_intel_subgroup_matrix_multiply_accumulate : enable
+#pragma OPENCL EXTENSION cl_intel_subgroups : enable
 
 #define GROUP_SIZE 128
 #define HIDDEN_DIM 2048
@@ -2246,6 +2247,129 @@ __kernel void deltanet_recurrent_batch(
     }
 }
 
+// =========================================================================
+// DeltaNet recurrence v2: identical numerics to deltanet_recurrent_batch,
+// but processes tokens in batches of 4 per workgroup barrier instead of
+// 1 (q/k for 4 steps staged in SLM, then 4 sequential register-only
+// steps). Barrier cost drops from B to B/4 per launch.
+// Requires subgroup size 16 only for consistency; no shuffle used.
+// =========================================================================
+__kernel void deltanet_recurrent_batch_v2(
+    __global float * restrict out,
+    __global float * restrict state,
+    __global const float * restrict q,
+    __global const float * restrict k,
+    __global const float * restrict v,
+    __global const float * restrict g,
+    __global const float * restrict beta,
+    int B
+) {
+    int h = get_group_id(0);
+    if (h >= H_V) return;
+    int j = get_local_id(0);
+
+    // Double-buffered 4-step staging in SLM (2x4KB q + 2x4KB k = 16KB,
+    // well within 128KB SLM).
+    __local float s_q[2][4][S_V];
+    __local float s_k[2][4][S_V];
+
+    int kh = h / 2;
+    __global float * S_h = state + (size_t)h * (S_V * S_V);
+
+    float s_col[S_V];
+    #pragma unroll 2
+    for (int i = 0; i < S_V; ++i) {
+        s_col[i] = S_h[i * S_V + j];
+    }
+
+    // Double-buffered staging: while computing batch N from buf_cur,
+    // stage batch N+1 into buf_nxt (disjoint buffers, no hazard), so only
+    // ONE barrier per 4 steps instead of one per step.
+    int cur = 0;
+    int steps0 = min(4, B);
+    #pragma unroll
+    for (int s = 0; s < 4; ++s) {
+        if (s < steps0) {
+            s_q[cur][s][j] = q[(size_t)s * (H_K * S_V) + kh * S_V + j];
+            s_k[cur][s][j] = k[(size_t)s * (H_K * S_V) + kh * S_V + j];
+        }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int b0 = 0; b0 < B; b0 += 4) {
+        int steps = min(4, B - b0);
+        int nxt = cur ^ 1;
+        // Compute current batch (register-only w.r.t. staged SLM).
+        #pragma unroll 1
+        for (int s = 0; s < 4; ++s) {
+            if (s < steps) {
+                int b = b0 + s;
+                float v_val = v[(size_t)b * C_QKV + 4096 + h * S_V + j];
+                float g_val = g[(size_t)b * H_V + h];
+                float b_val = beta[(size_t)b * H_V + h];
+
+                // 4-way split accumulators break the single-chain FMA
+                // dependency stall (128 sequential FMAs -> 4x32 parallel).
+                float kv0 = 0.0f, kv1 = 0.0f, kv2 = 0.0f, kv3 = 0.0f;
+                #pragma unroll 2
+                for (int i = 0; i < S_V; i += 4) {
+                    kv0 += s_col[i]     * s_k[cur][s][i];
+                    kv1 += s_col[i + 1] * s_k[cur][s][i + 1];
+                    kv2 += s_col[i + 2] * s_k[cur][s][i + 2];
+                    kv3 += s_col[i + 3] * s_k[cur][s][i + 3];
+                }
+                float kv_acc = (kv0 + kv1) + (kv2 + kv3);
+                float kv_j = kv_acc * g_val;
+                float delta_j = (v_val - kv_j) * b_val;
+
+                float o0 = 0.0f, o1 = 0.0f, o2 = 0.0f, o3 = 0.0f;
+                #pragma unroll 2
+                for (int i = 0; i < S_V; i += 4) {
+                    float s_old0 = s_col[i];
+                    float s_new0 = g_val * s_old0 + s_k[cur][s][i] * delta_j;
+                    s_col[i] = s_new0;
+                    o0 += s_new0 * s_q[cur][s][i];
+                    float s_old1 = s_col[i + 1];
+                    float s_new1 = g_val * s_old1 + s_k[cur][s][i + 1] * delta_j;
+                    s_col[i + 1] = s_new1;
+                    o1 += s_new1 * s_q[cur][s][i + 1];
+                    float s_old2 = s_col[i + 2];
+                    float s_new2 = g_val * s_old2 + s_k[cur][s][i + 2] * delta_j;
+                    s_col[i + 2] = s_new2;
+                    o2 += s_new2 * s_q[cur][s][i + 2];
+                    float s_old3 = s_col[i + 3];
+                    float s_new3 = g_val * s_old3 + s_k[cur][s][i + 3] * delta_j;
+                    s_col[i + 3] = s_new3;
+                    o3 += s_new3 * s_q[cur][s][i + 3];
+                }
+                float o_acc = (o0 + o1) + (o2 + o3);
+
+                out[(size_t)b * (H_V * S_V) + h * S_V + j] = o_acc * SCALE_128;
+            }
+        }
+        if (b0 + 4 < B) {
+            // Stage next batch into the idle buffer (safe: not read since
+            // two iterations ago / never), then publish with one barrier.
+            int steps_n = min(4, B - b0 - 4);
+            #pragma unroll
+            for (int s = 0; s < 4; ++s) {
+                if (s < steps_n) {
+                    int b = b0 + 4 + s;
+                    s_q[nxt][s][j] = q[(size_t)b * (H_K * S_V) + kh * S_V + j];
+                    s_k[nxt][s][j] = k[(size_t)b * (H_K * S_V) + kh * S_V + j];
+                }
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+            cur = nxt;
+        }
+    }
+
+    #pragma unroll 2
+    for (int i = 0; i < S_V; ++i) {
+        S_h[i * S_V + j] = s_col[i];
+    }
+}
+
 __kernel void deltanet_head_norm_silu_z_batch(
     __global float * restrict final_out,
     __global const float * restrict attn_out,
@@ -2443,6 +2567,111 @@ __kernel void gqa_attn_prefill_batch(
             float exp_diff = exp(score - run_max);
             run_sum += exp_diff;
             run_acc += exp_diff * v_val;
+        }
+    }
+
+    float attn_val = run_acc / run_sum;
+    float g_val = gate[(size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid];
+    float sig_g = 1.0f / (1.0f + exp(-g_val));
+
+    out[(size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid] = attn_val * sig_g;
+}
+
+// =========================================================================
+// GQA attention prefill v2: identical numerics to gqa_attn_prefill_batch,
+// but the per-position dot-product reduction uses in-register subgroup
+// butterfly shuffles (0 barriers) plus one SLM exchange per 4 positions,
+// instead of a 256-wide SLM tree reduction (~10 barriers) per position.
+// Barrier cost drops from ~10/position to 0.25/position.
+// Requires subgroup size 16 (same assumption as moe_*_grouped_batch).
+// =========================================================================
+// Force subgroup size 16: the shuffle butterfly below assumes 16 lanes
+// (IGC may otherwise pick SIMD32 for this light kernel).
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void gqa_attn_prefill_batch_v2(
+    __global float * restrict out,
+    __global const float * restrict q,
+    __global const float * restrict gate,
+    __global const ushort * restrict k_cache,
+    __global const ushort * restrict v_cache,
+    __global const int * restrict ctrl,
+    uint max_ctx,
+    int B
+) {
+    int group_id = get_group_id(0);
+    if (group_id >= B * NUM_Q_HEADS) return;
+    int b = group_id / NUM_Q_HEADS;
+    int qh = group_id % NUM_Q_HEADS;
+    int tid = get_local_id(0);
+    int lane = get_sub_group_local_id();
+    int sg = get_sub_group_id();
+
+    uint pos = (uint)ctrl[1] + (uint)b;
+    int kv_h = qh / GQA_GROUP_SIZE;
+
+    // Private q element for this dim (v1 kept it in SLM but each thread
+    // only ever reads its own lane — no sharing, no barrier needed).
+    float qv = q[(size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid];
+
+    __local float s_part[64]; // 16 subgroups x 4 positions
+
+    float run_max = -1e30f;
+    float run_sum = 0.0f;
+    float run_acc = 0.0f;
+
+    uint total_tokens = pos + 1;
+
+    for (uint tb = 0; tb < total_tokens; tb += 4) {
+        float part[4];
+        #pragma unroll
+        for (int u = 0; u < 4; ++u) {
+            uint t = tb + (uint)u;
+            float kval = 0.0f;
+            if (t < total_tokens) {
+                __global const ushort * k_slot = k_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                kval = bf16_to_float(k_slot[tid]);
+            }
+            part[u] = qv * kval;
+        }
+        // Subgroup butterfly reduction over the 16 lanes (register-only).
+        // XOR pattern keeps every shuffle id in range.
+        #pragma unroll
+        for (int u = 0; u < 4; ++u) {
+            float v = part[u];
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+            part[u] = v;
+        }
+        if (lane == 0) {
+            #pragma unroll
+            for (int u = 0; u < 4; ++u) s_part[sg * 4 + u] = part[u];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        // Every thread sums the 16 subgroup partials per position
+        // (register-only, no second reduction pass needed).
+        #pragma unroll
+        for (int u = 0; u < 4; ++u) {
+            float s = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 16; ++i) s += s_part[i * 4 + u];
+            uint t = tb + (uint)u;
+            if (t < total_tokens) {
+                __global const ushort * v_slot = v_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                float v_val = bf16_to_float(v_slot[tid]);
+                float sc = s * ATTN_SCALE;
+                if (sc > run_max) {
+                    float ed = exp(run_max - sc);
+                    run_max = sc;
+                    run_sum = run_sum * ed + 1.0f;
+                    run_acc = run_acc * ed + v_val;
+                } else {
+                    float ed = exp(sc - run_max);
+                    run_sum += ed;
+                    run_acc += ed * v_val;
+                }
+            }
         }
     }
 

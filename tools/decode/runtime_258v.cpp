@@ -533,11 +533,19 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_conv_batch_ = get_k("conv1d_update_silu_batch");
   k_l2_norm_qk_batch_ = get_k("head_l2_norm_qk_batch");
   k_gate_prep_batch_ = get_k("gate_prep_batch");
-  k_recr_batch_ = get_k("deltanet_recurrent_batch");
+  // v2 double-buffers 4 recurrence steps per workgroup barrier (1 B/4
+  // barriers vs B); AINFER_RECR_V1=1 restores the v1 kernel.
+  k_recr_batch_ = std::getenv("AINFER_RECR_V1")
+                      ? get_k("deltanet_recurrent_batch")
+                      : get_k("deltanet_recurrent_batch_v2");
   k_hnorm_batch_ = get_k("deltanet_head_norm_silu_z_batch");
   k_deinterleave_qg_batch_ = get_k("deinterleave_q_gate_batch");
   k_rope_batch_ = get_k("rope_and_kv_append_batch");
-  k_attn_batch_ = get_k("gqa_attn_prefill_batch");
+  // v2 uses in-register subgroup-shuffle reduction (0.25 barriers/position
+  // vs ~10 in v1); AINFER_ATTN_V1=1 restores the v1 SLM-tree kernel.
+  k_attn_batch_ = std::getenv("AINFER_ATTN_V1")
+                      ? get_k("gqa_attn_prefill_batch")
+                      : get_k("gqa_attn_prefill_batch_v2");
   k_router_batch_ = get_k("moe_topk_router_batch");
   k_moe_build_expert_bins_ = get_k("moe_build_expert_bins");
   k_moe_gateup_grouped_batch_ = get_k("moe_gateup_grouped_batch");
@@ -1824,6 +1832,86 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
   std::printf("-----------------------------------------------------------------\n");
   std::printf("  1 DeltaNet Layer Total:                 %6.3f ms\n", per_dn_layer);
   std::printf("  Extrapolated 30 DeltaNet Layers:        %6.3f ms\n", per_dn_layer * 30.0);
+
+  // 5. Full-Attention Layer (Layer 3 bindings; MoE tail shared with DeltaNet)
+  const LayerBinding &l3b = layers_[3];
+  double t_fa_qkv = time_cmd([&](ze_command_list_handle_t list) {
+    append_gemm_to_list(list, d_q_proj_raw_chunk_, l3b.q_proj_w, l3b.q_proj_s, d_x_norm_chunk_, 2 * NUM_Q_HEADS * HEAD_DIM, HIDDEN_DIM);
+    append_gemm_to_list(list, d_k_full_chunk_, l3b.k_proj_w, l3b.k_proj_s, d_x_norm_chunk_, NUM_KV_HEADS * HEAD_DIM, HIDDEN_DIM);
+    append_gemm_to_list(list, d_v_full_chunk_, l3b.v_proj_w, l3b.v_proj_s, d_x_norm_chunk_, NUM_KV_HEADS * HEAD_DIM, HIDDEN_DIM);
+  });
+  double t_fa_prep = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 0, sizeof(void *), &d_q_full_chunk_);
+    zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 1, sizeof(void *), &d_gate_full_chunk_);
+    zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 2, sizeof(void *), &d_q_proj_raw_chunk_);
+    zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 3, sizeof(int), &B);
+    zeKernelSetGroupSize(k_deinterleave_qg_batch_, 256, 1, 1);
+    ze_group_count_t gcnt_deint{(uint32_t)((B * NUM_Q_HEADS * HEAD_DIM + 255) / 256), 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_deinterleave_qg_batch_, &gcnt_deint, nullptr, 0, nullptr);
+    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+    int total_nq = B * NUM_Q_HEADS;
+    zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &d_q_full_chunk_);
+    zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &d_q_full_chunk_);
+    zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &l3b.q_norm_w);
+    zeKernelSetArgumentValue(k_norm256_, 3, sizeof(int), &total_nq);
+    zeKernelSetGroupSize(k_norm256_, 64, 1, 1);
+    ze_group_count_t gcnt_nq{(uint32_t)total_nq, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_norm256_, &gcnt_nq, nullptr, 0, nullptr);
+    int total_nkv = B * NUM_KV_HEADS;
+    zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &d_k_full_chunk_);
+    zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &d_k_full_chunk_);
+    zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &l3b.k_norm_w);
+    zeKernelSetArgumentValue(k_norm256_, 3, sizeof(int), &total_nkv);
+    zeKernelSetGroupSize(k_norm256_, 64, 1, 1);
+    ze_group_count_t gcnt_nkv{(uint32_t)total_nkv, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_norm256_, &gcnt_nkv, nullptr, 0, nullptr);
+    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+    uint32_t max_c = max_ctx_;
+    zeKernelSetArgumentValue(k_rope_batch_, 0, sizeof(void *), &d_q_full_chunk_);
+    zeKernelSetArgumentValue(k_rope_batch_, 1, sizeof(void *), &d_k_full_chunk_);
+    zeKernelSetArgumentValue(k_rope_batch_, 2, sizeof(void *), &d_v_full_chunk_);
+    zeKernelSetArgumentValue(k_rope_batch_, 3, sizeof(void *), &l3b.k_cache);
+    zeKernelSetArgumentValue(k_rope_batch_, 4, sizeof(void *), &l3b.v_cache);
+    zeKernelSetArgumentValue(k_rope_batch_, 5, sizeof(void *), &d_ctrl_);
+    zeKernelSetArgumentValue(k_rope_batch_, 6, sizeof(uint32_t), &max_c);
+    zeKernelSetArgumentValue(k_rope_batch_, 7, sizeof(int), &B);
+    zeKernelSetGroupSize(k_rope_batch_, 256, 1, 1);
+    ze_group_count_t gcnt_rope{(uint32_t)B, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_rope_batch_, &gcnt_rope, nullptr, 0, nullptr);
+  });
+  // d_ctrl_ is host-visible shared memory: pin base position to 0 so the
+  // attention timing reflects a fresh prefill (queries attend t=0..b),
+  // not whatever position a prior prefill left behind.
+  d_ctrl_->position = 0;
+  double t_fa_attn = time_cmd([&](ze_command_list_handle_t list) {
+    uint32_t max_c = max_ctx_;
+    zeKernelSetArgumentValue(k_attn_batch_, 0, sizeof(void *), &d_attn_out_chunk_);
+    zeKernelSetArgumentValue(k_attn_batch_, 1, sizeof(void *), &d_q_full_chunk_);
+    zeKernelSetArgumentValue(k_attn_batch_, 2, sizeof(void *), &d_gate_full_chunk_);
+    zeKernelSetArgumentValue(k_attn_batch_, 3, sizeof(void *), &l3b.k_cache);
+    zeKernelSetArgumentValue(k_attn_batch_, 4, sizeof(void *), &l3b.v_cache);
+    zeKernelSetArgumentValue(k_attn_batch_, 5, sizeof(void *), &d_ctrl_);
+    zeKernelSetArgumentValue(k_attn_batch_, 6, sizeof(uint32_t), &max_c);
+    zeKernelSetArgumentValue(k_attn_batch_, 7, sizeof(int), &B);
+    zeKernelSetGroupSize(k_attn_batch_, 256, 1, 1);
+    ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_attn_batch_, &gcnt_attn, nullptr, 0, nullptr);
+  });
+  double t_fa_out = time_cmd([&](ze_command_list_handle_t list) {
+    append_gemm_to_list(list, d_attn_proj_chunk_, l3b.o_proj_w, l3b.o_proj_s, d_attn_out_chunk_, HIDDEN_DIM, NUM_Q_HEADS * HEAD_DIM);
+  });
+  double t_moe_tail = t_router + t_moe_gu + t_moe_silu + t_moe_dn + t_moe_accum + t_sh_exp;
+  double per_fa_layer = t_fa_qkv + t_fa_prep + t_fa_attn + t_fa_out + t_moe_tail;
+  std::printf("-----------------------------------------------------------------\n");
+  std::printf("[FullAttn] QKV Projs:                      %6.3f ms\n", t_fa_qkv);
+  std::printf("[FullAttn] Deinterleave+Norms+RoPE:        %6.3f ms\n", t_fa_prep);
+  std::printf("[FullAttn] GQA Attention:                  %6.3f ms\n", t_fa_attn);
+  std::printf("[FullAttn] Out Proj:                       %6.3f ms\n", t_fa_out);
+  std::printf("[FullAttn] MoE Tail (shared):              %6.3f ms\n", t_moe_tail);
+  std::printf("  1 Full-Attn Layer Total:                %6.3f ms\n", per_fa_layer);
+  std::printf("  Extrapolated 10 Full-Attn Layers:       %6.3f ms\n", per_fa_layer * 10.0);
+  std::printf("  Full-model estimate (30xDN + 10xFA):    %6.3f ms\n",
+              per_dn_layer * 30.0 + per_fa_layer * 10.0);
   std::printf("=================================================================\n\n");
 
   return true;

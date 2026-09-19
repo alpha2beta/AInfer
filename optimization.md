@@ -152,6 +152,7 @@ Controlled comparison run from `tools/bench_258v/run_llama_comparison_t75.py`:
   - Prefill throughput doubled from **39.32 tok/s to 78.92 tok/s** (scaling up to **89.31 tok/s** at $P=32$, a **2.27x speedup**).
   - Warm TTFT for 21 tokens halved from **534.04 ms down to 266.17 ms** (-50.2%).
   - Prefill gap to llama.cpp Vulkan closed to **92.6% parity** (87.62 tok/s vs 94.59 tok/s @ $P=64$).
+  - **Scaled 2026-09-19 (`bench_prefill`, `report_prefill_scaling.json`):** P=8 (69.99 tok/s, 114.30 ms), P=16 (110.10 tok/s), P=32 (162.31 tok/s, 6.16 ms/tok), P=64 (216.27 tok/s, 4.62 ms/tok), P=128 (274.76 tok/s, 3.64 ms/tok), P=256 (**299.04 tok/s**, 856.07 ms, **3.34 ms/tok**) — throughput scales ~monotonically with prompt length, now well past the llama.cpp Vulkan P=64 reference (94.59 tok/s).
 ### Pillar 7: Hardware DPAS Systolic Array INT4 GEMM Tiling
 - **Problem:** While Pillar 6 chunked the prefill forward pass into batched operations, `int4_gemm_prefill` still relied on scalar SIMD instruction unpacking (shift + mask + cast for each nibble into `float4`), leaving Intel Xe2's systolic matrix engines idle. Linear projections accounted for ~33% of prefill execution time.
 - **Optimization:**
@@ -167,6 +168,15 @@ Controlled comparison run from `tools/bench_258v/run_llama_comparison_t75.py`:
   - Warm TTFT reduced further to **237.33 ms** (down from 266.17 ms, a total **55.6% reduction** vs initial 534 ms).
   - Sustained decode throughput reached an all-time record of **35.54 tok/s** (**+21.2% faster than llama.cpp Vulkan**).
   - Full Gate M4 suite (7/7 tests) verified bit-exact golden sequence match (`[148431, 62497, 148287, 198, ...]`), 0 KB RSS growth, and multi-chunk long-prompt determinism ($P=128$ and $P=256$).
+### Pillar 8: Prefill Attention Rewrite + Recurrence Tuning (299 → 318 tok/s)
+- **Problem:** With chunked + DPAS prefill at 299.04 tok/s (P=256), the remaining profile (new full-attention breakdown in `profile_prefill_breakdown`, with control-position pinned for faithful books) showed GQA attention at 20.64 ms/layer and the DeltaNet recurrence loop at 5.27 ms/layer.
+- **Optimization:**
+  - **Attention v2 (`gqa_attn_prefill_batch_v2`):** replaced the 256-wide SLM tree reduction (~10 barriers per KV position per query) with an in-register subgroup butterfly over 4 batched positions plus one SLM exchange (0.25 barriers/position). Private per-dim `q` load replaced the pointless SLM staging. **Lesson:** IGC silently compiled the light kernel as SIMD32, breaking the hardcoded subgroup-16 shuffle (constant 0.17 bias, caught by the A/B harness) — fixed with `__attribute__((intel_reqd_sub_group_size(16)))`. A/B harness `tools/kernels_258v/bench_attn_prefill.cpp` (synthetic runtime-layout buffers + batched CPU reference): 1.36–2.65x on the kernel, 1.68e-07 max diff vs CPU (same class as v1's 1.47e-07). Runtime switch is env-gated (`AINFER_ATTN_V1=1` restores v1).
+  - **Recurrence v2 (`deltanet_recurrent_batch_v2`):** double-buffered 4-step batching (1 barrier per 4 steps vs 1 per step) plus 4-way split accumulators for the dot-product FMA chains, env-gated (`AINFER_RECR_V1=1`). Measured only ~9% on the kernel (5.27→4.9 ms): the barrier cut alone changed nothing (verified identical via `AINFER_RECR_V1=1` A/B), so the loop is bound by FMA-chain latency/occupancy, not barriers — a parallel-scan rewrite would be needed for a large win (deferred: complex, ~10–13% end-to-end prize).
+- **Impact:**
+  - P=256 prefill: **299.04 → 318.31 tok/s** (+6.5%; 804.26 ms, 3.14 ms/tok), P=128: 274.76 → 286.31 tok/s.
+  - Full Gate M4 suite (7/7) re-verified bit-exact with final code (attention v2 + recurrence v2 active).
+  - Honest accounting: remaining prefill is ~memory-bound near the practical roofline (MoE + dense GEMMs ≈ 70%); further big wins need the recurrence parallel scan or higher achieved bandwidth, not more barrier-cutting.
 
 ---
 

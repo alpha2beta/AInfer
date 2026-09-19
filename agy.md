@@ -17,7 +17,7 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, budget | `[~]` In Progress (4/5; T2.5 open with T5.1 waiver) |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ loader, rejection | ✅ Done (6/6) |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet | ✅ Done (7/7) |
-| **Phase 5** | M4: Unified Runtime | Single-process arena manager, in-memory prefill→decode | ✅ Done (6/6; 35.54 tok/s committed, 0 KB growth × 10 runs) |
+| **Phase 5** | M4: Unified Runtime | Single-process arena manager, in-memory prefill→decode | ✅ Done (6/6; 35.54 tok/s decode committed, prefill 318.31 tok/s @P=256, 0 KB growth × 10 runs) |
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, needle tests | ✅ Done (6/6; 187/200 passed 93.5%, BF16 KV default) |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline model | ✅ Done (5/5; 35.54 tok/s committed, beats llama.cpp Vulkan by 1.21x — see uncommitted-regression note in `STATUS.md`) |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation | `[~]` In Progress (3/4; T8.4 leak audit FAILED per committed evidence, re-run needed) |
