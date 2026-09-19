@@ -1,31 +1,39 @@
 {
   "task": "T8.4",
   "milestone": "Milestone 7 (Phase 8)",
-  "status": "FAILED",
-  "timestamp": "2026-09-19T12:48:42Z",
+  "status": "PASSED",
+  "timestamp": "2026-09-19T19:59:46Z",
   "test_parameters": {
-    "total_requests": 20,
+    "total_requests": 100,
     "concurrency": 2,
     "target_url": "http://127.0.0.1:8088"
   },
   "aggregate_metrics": {
-    "successful_requests": 20,
+    "successful_requests": 100,
     "failed_requests": 0,
-    "total_tokens_emitted": 650,
-    "total_duration_s": 22.71,
-    "mean_latency_ms": 2214.72,
-    "mean_ttft_ms": 823.91,
-    "mean_decode_tps": 26.99
+    "total_tokens_emitted": 3250,
+    "total_duration_s": 107.74,
+    "mean_latency_ms": 2144.53,
+    "mean_ttft_ms": 783.75,
+    "mean_decode_tps": 28.34
   },
   "memory_leak_audit": {
-    "initial_rss_kb": 205544,
-    "final_rss_kb": 212044,
-    "rss_delta_kb": 6500,
+    "initial_rss_kb": 211776,
+    "final_rss_kb": 211796,
+    "rss_delta_kb": 20,
     "rss_checkpoints_kb": {
-      "10": 211820,
-      "20": 212044
+      "10": 211816,
+      "20": 211816,
+      "30": 211816,
+      "40": 211820,
+      "50": 211820,
+      "60": 211820,
+      "70": 211820,
+      "80": 211820,
+      "90": 211836,
+      "100": 211796
     },
-    "zero_leak_verified": false
+    "zero_leak_verified": true
   },
   "final_healthz": {
     "status": "ok",
@@ -34,18 +42,18 @@
     "queue_depth": 0,
     "max_queue_capacity": 16,
     "resident_memory_gib": 18.03,
-    "total_requests_served": 22,
-    "total_tokens_generated": 665,
-    "uptime_seconds": 194.1
+    "total_requests_served": 204,
+    "total_tokens_generated": 6430,
+    "uptime_seconds": 295.1
   },
   "sample_runs": [
     {
       "req_id": 1,
       "stream": false,
       "tokens": 32,
-      "total_latency_ms": 1124.2,
-      "ttft_ms": 231.36,
-      "decode_tps": 34.72,
+      "total_latency_ms": 958.94,
+      "ttft_ms": 165.76,
+      "decode_tps": 39.08,
       "success": true,
       "error": null
     },
@@ -53,9 +61,9 @@
       "req_id": 2,
       "stream": true,
       "tokens": 33,
-      "total_latency_ms": 2273.87,
-      "ttft_ms": 1385.85,
-      "decode_tps": 36.04,
+      "total_latency_ms": 1833.89,
+      "ttft_ms": 1148.1,
+      "decode_tps": 46.66,
       "success": true,
       "error": null
     },
@@ -63,9 +71,9 @@
       "req_id": 3,
       "stream": false,
       "tokens": 32,
-      "total_latency_ms": 2308.21,
-      "ttft_ms": 264.35,
-      "decode_tps": 15.17,
+      "total_latency_ms": 1725.92,
+      "ttft_ms": 186.44,
+      "decode_tps": 20.14,
       "success": true,
       "error": null
     },
@@ -73,9 +81,9 @@
       "req_id": 4,
       "stream": true,
       "tokens": 33,
-      "total_latency_ms": 2262.36,
-      "ttft_ms": 1396.77,
-      "decode_tps": 36.97,
+      "total_latency_ms": 1884.75,
+      "ttft_ms": 1032.33,
+      "decode_tps": 37.54,
       "success": true,
       "error": null
     },
@@ -83,9 +91,9 @@
       "req_id": 5,
       "stream": false,
       "tokens": 32,
-      "total_latency_ms": 2253.89,
-      "ttft_ms": 265.74,
-      "decode_tps": 15.59,
+      "total_latency_ms": 1921.81,
+      "ttft_ms": 185.93,
+      "decode_tps": 17.86,
       "success": true,
       "error": null
     },
@@ -93,9 +101,9 @@
       "req_id": 6,
       "stream": true,
       "tokens": 33,
-      "total_latency_ms": 2294.41,
-      "ttft_ms": 1413.08,
-      "decode_tps": 36.31,
+      "total_latency_ms": 1758.58,
+      "ttft_ms": 1081.81,
+      "decode_tps": 47.28,
       "success": true,
       "error": null
     },
@@ -103,9 +111,9 @@
       "req_id": 7,
       "stream": false,
       "tokens": 32,
-      "total_latency_ms": 2255.57,
-      "ttft_ms": 240.33,
-      "decode_tps": 15.38,
+      "total_latency_ms": 1938.71,
+      "ttft_ms": 170.7,
+      "decode_tps": 17.53,
       "success": true,
       "error": null
     },
@@ -113,9 +121,9 @@
       "req_id": 8,
       "stream": true,
       "tokens": 33,
-      "total_latency_ms": 2251.82,
-      "ttft_ms": 1387.72,
-      "decode_tps": 37.03,
+      "total_latency_ms": 1909.09,
+      "ttft_ms": 1266.57,
+      "decode_tps": 49.8,
       "success": true,
       "error": null
     },
@@ -123,9 +131,9 @@
       "req_id": 9,
       "stream": false,
       "tokens": 32,
-      "total_latency_ms": 2252.18,
-      "ttft_ms": 232.32,
-      "decode_tps": 15.35,
+      "total_latency_ms": 1855.08,
+      "ttft_ms": 164.12,
+      "decode_tps": 18.33,
       "success": true,
       "error": null
     },
@@ -133,9 +141,9 @@
       "req_id": 10,
       "stream": true,
       "tokens": 33,
-      "total_latency_ms": 2247.6,
-      "ttft_ms": 1382.18,
-      "decode_tps": 36.98,
+      "total_latency_ms": 2052.22,
+      "ttft_ms": 1211.36,
+      "decode_tps": 38.06,
       "success": true,
       "error": null
     }

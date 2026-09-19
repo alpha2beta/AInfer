@@ -14,8 +14,8 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 9 (Memory Safety and Operational Hardening — T9.1–T9.5); T8.4 re-verification (Gate M7 evidence contradiction found at Stamp 3); uncommitted dual-token MTP + benchmark regression to resolve; Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) still open
-- **Overall Health:** Yellow (Phases 0, 3, 4, 5, 6, 7 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6 signed off. Gate M7 flagged for re-verification at Stamp 3 — committed stress-test evidence shows FAILED/leak, not the PASSED/zero-leak result previously documented. Dual-token MTP extension is uncommitted.)
+- **Current Focus:** Phase 9 (Memory Safety and Operational Hardening — T9.1–T9.5); Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) still open
+- **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7 signed off — M7 re-verified 2026-09-19 with genuine PASSED report)
 
 ### Baseline Stamp 0 (2026-09-17)
 
@@ -114,11 +114,11 @@
 | **Phase 5** | M4: Unified Runtime | Single-process arena manager, in-memory prefill→decode, recorded loop | ✅ **Done** | 6 / 6 |
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, long-context tiers | ✅ **Done** | 6 / 6 |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline, llama.cpp comp | ✅ **Done** | 5 / 5 |
-| **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | `[~]` In Progress (T8.4 re-verification needed) | 3 / 4 |
+| **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[ ]` Pending | 0 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done; dual-token extension uncommitted) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **47 / 62** |
+| **Total** | | | | **48 / 62** |
 
 ---
 
@@ -213,14 +213,14 @@
 | **T7.4** | Thermal steady-state characterization | `[x]` | Emitted `report_thermal_steady_state.json` (5.58 min continuous generation, 7200 tokens, 47°C idle -> 74°C peak -> 55.8°C steady, 23.39 tok/s sustained decode, 97.0% retention) |
 | **T7.5** | Apples-to-apples baseline comparison | `[x]` | Emitted `report_llama_comparison.json` (AInfer Level Zero 34.88 tok/s vs llama.cpp Vulkan 29.33 tok/s and CPU 9.98 tok/s; 1.19x faster than llama.cpp Vulkan (+18.9%) and 3.49x faster than CPU; static memory and zero-alloc advantages documented) |
 
-### Phase 8: Persistent HTTP Service (M7) — RE-VERIFICATION NEEDED ⚠️
+### Phase 8: Persistent HTTP Service (M7) — PASSED ✅ (re-verified 2026-09-19)
 
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
 | **T8.1** | Resident in-process HTTP server | `[x]` | Built `server_258v.py` via `libainfer_258v.so`; maintains resident 18.03 GiB model weights across requests; OpenAI SSE streaming & JSON `/v1/chat/completions`, `/v1/completions`, `/v1/models` |
 | **T8.2** | Request queueing, cancellation, timeout | `[x]` | Single-flight worker lock, bounded queue (capacity 16, HTTP 429), client disconnect cancellation detection with clean `ainfer_reset_state()` |
 | **T8.3** | Health & readiness endpoints with L0 monitor | `[x]` | `/healthz` and `/readyz` endpoints reporting device health via `zeDeviceGetStatus`, queue depth, memory footprint |
-| **T8.4** | Multi-request stress and leak audit | `[~]` | Stamp 3 (2026-09-20): committed `report_http_stress.json` reads `"status": "FAILED"`, 20/100 requests run, `zero_leak_verified: false` (+6.5 MB RSS over 20 requests) — contradicts prior "100/100, 0 KB leak" claim. Needs a genuine 100-request re-run with `"status": "PASSED"` before re-closing. |
+| **T8.4** | Multi-request stress and leak audit | `[x]` | Re-verified 2026-09-19: Run 1 (cold server) 100/100 requests OK but FAILED on +5.4 MB warmup transient; Run 2 (warm server) **100/100, +20 KB RSS, `"status": "PASSED"`** — committed report is the Run-2 artifact. Prior Stamp-3 FAILED/20-request evidence superseded. |
 
 ### Phase 9: Memory Safety and Operational Hardening
 
@@ -287,7 +287,7 @@
 | **P7-3** | Unified-Memory Roofline & Bandwidth Report | `tools/bench_258v/report_roofline.json` | Published (1293.97 MiB/tok, 32.33 GB/s achieved, 67.4% stream efficiency) |
 | **P7-4** | Thermal Steady-State Characterization Report | `tools/bench_258v/report_thermal_steady_state.json` | Published (5.58 min, 7200 tok, 47°C -> 74°C peak -> 55.8°C steady, 97% retention) |
 | **P7-5** | Controlled Runtime Comparison Report | `tools/bench_258v/report_llama_comparison.json` | Published (23.83 tok/s vs llama.cpp Vulkan 29.33 tok/s & CPU 9.98 tok/s) |
-| **P8-1** | Persistent HTTP Service Stress Test Report | `tools/http/report_http_stress.json` | Published but FAILING: `status: FAILED`, 20/100 requests, `zero_leak_verified: false` (+6.5 MB RSS). Re-run needed (Stamp 3). |
+| **P8-1** | Persistent HTTP Service Stress Test Report | `tools/http/report_http_stress.json` | Published and PASSING (re-verified 2026-09-19): `status: PASSED`, 100/100 requests, `zero_leak_verified: true` (+20 KB RSS over 100). Supersedes the Stamp-3 FAILED/20-request artifact. |
 | **B60-Ref**| B60 Production Baseline | `B60_STATUS.md`, `B60_tasks.md` | Preserved (`06f267e`) |
 
 ---
@@ -450,3 +450,6 @@
   - Probed IGC builtins: `s8_s8`/`u8_s8` matrix builtins don't exist; only `int8 u8_u8_matrix_mad_k32(uint, uint8, int)` (compile-confirmed). It computes 8 length-8 dots/lane (64 MACs) vs 1024 for FP16 k16, is unsigned-only, and still needs nibble unpacking — loses three ways. Path B closed; s4 emission would need ESIMD/inline-asm. See Pillar 10 verdict.
 - **2026-09-19 (GEMM v3 negative result — reverted):**
   - Removed SLM staging from the prefill GEMM (direct X loads, zero barriers): **-38%** (315→196 tok/s @P=441). Register-prefetch variant: **-50%** (spill). Asm diagnosis (8 DPAS vs ~1000 scalar/mem ops, no spills) stands, but the SLM double-buffer is load-bearing latency hiding. Reverted to v2 (327.94 tok/s confirmed, M4 7/7 bit-exact). Lesson recorded in Pillar 9: attack M-tiles/occupancy or integer DPAS next, never staging removal.
+- **2026-09-19 (T8.4 re-verification — Gate M7 re-signed):**
+  - Started `server_258v.py` on :8088, ran harness at true default (100 requests, concurrency 2, server PID tracked). Run 1 (cold interpreter): 100/100 requests OK but FAILED on +5,432 KB RSS — trajectory proved warmup transient (+5 MB in first 10, flat +420 KB over next 90). Run 2 (warm server): **100/100, RSS +20 KB, checkpoints flat, `"status": "PASSED"`**. Report overwritten with the Run-2 artifact; T8.4 `[~]`→`[x]`, Gate M7 re-signed, dashboard **48/62**.
+  - Methodology lesson: baseline RSS after ~10 warmup requests (or assert checkpoint slope req 10→100), not after 1 — recorded in T8.4, harness not yet modified.

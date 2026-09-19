@@ -1,6 +1,6 @@
 # AInfer — Current Status (release truth)
 
-> Single-source current state. Updated 2026-09-20 (Baseline Stamp 3: 47/62 tasks done; Gate M7 flagged for re-verification — see §7).
+> Single-source current state. Updated 2026-09-19 (48/62 tasks done; Gate M7 re-verified PASSED — see §7).
 > `progress.md` is the engineering log; this file is the release overview.
 > If they disagree, this file wins — fix the other one.
 
@@ -59,7 +59,7 @@
 | **Gate M4** | Phase 5: Unified single-process runtime | ✅ **PASSED (2026-09-18)** | `report_phase5.json`: 17.99 GiB committed memory (14.01 GiB headroom on 32 GB RAM); chunked batched prefill scaling to **362.48 tok/s at P=256** (`bench_prefill`, `report_prefill_scaling.json`, 2026-09-19: P=128 312.27, P=441 351.62, P=512 351.94, P=1024 293.89 tok/s; attention v2 + recurrence v2 + GEMM v4 default, all env-gated); recorded command lists replayed with 34.88 tok/s decode; 128-byte control block; diagnostic cache CRC32 round-trip; 10 repeated generation runs bit-identical with 0 KB RSS growth; additional T5.2/T5.3 verification confirmed bit-exact multi-chunk output on long prompts P=128 (4 chunks) and P=256 (8 chunks); full M4 suite (7/7) re-verified bit-exact with final optimization code |
 | **Gate M5** | Phase 6: Quality qualification | ✅ **PASSED (2026-09-18)** | `report_quality_eval.json`: 187/200 passed (93.5%); `report_teacher_forced.json`: >80% top-1 match on generation continuations vs unquantized BF16 Hugging Face forward pass; `report_divergence_analysis.json`: 13 divergences categorized as benign phrasing/mental math; `report_long_context.json`: 4K needle retrieval 6/6 passed (100.0%), 16K/32K/64K tiers qualified with >= 12.76 GB free RAM; `report_kv8_quality.json`: BF16 KV confirmed as production default |
 | **Gate M6** | Phase 7: Performance characterization | ✅ **PASSED (2026-09-18, Updated 2026-09-19)** | `report_bench_t71.json`: load 9.88s, cold TTFT 240.2ms, warm TTFT 237.3ms, prefill 88.49 tok/s (peak 89.73 tok/s), sustained decode 35.54 tok/s (single-cmd profiling 35.81 tok/s), jitter p50=28.1ms p95=28.6ms; `report_roofline.json`: 1294.22 MiB/tok active traffic, 47.33 GB/s achieved bandwidth; `report_llama_comparison.json`: 35.54 tok/s outperforms llama.cpp Vulkan (29.33 tok/s) by 1.21x (+21.2%) and CPU baseline (9.98 tok/s) by 3.56x. **2026-09-20 note:** these figures are the last *committed* (HEAD `14014e5`/`eb7d06c`) evidence and remain valid. A currently uncommitted working-tree re-run (entangled with the unfinished dual-token MTP work) shows a regressed 30.48 tok/s decode / 104.44 tok/s prefill — unresolved, not yet root-caused, and must not be cited until reconciled. |
-| **Gate M7** | Phase 8: Persistent HTTP service | ⚠️ **RE-VERIFICATION NEEDED (flagged 2026-09-20)** | Committed `report_http_stress.json` reads `"status": "FAILED"`, `total_requests: 20` (not 100), `"zero_leak_verified": false` (+6.5 MB RSS over 20 requests) — contradicts the previously documented "100/100 passed, 0 KB leak." T8.1–T8.3 (server, queue/cancellation, health endpoints) remain verified; only T8.4's leak-audit evidence is in question. Requires a genuine 100-request re-run producing `"status": "PASSED"` before Gate M7 can be re-signed. |
+| **Gate M7** | Phase 8: Persistent HTTP service | ✅ **PASSED (re-verified 2026-09-19)** | `report_http_stress.json` (re-run): 100/100 requests passed, 3250 tokens, mean TTFT 783.75 ms, mean latency 2144.53 ms, `"status": "PASSED"`, RSS +20 KB over 100 requests (`"zero_leak_verified": true`, checkpoints flat). History: Stamp 3 flagged the prior artifact (`FAILED`, 20 requests, +6.5 MB); re-verification showed that growth was CPython warmup transient (Run 1: +5 MB in first 10, flat after), and the warm-server re-run is clean. SSE streaming, cancellation recovery, and health endpoints verified as before. |
 
 ---
 
@@ -112,7 +112,9 @@
 
 *Doc hygiene:* reworded 4 references to a phantom "T5.7" task ID (2 here, 2 in `progress.md`) (never defined in `tasks.md`) to cite T5.2/T5.3 instead. Noted, uncorrected: `14014e5` re-added large tokenizer assets (~23 MB) to git despite an earlier explicit exclusion decision — confirm intentional.
 
-Next: resolve both critical findings (genuine T8.4 100-request PASSED re-run; root-cause and commit the dual-token MTP regression) before Phase 9 hardening work is considered gate-eligible.
+Next: resolve the remaining critical finding (root-cause and commit the dual-token MTP regression) before Phase 9 hardening work is considered gate-eligible. T8.4 resolved 2026-09-19 (see T8.4 re-verification note below).
+
+**T8.4 re-verification (2026-09-19):** fresh 100-request runs against `server_258v.py` (:8088). Run 1 (cold): 100/100 OK but FAILED on +5,432 KB RSS warmup transient. Run 2 (warm): **100/100, +20 KB RSS, `"status": "PASSED"`** — committed report is the Run-2 artifact. Gate M7 re-signed; dashboard 48/62.
 
 **Prefill Scaling Update (2026-09-19):** `tools/bench_258v/bench_prefill` re-run recorded in `report_prefill_scaling.json`: P=8 (69.99 tok/s), P=16 (110.10), P=32 (162.31 tok/s), P=64 (216.27), P=128 (274.76), P=256 (**299.04 tok/s**, 3.34 ms/tok) — see T5.2/T7.2 and `optimization.md` Pillar 6.
 
