@@ -16,9 +16,10 @@ for d in /mnt/usb/retr/retr-*; do
   ctx=$(~/.venvs/ainfer/bin/python -c "import json;print(json.load(open('$d/manifest.json'))['ctx'])")
   nch=$((ctx / 256))
   echo "===== $id ctx=$ctx nch=$nch $(date) ====="
+  # ids.txt = FULL context + question tail (merged-path guard P >= TC).
   if ! AINFER_MAXCTX=$((ctx + 64)) CHUNK_M=256 CHUNK64MC_HOST_IN="$d/ch" \
     $DEC $MODEL 1 1 build-b60/tools/cmdlist "$d/gen.json" \
-    --ids-file="$d/q.txt" --max-new=24 --prefill-chunks=$nch \
+    --ids-file="$d/ids.txt" --max-new=96 --prefill-chunks=$nch \
     > "$d/dec.log" 2>&1; then
     echo "$id: PREFILL/DECODE FAILED"; echo "FAIL" > "$d/done"; continue
   fi

@@ -1,0 +1,1 @@
+{"gen": "```python\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```", "stderr_tail": ""}

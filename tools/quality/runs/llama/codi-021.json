@@ -1,0 +1,1 @@
+{"gen": "def word_count(s):\n    counts = {}\n    for word in s.split():\n        counts[word] = counts.get(word, 0) + 1\n    return counts", "stderr_tail": ""}

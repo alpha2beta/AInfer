@@ -1,0 +1,1 @@
+{"gen": "```python\ndef char_freq(s):\n    freq = {}\n    for c in s:\n        freq[c] = freq.get(c, 0) + 1\n    return freq\n```", "stderr_tail": ""}

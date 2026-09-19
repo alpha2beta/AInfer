@@ -99,6 +99,9 @@ def run_llama(user_message, max_new, nctx, report):
     inner = (f"{LLAMA} -m {LLAMA_MODEL} -ngl 99 --no-warmup "
              f"--no-display-prompt --simple-io --single-turn -n {max_new} "
              f"-c {nctx} --temp 0.0 -s 0 -t 8 --reasoning off")
+    # Harness constraint: single-turn stdin consumes the FIRST LINE only;
+    # newlines are flattened to spaces (content identical, documented).
+    flat = " ".join(user_message.splitlines())
     p = subprocess.Popen(
         ["bash", "-c",
          "source /opt/intel/oneapi/setvars.sh --force >/dev/null 2>&1; exec "
@@ -106,7 +109,7 @@ def run_llama(user_message, max_new, nctx, report):
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True)
     try:
-        out_text, err = p.communicate(input=user_message + "\n", timeout=1500)
+        out_text, err = p.communicate(input=flat + "\n", timeout=1500)
         rc = p.returncode
     except subprocess.TimeoutExpired:
         p.kill()

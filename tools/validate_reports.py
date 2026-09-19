@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """T8.2: strict-parse every tracked JSON evidence report (Gate A).
 
-Scope: tools/*/report_*.json + reference/*.json + repo-root *.json.
+Scope: tools/*/report_*.json + tools/*/golden_*.json + tools/*/corpus_*.json
++ reference/*.json + repo-root *.json (Stamp 14: golden/corpus were gaps).
 Exits 0 with a PASS line, or 1 listing each unparseable file.
 Host-only, no GPU. Registered as ctest `reports_json`.
 """
@@ -13,6 +14,8 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATTERNS = [
     "tools/*/report_*.json",
+    "tools/*/golden_*.json",
+    "tools/*/corpus_*.json",
     "reference/*.json",
     "*.json",
 ]

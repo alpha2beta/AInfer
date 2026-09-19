@@ -1,0 +1,1 @@
+{"gen": "```python\ndef list_max(xs):\n    return max(xs)\n```", "stderr_tail": ""}

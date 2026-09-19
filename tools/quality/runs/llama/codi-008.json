@@ -1,0 +1,1 @@
+{"gen": "```python\ndef sum_list(xs):\n    return sum(xs)\n```", "stderr_tail": ""}

@@ -1,0 +1,1 @@
+{"gen": "def running_total(xs):\n    total = 0\n    result = []\n    for x in xs:\n        total += x\n        result.append(total)\n    return result", "stderr_tail": ""}

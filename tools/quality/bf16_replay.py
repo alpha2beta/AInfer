@@ -73,8 +73,10 @@ def main():
         assert torch.isfinite(lb).all()
         recs = []
         for j, tok_id in enumerate(gen):
-            i = len(prompt_ids) + j
-            if i >= len(ids):
+            # lb[i] predicts token i+1; gen[j] sits at seq index
+            # len(prompt)+j, so its predictor is lb[len(prompt)+j-1].
+            i = len(prompt_ids) + j - 1
+            if i < 0 or i >= len(lb):
                 break
             top = torch.topk(lb[i], 10)
             recs.append({"pos": j, "int4_tok": tok_id,

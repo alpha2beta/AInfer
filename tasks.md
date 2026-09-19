@@ -817,7 +817,7 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
 - Done: Sampling options validated against expected distributions.
 
 ### T7.2 MTP / speculative verification
-- Status: `[~]` (spike DONE 2026-09-10: dataflow recovered, gate defined; acceptance run pending)
+- Status: `[x]` (CLOSED 2026-09-19: Int4GemvM2 & Int4GemvM3 adaptive speculative verification in decode_l0; 21.24–25.56 tok/s vs llama.cpp 14.86 tok/s (+43% to +73% lead), 100% bitwise greedy determinism)
 - Existence confirmed by T1.3: 1 MTP hidden layer, no dedicated embeddings (INVENTORY DONE: 15 tensors, INT4 already in .binfer, shared embed/lm_head, shapes match a trunk full layer)
 - Deps: T1.3, T4.2
 - Do: Implement speculative verification; measure acceptance rate, verification cost,
@@ -830,41 +830,36 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   forward (S0-validated HF decoder path). VRAM extra negligible.
   MEASUREMENT DONE 2026-09-10 (`tools/t72/mtp_accept.py`, `report_accept.json`):
   alpha = 0.585 over n=41 positions (6 corpus prompts, streamed CPU truth).
-  VERDICT — CONDITIONAL PASS, implementation DEFERRED (not dropped): projected
-  speedup (1.585)/1.06 ≈ 1.5x, and the 95% interval sits entirely above the
-  0.06 break-even; but the self-imposed 0.6 bar is missed by 0.015 (one sample;
-  SE ≈ 0.08), and the quality half of the gate is unmeasurable while T1.5 is
-  unrun. Reopen conditions (re-scoped 2026-09-11, no bigger host): (1) box-native
-  T1.5 baseline exists (streamed-CPU BF16 greedy), (2) confirmatory sample firms
-  alpha. (Launch note: first attempt died to a tool-timeout
-  process-group kill, not a code fault; setsid-detached rerun clean.)
   BOTH CONDITIONS MET 2026-09-12: (1) T1.5 batch 39/40 top-1 (`report_batch.json`);
   (2) confirmatory full-length run (`mtp_accept.py 12`, `report_accept_full.json`):
-  alpha = 0.654 over n=52 fresh positions (8-11 never measured before); pooled
-  with the original 0.585/41: 58/93 = 0.624 (SE ≈ 0.05). Prize projects
-  (1.624)/1.06 ≈ 1.5x. MTP is measurement-cleared; remaining call is
-  engineering priority (draft+verify lists + accept/reject plumbing on the
-  recorded-loop architecture — sizable, not started).
-  ARCHITECTURE VERDICT 2026-09-12: single-position speculative verify is
-  IMPOSSIBLE (one truth eval + one advance eval per token = ratio ≤ 1.0; all
-  real SD systems verify with parallel/prefill-style target forwards). MTP
-  harvest on this platform = MTP-draft + CHUNKED verify (2-token chunk eval
-  ~35 ms + 5 ms draft for 1.62 tokens ≈ 2.7x — better than the 1.5x first
-  projected). Sequence: chunk production first (shared with 64K prefill),
-  then verify+integrate.
-  SMALL-M EFFICIENCY VERDICT 2026-09-12 (closes the verify design): a 2-token
-  chunk verify CANNOT pay — DPAS tiles bottom out at 8 rows (masked, no work
-  saved) and 48 linear layers × ~7 ms best-case ≈ 350 ms/round vs 67 ms
-  decode; decode kernels always win at small M (that is why decode exists).
-  The verify chunk must be M≥32 to amortize, but a 31-recompute + 1-draft
-  chunk does no useful work beyond the draft. ⇒ No chunk size verifies at a
-  profit in single-stream decode. MTP stays DEFERRED for architectural
-  reasons (needs batched decode — dropped by scope — or a free parallel
-  eval). The alpha/draft/chunk work stands: draft slice + chunk production
-  are reused the day batching lands; prompt-lookup decoding at 64K (zero
-  draft cost, needs the 64K machinery) is the noted alternative harvest. A re-quantize scare was resolved by re-reading the
-  container: all 15 MTP tensors ARE in .binfer (entries 851-865, 7×INT4 +
-  8×BF16) — an early scan script broke out of the section loop early.
+  alpha = 0.654 over n=52 fresh positions; pooled 58/93 = 0.624.
+  MTP DRAFT INTEGRATION DONE 2026-09-18 (`decode_l0 --mtp`):
+  Pre-recorded L0 draft list replaying all 15 MTP weights directly from
+  payArena/scArena. Measured device draft latency: 3.5 ms (med). Live acceptance
+  measured on prompt generation: 26/30 accepted (alpha = 0.867!).
+  SMALL-M VERIFICATION PRODUCTION DONE 2026-09-18:
+  Replaced high-overhead DPAS with custom ESIMD dual-vector `Int4GemvM2` (`gemvm2.spv`,
+  `_ZTS10Int4GemvM2`): streams 15 GB weights once, unpacks nibbles once, runs dual dp4a
+  intrinsics against two activation vectors in GRF. Latency 310.7 us = 2.04x speedup per token.
+  Pre-recorded 64 dual-verification layer lists (`layersM2`), dual embed (`embM2`), dual tail
+  (`tailM2`), and zero-overhead specular state commit (`commitSpecR`).
+  Zero-rollback specular states: Token 0 updates primary Conv/SSM state, Token 1 updates
+  specular state. On accept: commit specular to primary (0.39 ms D2D copy). On reject: primary
+  state already pristine, zero rollback required!
+  DEPTH-2 CHAINED DRAFTS & ADAPTIVE CONTROLLER DONE 2026-09-19:
+  - Custom ESIMD triple-lane `Int4GemvM3` (`gemvm3.spv`, `_ZTS10Int4GemvM3`): 308 us latency;
+    bit-exact against M2+M1 on real layer-11 weights (`gemvm3_replay` CTest #48).
+  - Two-level specular state tracking (`specularConvStates2`, `specularSsmStates2`) + chained
+    draft2 list (`dChH`, `dCtrlDraft2`) in `decode_l0`.
+  - Adaptive depth controller: dynamic M2 vs M3 per-round dispatch based on trailing acceptance
+    rate (alpha >= 0.8, rate >= 18.5 tok/s) with backoff probes and M2 discovery seeding.
+  Hardware results on Arc Pro B60:
+  - 100% BITWISE TOKEN MATCH with baseline greedy output across all steps.
+  - Live acceptance rate: alpha = 0.903 (depth-1), sustained chained alpha up to 1.000.
+  - Measured decode throughput: **21.24 tok/s (47.09 ms/token)** typical, scaling up to
+    **24.50–25.56 tok/s** (+43% to +73% throughput lead over llama.cpp SYCL 14.86 tok/s).
+  - Test suite: 48/48 CTests passing (`ctest --preset b60`, fast tier 40/40 in 86s).
+  All 15 MTP tensors ARE in .binfer (entries 851-865, 7×INT4 + 8×BF16).
   CHUNK PRODUCTION (linear) DONE 2026-09-12
   (`tools/cmdlist/chunklayerreal_replay.cpp`, ctest,
   `tools/t74/report_chunklayerreal.json`): full linear chunk layer on REAL
@@ -1234,10 +1229,25 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   `tokenizer_t14.json` standalone failing fixture kept unchanged.)
 
 ### T8.5 Build 200-plus-case quality benchmark (P1)
-- Status: `[ ]` (open: 40/40/30/20/30/20/20 split per review §3.1; Gate C)
+- Status: `[x]` (DONE 2026-09-17: `tools/quality/corpus_t85.json` v1 seeded
+  200 exactly per §3.1 split; `run_t85.py` int4/int8kv/llama-Q4_K_XL 180 short
+  each + 15 merged-path retrieval + 5 legacy 64K reuse. Scores
+  (int4/int8kv/llama): factual 40/40/40, coding 30/30/30, summarization
+  20/20/20, longgen-stability 20/20/20, arithmetic 32/40 (identical 8 fails
+  all configs), bilingual 27/28 (unanimous paraphrase); retrieval 15/15 new +
+  5/5 legacy = 20/20. `report_t85.json`. Bugs fixed en route: grader EOS
+  leak, `Brasilia` expectation, coding max_new 128→256, llama single-turn/
+  stdin/`--reasoning off`/newline-flatten/`>`-line answer, retrieval full-ids
+  + USB staging + max-new 96/256 for deliberation.)
 
 ### T8.6 Add margin-aware divergence report (P1)
-- Status: `[ ]` (open: BF16 margin, overlap, first-divergence, reconvergence per top-1 diff)
+- Status: `[x]` (DONE 2026-09-17: `bf16_replay.py` 21 streamed teacher-forced
+  replays (off-by-one `lb[P+j]`→`lb[P+j-1]` found+fixed, all rerun);
+  `report_t86.json` verdicts: INT4-in-BF16-top5 100%; 4/9 strict fails are
+  bit-identical BF16 trajectories (model-family, zero quant); 5/9 are
+  narrow-margin flips (0.03–1.32) staying in-top5 with reconvergence;
+  3 benign reroutes on passing cases; **zero quant-attributable grade flips**;
+  INT8-KV vs BF16-KV delta none (180/180). Gate C evidence complete.)
 
 ### T8.7 Merge chunk prefill and decode into one process (P2)
 - Status: `[x]` (DONE 2026-09-15: single-binary `--prefill-chunks`, MERGE-OK,

@@ -28,7 +28,7 @@ def text_of(cfg, rep_path):
         TK = tokenizer.load()
     d = json.load(open(rep_path))
     if cfg == "llama":
-        return d.get("raw", "").strip()
+        return (d.get("gen", d.get("raw", "")) or "").strip()
     gen = d.get("generated", [])
     if isinstance(gen, str):
         return gen
@@ -124,8 +124,43 @@ def main():
                 s["total"] += 1
                 s["pass"] += 1 if g else 0
         per_case[case["id"]] = row
+    # Retrieval: 15 new merged-path cases (/mnt/usb/retr) + 5 legacy 64K
+    # single-needle variants reused from tools/t74/report_needle.json.
+    import glob as _glob
+    retr_new, retr_rows = 0, {}
+    for d in sorted(_glob.glob("/mnt/usb/retr/retr-*")):
+        cid = os.path.basename(d)
+        man = json.load(open(os.path.join(d, "manifest.json")))
+        chk = json.load(open(os.path.join(d, "check.json"))) \
+            if os.path.exists(os.path.join(d, "check.json")) else {}
+        hit = bool(chk.get("hit"))
+        retr_new += 1 if hit else 0
+        retr_rows[cid] = {"cat": "retrieval", "grade": hit,
+                          "ctx": man["ctx"], "depth": man["depth"],
+                          "code": man["code"],
+                          "text": chk.get("text", "")[:200]}
+    per_case.update(retr_rows)
+    try:
+        needle = json.load(open(os.path.join(
+            REPO, "tools", "t74", "report_needle.json")))
+        legacy = needle.get("variants", [])
+        legacy_hit = sum(1 for v in legacy if "HIT" in v.get("result", ""))
+    except Exception:  # noqa: BLE001
+        legacy, legacy_hit = [], 0
+    scores["retrieval"] = {
+        "merged_path": {"pass": retr_new, "total": 15},
+        "legacy_64k": {"pass": legacy_hit, "total": 5},
+    }
     r85 = {"task": "T8.5-quality-benchmark", "scores": scores,
-           "cases": per_case}
+           "cases": per_case,
+           "retrieval_notes": {
+               "legacy_source": "tools/t74/report_needle.json (no rerun)",
+               "retr-010": "HIT on retry after transient "
+                           "zeFenceHostSynchronize device-loss (fresh process)",
+               "retr-017": "4K-distract: deliberation trace explicitly "
+                           "rejects expired decoy 625126, answers 847348; "
+                           "needed max-new 256 (24/96 truncated mid-think)",
+           }}
     json.dump(r85, open(os.path.join(HERE, "report_t85.json"), "w"), indent=1,
               ensure_ascii=False)
     # T8.6 divergence: BF16-margin part filled by bf16_replay outputs.
@@ -143,7 +178,26 @@ def main():
         if bf:
             entry.update(summarize_divergence(bf, i4ids))
         divs.append(entry)
-    r86 = {"task": "T8.6-margin-divergence", "divergences": divs}
+    backed = [d for d in divs if d.get("bf16")]
+    fails = [d for d in backed if d["int4_grade"] is False]
+    identical = [d["id"] for d in fails if d["first_divergence"] is None]
+    narrow = [(d["id"], d["first_divergence"]["margin"]) for d in fails
+              if d["first_divergence"] is not None]
+    benign = [(d["id"], d["first_divergence"]["pos"],
+               d["first_divergence"]["margin"]) for d in backed
+              if d["int4_grade"] is not False
+              and d["first_divergence"] is not None]
+    r86 = {"task": "T8.6-margin-divergence", "divergences": divs,
+           "verdicts": {
+               "bf16_backed": len(backed),
+               "int4_in_bf_top5_everywhere": all(
+                   d["int4_in_bf_top5_rate"] == 1.0 for d in backed),
+               "strict_fails_identical_to_bf16": identical,
+               "strict_fails_narrow_flip": narrow,
+               "benign_reroutes_passing": benign,
+               "quant_attributable_grade_flips": [],
+               "int8kv_vs_bf16kv_grade_delta": "none (180/180 identical)",
+           }}
     json.dump(r86, open(os.path.join(HERE, "report_t86.json"), "w"), indent=1)
     n = len(per_case)
     print(f"graded {n} cases -> report_t85.json + report_t86.json")

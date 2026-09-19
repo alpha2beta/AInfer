@@ -1,0 +1,1 @@
+{"gen": "def second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        raise ValueError(\"List must contain at least two distinct values\")\n    return distinct[1]", "stderr_tail": ""}

@@ -1,0 +1,1 @@
+{"gen": "```python\ndef group_by_first(words):\n    result = {}\n    for word in words:\n        if word:\n            first = word[0].lower()\n            result.setdefault(first, []).append(word)\n    return result\n```", "stderr_tail": ""}

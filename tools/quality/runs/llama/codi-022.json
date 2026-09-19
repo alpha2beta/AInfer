@@ -1,0 +1,1 @@
+{"gen": "```python\ndef most_common(xs):\n    return max(set(xs), key=xs.count)\n```", "stderr_tail": ""}

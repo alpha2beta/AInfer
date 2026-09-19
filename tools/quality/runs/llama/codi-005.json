@@ -1,0 +1,1 @@
+{"gen": "```python\ndef reverse_string(s):\n    return s[::-1]\n```", "stderr_tail": ""}

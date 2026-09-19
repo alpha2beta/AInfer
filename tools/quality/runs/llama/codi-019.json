@@ -1,0 +1,1 @@
+{"gen": "def bubble_pass(xs):\n    for i in range(len(xs) - 1):\n        if xs[i] > xs[i + 1]:\n            xs[i], xs[i + 1] = xs[i + 1], xs[i]\n    return xs", "stderr_tail": ""}

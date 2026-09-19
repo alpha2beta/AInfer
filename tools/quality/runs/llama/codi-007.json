@@ -1,0 +1,1 @@
+{"gen": "def count_vowels(s):\n    return sum(1 for c in s.lower() if c in 'aeiou')", "stderr_tail": ""}

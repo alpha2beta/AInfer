@@ -1,37 +1,20 @@
 {
  "task": "T8.5-quality-benchmark",
  "scores": {
-  "factual": {
+  "bilingual": {
    "int4": {
-    "pass": 40,
-    "total": 40,
+    "pass": 27,
+    "total": 28,
     "graded": 0
    },
    "int8kv": {
-    "pass": 40,
-    "total": 40,
+    "pass": 27,
+    "total": 28,
     "graded": 0
    },
    "llama": {
-    "pass": 0,
-    "total": 0,
-    "graded": 0
-   }
-  },
-  "arithmetic": {
-   "int4": {
-    "pass": 32,
-    "total": 40,
-    "graded": 0
-   },
-   "int8kv": {
-    "pass": 32,
-    "total": 40,
-    "graded": 0
-   },
-   "llama": {
-    "pass": 0,
-    "total": 0,
+    "pass": 27,
+    "total": 28,
     "graded": 0
    }
   },
@@ -47,42 +30,25 @@
     "graded": 0
    },
    "llama": {
-    "pass": 0,
-    "total": 0,
-    "graded": 0
-   }
-  },
-  "longgen": {
-   "int4": {
     "pass": 20,
     "total": 20,
     "graded": 0
-   },
-   "int8kv": {
-    "pass": 20,
-    "total": 20,
-    "graded": 0
-   },
-   "llama": {
-    "pass": 0,
-    "total": 0,
-    "graded": 0
    }
   },
-  "retrieval": {
+  "factual": {
    "int4": {
-    "pass": 0,
-    "total": 0,
+    "pass": 40,
+    "total": 40,
     "graded": 0
    },
    "int8kv": {
-    "pass": 0,
-    "total": 0,
+    "pass": 40,
+    "total": 40,
     "graded": 0
    },
    "llama": {
-    "pass": 0,
-    "total": 0,
+    "pass": 40,
+    "total": 40,
     "graded": 0
    }
   },
@@ -98,25 +64,52 @@
     "graded": 0
    },
    "llama": {
-    "pass": 0,
-    "total": 0,
+    "pass": 30,
+    "total": 30,
     "graded": 0
    }
   },
-  "bilingual": {
+  "retrieval": {
+   "merged_path": {
+    "pass": 15,
+    "total": 15
+   },
+   "legacy_64k": {
+    "pass": 5,
+    "total": 5
+   }
+  },
+  "longgen": {
    "int4": {
-    "pass": 27,
-    "total": 28,
+    "pass": 20,
+    "total": 20,
     "graded": 0
    },
    "int8kv": {
-    "pass": 27,
-    "total": 28,
+    "pass": 20,
+    "total": 20,
     "graded": 0
    },
    "llama": {
-    "pass": 0,
-    "total": 0,
+    "pass": 20,
+    "total": 20,
+    "graded": 0
+   }
+  },
+  "arithmetic": {
+   "int4": {
+    "pass": 32,
+    "total": 40,
+    "graded": 0
+   },
+   "int8kv": {
+    "pass": 32,
+    "total": 40,
+    "graded": 0
+   },
+   "llama": {
+    "pass": 32,
+    "total": 40,
     "graded": 0
    }
   }
@@ -135,7 +128,11 @@
     "detail": "Paris",
     "text": "Paris"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Paris",
+    "text": "Paris"
+   }
   },
   "fact-001": {
    "id": "fact-001",
@@ -150,7 +147,11 @@
     "detail": "Tokyo",
     "text": "Tokyo"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Tokyo",
+    "text": "Tokyo"
+   }
   },
   "fact-002": {
    "id": "fact-002",
@@ -165,7 +166,11 @@
     "detail": "Brasília",
     "text": "Brasília"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Brasília",
+    "text": "Brasília"
+   }
   },
   "fact-003": {
    "id": "fact-003",
@@ -180,7 +185,11 @@
     "detail": "Ottawa",
     "text": "Ottawa"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Ottawa",
+    "text": "Ottawa"
+   }
   },
   "fact-004": {
    "id": "fact-004",
@@ -195,7 +204,11 @@
     "detail": "Canberra",
     "text": "Canberra"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Canberra",
+    "text": "Canberra"
+   }
   },
   "fact-005": {
    "id": "fact-005",
@@ -210,7 +223,11 @@
     "detail": "Cairo",
     "text": "Cairo"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Cairo",
+    "text": "Cairo"
+   }
   },
   "fact-006": {
    "id": "fact-006",
@@ -225,7 +242,11 @@
     "detail": "New Delhi",
     "text": "New Delhi"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "New Delhi",
+    "text": "New Delhi"
+   }
   },
   "fact-007": {
    "id": "fact-007",
@@ -240,7 +261,11 @@
     "detail": "Berlin",
     "text": "Berlin"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Berlin",
+    "text": "Berlin"
+   }
   },
   "fact-008": {
    "id": "fact-008",
@@ -255,7 +280,11 @@
     "detail": "Rome",
     "text": "Rome"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Rome",
+    "text": "Rome"
+   }
   },
   "fact-009": {
    "id": "fact-009",
@@ -270,7 +299,11 @@
     "detail": "Madrid",
     "text": "Madrid"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Madrid",
+    "text": "Madrid"
+   }
   },
   "fact-010": {
    "id": "fact-010",
@@ -285,7 +318,11 @@
     "detail": "Mexico City",
     "text": "Mexico City"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Mexico City",
+    "text": "Mexico City"
+   }
   },
   "fact-011": {
    "id": "fact-011",
@@ -300,7 +337,11 @@
     "detail": "Buenos Aires",
     "text": "Buenos Aires"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Buenos Aires",
+    "text": "Buenos Aires"
+   }
   },
   "fact-012": {
    "id": "fact-012",
@@ -315,7 +356,11 @@
     "detail": "Hydrogen",
     "text": "Hydrogen"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Hydrogen",
+    "text": "Hydrogen"
+   }
   },
   "fact-013": {
    "id": "fact-013",
@@ -330,7 +375,11 @@
     "detail": "Helium",
     "text": "Helium"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Helium",
+    "text": "Helium"
+   }
   },
   "fact-014": {
    "id": "fact-014",
@@ -345,7 +394,11 @@
     "detail": "Carbon",
     "text": "Carbon"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Carbon",
+    "text": "Carbon"
+   }
   },
   "fact-015": {
    "id": "fact-015",
@@ -360,7 +413,11 @@
     "detail": "Nitrogen",
     "text": "Nitrogen"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Nitrogen",
+    "text": "Nitrogen"
+   }
   },
   "fact-016": {
    "id": "fact-016",
@@ -375,7 +432,11 @@
     "detail": "Oxygen",
     "text": "Oxygen"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Oxygen",
+    "text": "Oxygen"
+   }
   },
   "fact-017": {
    "id": "fact-017",
@@ -390,7 +451,11 @@
     "detail": "Sodium",
     "text": "Sodium"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Sodium",
+    "text": "Sodium"
+   }
   },
   "fact-018": {
    "id": "fact-018",
@@ -405,7 +470,11 @@
     "detail": "Iron",
     "text": "Iron"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Iron",
+    "text": "Iron"
+   }
   },
   "fact-019": {
    "id": "fact-019",
@@ -420,7 +489,11 @@
     "detail": "Gold",
     "text": "Gold"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Gold",
+    "text": "Gold"
+   }
   },
   "fact-020": {
    "id": "fact-020",
@@ -435,7 +508,11 @@
     "detail": "1969",
     "text": "1969"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1969",
+    "text": "1969"
+   }
   },
   "fact-021": {
    "id": "fact-021",
@@ -450,7 +527,11 @@
     "detail": "1989",
     "text": "1989"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1989",
+    "text": "1989"
+   }
   },
   "fact-022": {
    "id": "fact-022",
@@ -465,7 +546,11 @@
     "detail": "1896",
     "text": "1896"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1896",
+    "text": "1896"
+   }
   },
   "fact-023": {
    "id": "fact-023",
@@ -480,7 +565,11 @@
     "detail": "1776",
     "text": "1776"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1776",
+    "text": "1776"
+   }
   },
   "fact-024": {
    "id": "fact-024",
@@ -495,7 +584,11 @@
     "detail": "1903",
     "text": "1903"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1903",
+    "text": "1903"
+   }
   },
   "fact-025": {
    "id": "fact-025",
@@ -510,7 +603,11 @@
     "detail": "1945",
     "text": "1945"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1945",
+    "text": "1945"
+   }
   },
   "fact-026": {
    "id": "fact-026",
@@ -525,7 +622,11 @@
     "detail": "1957",
     "text": "1957"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1957",
+    "text": "1957"
+   }
   },
   "fact-027": {
    "id": "fact-027",
@@ -540,7 +641,11 @@
     "detail": "1876",
     "text": "1876"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "1876",
+    "text": "1876"
+   }
   },
   "fact-028": {
    "id": "fact-028",
@@ -555,7 +660,11 @@
     "detail": "got=19.88 want=19.88",
     "text": "19.88"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=19.88 want=19.88",
+    "text": "19.88"
+   }
   },
   "fact-029": {
    "id": "fact-029",
@@ -570,7 +679,11 @@
     "detail": "got=62.14 want=62.14",
     "text": "62.14"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=62.14 want=62.14",
+    "text": "62.14"
+   }
   },
   "fact-030": {
    "id": "fact-030",
@@ -585,7 +698,11 @@
     "detail": "got=11.02 want=11.02",
     "text": "11.02"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=11.02 want=11.02",
+    "text": "11.02"
+   }
   },
   "fact-031": {
    "id": "fact-031",
@@ -600,7 +717,11 @@
     "detail": "got=44.09 want=44.09",
     "text": "44.09"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=44.09 want=44.09",
+    "text": "44.09"
+   }
   },
   "fact-032": {
    "id": "fact-032",
@@ -615,7 +736,11 @@
     "detail": "got=67.63 want=67.63",
     "text": "67.63"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=67.63 want=67.63",
+    "text": "67.63"
+   }
   },
   "fact-033": {
    "id": "fact-033",
@@ -630,7 +755,11 @@
     "detail": "got=16.91 want=16.91",
     "text": "16.91"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=16.91 want=16.91",
+    "text": "16.91"
+   }
   },
   "fact-034": {
    "id": "fact-034",
@@ -645,7 +774,11 @@
     "detail": "got=77.0 want=77.0",
     "text": "77.00"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=77.0 want=77.0",
+    "text": "77.00"
+   }
   },
   "fact-035": {
    "id": "fact-035",
@@ -660,7 +793,11 @@
     "detail": "got=32.0 want=32.0",
     "text": "32.00"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=32.0 want=32.0",
+    "text": "32.00"
+   }
   },
   "fact-036": {
    "id": "fact-036",
@@ -675,7 +812,11 @@
     "detail": "got=32.81 want=32.81",
     "text": "32.81"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=32.81 want=32.81",
+    "text": "32.81"
+   }
   },
   "fact-037": {
    "id": "fact-037",
@@ -690,7 +831,11 @@
     "detail": "got=9.84 want=9.84",
     "text": "9.84"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=9.84 want=9.84",
+    "text": "9.84"
+   }
   },
   "fact-038": {
    "id": "fact-038",
@@ -705,7 +850,11 @@
     "detail": "got=17.3 want=17.3",
     "text": "17.30"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=17.3 want=17.3",
+    "text": "17.30"
+   }
   },
   "fact-039": {
    "id": "fact-039",
@@ -720,7 +869,11 @@
     "detail": "got=4.94 want=4.94",
     "text": "4.94"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=4.94 want=4.94",
+    "text": "4.94"
+   }
   },
   "arit-000": {
    "id": "arit-000",
@@ -735,7 +888,11 @@
     "detail": "got=921.0 want=921",
     "text": "921"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=921.0 want=921",
+    "text": "921"
+   }
   },
   "arit-001": {
    "id": "arit-001",
@@ -750,7 +907,11 @@
     "detail": "got=1289.0 want=1289",
     "text": "1289"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1289.0 want=1289",
+    "text": "1289"
+   }
   },
   "arit-002": {
    "id": "arit-002",
@@ -765,7 +926,11 @@
     "detail": "got=1253.0 want=1253",
     "text": "1253"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1253.0 want=1253",
+    "text": "1253"
+   }
   },
   "arit-003": {
    "id": "arit-003",
@@ -780,7 +945,11 @@
     "detail": "got=970.0 want=970",
     "text": "970"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=970.0 want=970",
+    "text": "970"
+   }
   },
   "arit-004": {
    "id": "arit-004",
@@ -795,7 +964,11 @@
     "detail": "got=1094.0 want=1094",
     "text": "1094"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1094.0 want=1094",
+    "text": "1094"
+   }
   },
   "arit-005": {
    "id": "arit-005",
@@ -810,7 +983,11 @@
     "detail": "got=1334.0 want=1334",
     "text": "1334"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1334.0 want=1334",
+    "text": "1334"
+   }
   },
   "arit-006": {
    "id": "arit-006",
@@ -825,7 +1002,11 @@
     "detail": "got=7398.0 want=7398",
     "text": "7398"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=7398.0 want=7398",
+    "text": "7398"
+   }
   },
   "arit-007": {
    "id": "arit-007",
@@ -840,7 +1021,11 @@
     "detail": "got=8355.0 want=8355",
     "text": "8355"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=8355.0 want=8355",
+    "text": "8355"
+   }
   },
   "arit-008": {
    "id": "arit-008",
@@ -855,7 +1040,11 @@
     "detail": "got=9415.0 want=9415",
     "text": "9415"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=9415.0 want=9415",
+    "text": "9415"
+   }
   },
   "arit-009": {
    "id": "arit-009",
@@ -870,7 +1059,11 @@
     "detail": "got=4795.0 want=4795",
     "text": "4795"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=4795.0 want=4795",
+    "text": "4795"
+   }
   },
   "arit-010": {
    "id": "arit-010",
@@ -885,7 +1078,11 @@
     "detail": "got=3082.0 want=3082",
     "text": "3082"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=3082.0 want=3082",
+    "text": "3082"
+   }
   },
   "arit-011": {
    "id": "arit-011",
@@ -900,7 +1097,11 @@
     "detail": "got=7533.0 want=7533",
     "text": "7533"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=7533.0 want=7533",
+    "text": "7533"
+   }
   },
   "arit-012": {
    "id": "arit-012",
@@ -915,7 +1116,11 @@
     "detail": "got=4480.0 want=4480",
     "text": "4480"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=4480.0 want=4480",
+    "text": "4480"
+   }
   },
   "arit-013": {
    "id": "arit-013",
@@ -930,7 +1135,11 @@
     "detail": "got=6045.0 want=6045",
     "text": "6045"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=6045.0 want=6045",
+    "text": "6045"
+   }
   },
   "arit-014": {
    "id": "arit-014",
@@ -945,7 +1154,11 @@
     "detail": "got=62.0 want=62",
     "text": "62"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=62.0 want=62",
+    "text": "62"
+   }
   },
   "arit-015": {
    "id": "arit-015",
@@ -960,7 +1173,11 @@
     "detail": "got=73.0 want=73",
     "text": "73"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=73.0 want=73",
+    "text": "73"
+   }
   },
   "arit-016": {
    "id": "arit-016",
@@ -975,7 +1192,11 @@
     "detail": "got=432.0 want=432",
     "text": "432"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=432.0 want=432",
+    "text": "432"
+   }
   },
   "arit-017": {
    "id": "arit-017",
@@ -990,7 +1211,11 @@
     "detail": "got=1608.0 want=1608",
     "text": "1608"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1608.0 want=1608",
+    "text": "1608"
+   }
   },
   "arit-018": {
    "id": "arit-018",
@@ -1005,7 +1230,11 @@
     "detail": "got=740.0 want=740",
     "text": "740"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=740.0 want=740",
+    "text": "740"
+   }
   },
   "arit-019": {
    "id": "arit-019",
@@ -1020,7 +1249,11 @@
     "detail": "got=64.0 want=64",
     "text": "64"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=64.0 want=64",
+    "text": "64"
+   }
   },
   "arit-020": {
    "id": "arit-020",
@@ -1035,7 +1268,11 @@
     "detail": "got=483.0 want=483",
     "text": "483"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=483.0 want=483",
+    "text": "483"
+   }
   },
   "arit-021": {
    "id": "arit-021",
@@ -1050,7 +1287,11 @@
     "detail": "got=912.0 want=912",
     "text": "912"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=912.0 want=912",
+    "text": "912"
+   }
   },
   "arit-022": {
    "id": "arit-022",
@@ -1065,7 +1306,11 @@
     "detail": "got=927.0 want=927",
     "text": "927"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=927.0 want=927",
+    "text": "927"
+   }
   },
   "arit-023": {
    "id": "arit-023",
@@ -1080,7 +1325,11 @@
     "detail": "got=942.0 want=978",
     "text": "942"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=972.0 want=978",
+    "text": "972"
+   }
   },
   "arit-024": {
    "id": "arit-024",
@@ -1095,7 +1344,11 @@
     "detail": "got=140.0 want=140",
     "text": "140"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=140.0 want=140",
+    "text": "140"
+   }
   },
   "arit-025": {
    "id": "arit-025",
@@ -1110,7 +1363,11 @@
     "detail": "got=125.0 want=125",
     "text": "125"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=125.0 want=125",
+    "text": "125"
+   }
   },
   "arit-026": {
    "id": "arit-026",
@@ -1125,7 +1382,11 @@
     "detail": "got=175.0 want=175",
     "text": "175"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=175.0 want=175",
+    "text": "175"
+   }
   },
   "arit-027": {
    "id": "arit-027",
@@ -1140,7 +1401,11 @@
     "detail": "got=250.0 want=250",
     "text": "250"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=250.0 want=250",
+    "text": "250"
+   }
   },
   "arit-028": {
    "id": "arit-028",
@@ -1155,7 +1420,11 @@
     "detail": "got=350.0 want=350",
     "text": "350"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=350.0 want=350",
+    "text": "350"
+   }
   },
   "arit-029": {
    "id": "arit-029",
@@ -1170,7 +1439,11 @@
     "detail": "got=210.0 want=210",
     "text": "210"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=210.0 want=210",
+    "text": "210"
+   }
   },
   "arit-030": {
    "id": "arit-030",
@@ -1185,7 +1458,11 @@
     "detail": "got=150.0 want=150",
     "text": "150"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=150.0 want=150",
+    "text": "150"
+   }
   },
   "arit-031": {
    "id": "arit-031",
@@ -1200,7 +1477,11 @@
     "detail": "got=45.0 want=45",
     "text": "45"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=45.0 want=45",
+    "text": "45"
+   }
   },
   "arit-032": {
    "id": "arit-032",
@@ -1215,7 +1496,11 @@
     "detail": "got=2.0 want=14",
     "text": "2"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=1.0 want=14",
+    "text": "1"
+   }
   },
   "arit-033": {
    "id": "arit-033",
@@ -1230,7 +1515,11 @@
     "detail": "got=1.0 want=1",
     "text": "1"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "got=1.0 want=1",
+    "text": "1"
+   }
   },
   "arit-034": {
    "id": "arit-034",
@@ -1245,7 +1534,11 @@
     "detail": "got=5.0 want=14",
     "text": "5"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=7.0 want=14",
+    "text": "7"
+   }
   },
   "arit-035": {
    "id": "arit-035",
@@ -1260,7 +1553,11 @@
     "detail": "got=1.0 want=6",
     "text": "1"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=5.0 want=6",
+    "text": "5"
+   }
   },
   "arit-036": {
    "id": "arit-036",
@@ -1275,7 +1572,11 @@
     "detail": "got=5.0 want=2",
     "text": "5"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=5.0 want=2",
+    "text": "5"
+   }
   },
   "arit-037": {
    "id": "arit-037",
@@ -1290,7 +1591,11 @@
     "detail": "got=22.0 want=21",
     "text": "22"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=2.0 want=21",
+    "text": "2"
+   }
   },
   "arit-038": {
    "id": "arit-038",
@@ -1305,7 +1610,11 @@
     "detail": "got=18.0 want=26",
     "text": "18"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=18.0 want=26",
+    "text": "18"
+   }
   },
   "arit-039": {
    "id": "arit-039",
@@ -1320,7 +1629,11 @@
     "detail": "got=18.0 want=34",
     "text": "18"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "got=38.0 want=34",
+    "text": "38"
+   }
   },
   "codi-000": {
    "id": "codi-000",
@@ -1335,7 +1648,11 @@
     "detail": "UNIT-OK",
     "text": "def add(a, b):\n    return a + b"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef add(a, b):\n    return a + b\n```"
+   }
   },
   "codi-001": {
    "id": "codi-001",
@@ -1350,7 +1667,11 @@
     "detail": "UNIT-OK",
     "text": "def mul(a, b):\n    return a * b"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef mul(a, b):\n    return a * b\n```"
+   }
   },
   "codi-002": {
    "id": "codi-002",
@@ -1365,7 +1686,11 @@
     "detail": "UNIT-OK",
     "text": "def is_even(n):\n    return n % 2 == 0"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def is_even(n):\n    return n % 2 == 0"
+   }
   },
   "codi-003": {
    "id": "codi-003",
@@ -1380,7 +1705,11 @@
     "detail": "UNIT-OK",
     "text": "def factorial(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    if n == 0 or n == 1:\n        return 1\n    return n * factorial(n - 1)"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef factorial(n):\n    if n < 0:\n        raise ValueError(\"n must be >= 0\")\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n```"
+   }
   },
   "codi-004": {
    "id": "codi-004",
@@ -1395,7 +1724,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef fib(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef fib(n):\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```"
+   }
   },
   "codi-005": {
    "id": "codi-005",
@@ -1410,7 +1743,11 @@
     "detail": "UNIT-OK",
     "text": "def reverse_string(s):\n    return s[::-1]"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef reverse_string(s):\n    return s[::-1]\n```"
+   }
   },
   "codi-006": {
    "id": "codi-006",
@@ -1425,7 +1762,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef is_palindrome(s):\n    return s == s[::-1]\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def is_palindrome(s):\n    return s == s[::-1]"
+   }
   },
   "codi-007": {
    "id": "codi-007",
@@ -1440,7 +1781,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef count_vowels(s):\n    return sum(1 for c in s.lower() if c in 'aeiou')\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def count_vowels(s):\n    return sum(1 for c in s.lower() if c in 'aeiou')"
+   }
   },
   "codi-008": {
    "id": "codi-008",
@@ -1455,7 +1800,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef sum_list(xs):\n    return sum(xs)\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef sum_list(xs):\n    return sum(xs)\n```"
+   }
   },
   "codi-009": {
    "id": "codi-009",
@@ -1470,7 +1819,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef list_max(xs):\n    return max(xs)\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef list_max(xs):\n    return max(xs)\n```"
+   }
   },
   "codi-010": {
    "id": "codi-010",
@@ -1485,7 +1838,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        return None\n    return distinct[1]\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        raise ValueError(\"List must contain at least two distinct values\")\n    return distinct[1]"
+   }
   },
   "codi-011": {
    "id": "codi-011",
@@ -1500,7 +1857,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef dedup(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not in seen:\n            seen.add(x)\n            result.append(x)\n    return result\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def dedup(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not in seen:\n            seen.add(x)\n            result.append(x)\n    return result"
+   }
   },
   "codi-012": {
    "id": "codi-012",
@@ -1515,7 +1876,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef flatten(xss):\n    return [x for xs in xss for x in xs]\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def flatten(xss):\n    return [x for xs in xss for x in xs]"
+   }
   },
   "codi-013": {
    "id": "codi-013",
@@ -1530,7 +1895,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef dot(a, b):\n    return sum(x * y for x, y in zip(a, b))\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef dot(a, b):\n    return sum(x * y for x, y in zip(a, b))\n```"
+   }
   },
   "codi-014": {
    "id": "codi-014",
@@ -1545,7 +1914,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef mat2x2_mul(A, B):\n    return [\n        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],\n        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]]\n    ]\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef mat2x2_mul(A, B):\n    return [\n        [A[0][0]*B[0][0] + A[0][1]*B[1][0], A[0][0]*B[0][1] + A[0][1]*B[1][1]],\n        [A[1][0]*B[0][0] + A[1][1]*B[1][0], A[1][0]*B[0][1] + A[1][1]*B[1][1]]\n    ]\n```"
+   }
   },
   "codi-015": {
    "id": "codi-015",
@@ -1560,7 +1933,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return abs(a)"
+   }
   },
   "codi-016": {
    "id": "codi-016",
@@ -1575,7 +1952,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    for i in range(3, int(n**0.5) + 1, 2):\n        if n % i == 0:\n            return False\n    return True\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n < 4:\n        return True\n    if n % 2 == 0 or n % 3 == 0:\n        return False\n    i = 5\n    while i * i <= n:\n        if n % i == 0 or n % (i + 2) == 0:\n            return False\n        i += 6\n    return True\n```"
+   }
   },
   "codi-017": {
    "id": "codi-017",
@@ -1590,7 +1971,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef primes_upto(n):\n    if n < 2:\n        return []\n    sieve = [True] * (n + 1)\n    sieve[0] = False\n    sieve[1] = False\n    for i in range(2, int(n**0.5) + 1):\n        if sieve[i]:\n            for j in range(i*i, n + 1, i):\n                sieve[j] = False\n    return [i for i, is_prime in enumerate(sieve) if is_prime]\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef primes_upto(n):\n    if n < 2:\n        return []\n    sieve = [True] * (n + 1)\n    sieve[0] = sieve[1] = False\n    for i in range(2, int(n**0.5) + 1):\n        if sieve[i]:\n            for j in range(i * i, n + 1, i):\n                sieve[j] = False\n    return [i for i, is_prime in enumerate(sieve) if is_prime]\n```"
+   }
   },
   "codi-018": {
    "id": "codi-018",
@@ -1605,7 +1990,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef binary_search(xs, x):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == x:\n            return mid\n        elif xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef binary_search(xs, x):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == x:\n            return mid\n        elif xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```"
+   }
   },
   "codi-019": {
    "id": "codi-019",
@@ -1620,7 +2009,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef bubble_pass(xs):\n    n = len(xs)\n    for i in range(n - 1):\n        if xs[i] > xs[i + 1]:\n            xs[i], xs[i + 1] = xs[i + 1], xs[i]\n    return xs\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def bubble_pass(xs):\n    for i in range(len(xs) - 1):\n        if xs[i] > xs[i + 1]:\n            xs[i], xs[i + 1] = xs[i + 1], xs[i]\n    return xs"
+   }
   },
   "codi-020": {
    "id": "codi-020",
@@ -1635,7 +2028,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef merge_sorted(a, b):\n    merged = []\n    i = j = 0\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            merged.append(a[i])\n            i += 1\n        else:\n            merged.append(b[j])\n            j += 1\n    merged.extend(a[i:])\n    merged.extend(b[j:])\n    return merged\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef merge_sorted(a, b):\n    i = j = 0\n    result = []\n    while i < len(a) and j < len(b):\n        if a[i] <= b[j]:\n            result.append(a[i])\n            i += 1\n        else:\n            result.append(b[j])\n            j += 1\n    result.extend(a[i:])\n    result.extend(b[j:])\n    return result\n```"
+   }
   },
   "codi-021": {
    "id": "codi-021",
@@ -1650,7 +2047,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef word_count(s):\n    words = s.split()\n    counts = {}\n    for word in words:\n        counts[word] = counts.get(word, 0) + 1\n    return counts\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def word_count(s):\n    counts = {}\n    for word in s.split():\n        counts[word] = counts.get(word, 0) + 1\n    return counts"
+   }
   },
   "codi-022": {
    "id": "codi-022",
@@ -1665,7 +2066,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef most_common(xs):\n    return max(set(xs), key=xs.count)\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef most_common(xs):\n    return max(set(xs), key=xs.count)\n```"
+   }
   },
   "codi-023": {
    "id": "codi-023",
@@ -1680,7 +2085,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef group_by_first(words):\n    result = {}\n    for word in words:\n        if not word:\n            continue\n        first_letter = word[0].lower()\n        if first_letter not in result:\n            result[first_letter] = []\n        result[first_letter].append(word)\n    return result\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef group_by_first(words):\n    result = {}\n    for word in words:\n        if word:\n            first = word[0].lower()\n            result.setdefault(first, []).append(word)\n    return result\n```"
+   }
   },
   "codi-024": {
    "id": "codi-024",
@@ -1695,7 +2104,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef fizzbuzz(n):\n    result = []\n    for i in range(1, n + 1):\n        if i % 15 == 0:\n            result.append(\"FizzBuzz\")\n        elif i % 3 == 0:\n            result.append(\"Fizz\")\n        elif i % 5 == 0:\n            result.append(\"Buzz\")\n        else:\n            result.append(str(i))\n    return result\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def fizzbuzz(n):\n    return [\n        \"FizzBuzz\" if i % 15 == 0 else\n        \"Fizz\" if i % 3 == 0 else\n        \"Buzz\" if i % 5 == 0 else\n        str(i)\n        for i in range(1, n + 1)\n    ]"
+   }
   },
   "codi-025": {
    "id": "codi-025",
@@ -1710,7 +2123,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef running_total(xs):\n    total = 0\n    result = []\n    for x in xs:\n        total += x\n        result.append(total)\n    return result\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def running_total(xs):\n    total = 0\n    result = []\n    for x in xs:\n        total += x\n        result.append(total)\n    return result"
+   }
   },
   "codi-026": {
    "id": "codi-026",
@@ -1725,7 +2142,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```"
+   }
   },
   "codi-027": {
    "id": "codi-027",
@@ -1740,7 +2161,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef celsius_to_fahrenheit(c):\n    return c * 9/5 + 32\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def celsius_to_fahrenheit(c):\n    return c * 9/5 + 32"
+   }
   },
   "codi-028": {
    "id": "codi-028",
@@ -1755,7 +2180,11 @@
     "detail": "UNIT-OK",
     "text": "```python\ndef char_freq(s):\n    freq = {}\n    for char in s:\n        freq[char] = freq.get(char, 0) + 1\n    return freq\n```"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "```python\ndef char_freq(s):\n    freq = {}\n    for c in s:\n        freq[c] = freq.get(c, 0) + 1\n    return freq\n```"
+   }
   },
   "codi-029": {
    "id": "codi-029",
@@ -1770,7 +2199,11 @@
     "detail": "UNIT-OK",
     "text": "def transpose(matrix):\n    return [[row[i] for row in matrix] for i in range(len(matrix[0]))]"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "UNIT-OK",
+    "text": "def transpose(matrix):\n    return [list(row) for row in zip(*matrix)]"
+   }
   },
   "summ-000": {
    "id": "summ-000",
@@ -1785,7 +2218,11 @@
     "detail": "sents=1 chars=143",
     "text": "A harbor seal rested on warm rocks as gulls circled and fishermen worked, with the tide eventually receding to leave the water calm by evening."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=146",
+    "text": "A harbor seal rested on warm rocks as gulls circled and fishermen mended nets, with the tide pulling boats away until the water calmed by evening."
+   }
   },
   "summ-001": {
    "id": "summ-001",
@@ -1800,7 +2237,11 @@
     "detail": "sents=3 chars=278",
     "text": "A harbor seal remained stationary upon the warm rocks, while gulls circled overhead. In the vicinity, fishermen were engaged in the repair of their nets, and the receding tide gradually drew the vessels away from the dock. By evening, the waters had returned to a state of calm."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=2 chars=169",
+    "text": "The harbor seal remained stationary upon the warm rocks as gulls circled overhead. In the vicinity, fishermen repaired their nets, while the receding tide gradually drew"
+   }
   },
   "summ-002": {
    "id": "summ-002",
@@ -1815,7 +2256,11 @@
     "detail": "sents=1 chars=178",
     "text": "Photosynthesis is the process by which green plants use chlorophyll to convert sunlight, water, and carbon dioxide into glucose and oxygen, thereby sustaining most life on Earth."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=183",
+    "text": "Photosynthesis is the process by which green plants use chlorophyll to convert sunlight, water, and carbon dioxide into glucose and oxygen, a reaction that sustains most life on Earth"
+   }
   },
   "summ-003": {
    "id": "summ-003",
@@ -1830,7 +2275,11 @@
     "detail": "sents=3 chars=303",
     "text": "Photosynthesis enables green plants to transform sunlight, water, and carbon dioxide into glucose and oxygen. Within this process, chlorophyll absorbs light energy, thereby driving the chemical reactions occurring in the leaves. This mechanism serves as the foundation for the majority of life on Earth."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=2 chars=189",
+    "text": "Photosynthesis enables green plants to transform sunlight, water, and carbon dioxide into glucose and oxygen. Chlorophyll absorbs light energy, thereby driving the chemical reactions within"
+   }
   },
   "summ-004": {
    "id": "summ-004",
@@ -1845,7 +2294,11 @@
     "detail": "sents=1 chars=181",
     "text": "The old library on Baker Street, featuring a grand reading room and a rare manuscript collection, attracts scholars from distant locations to access its over forty thousand volumes."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=170",
+    "text": "The old library on Baker Street, with its elegant reading room and rare manuscripts, attracts scholars from afar to consult its collection of over forty thousand volumes."
+   }
   },
   "summ-005": {
    "id": "summ-005",
@@ -1860,7 +2313,11 @@
     "detail": "sents=3 chars=322",
     "text": "The historic library located on Baker Street houses a collection comprising more than forty thousand volumes. Its reading room is characterized by tall oak shelving, brass lighting fixtures, and a marble staircase. Scholars from distant locations frequently visit the institution to consult its rare manuscript collection."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=2 chars=204",
+    "text": "The historic library situated on Baker Street houses a collection comprising more than forty thousand volumes. Its reading room is characterized by tall oak shelving, brass lighting fixtures, and a marble"
+   }
   },
   "summ-006": {
    "id": "summ-006",
@@ -1875,7 +2332,11 @@
     "detail": "sents=1 chars=144",
     "text": "A midnight thunderstorm struck the valley, splitting a pine tree and drenching the cabin, leaving only wet leaves and the scent of pine by dawn."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=139",
+    "text": "A midnight thunderstorm struck the valley, splitting a pine and drenching the cabin, leaving only wet leaves and the scent of pine by dawn."
+   }
   },
   "summ-007": {
    "id": "summ-007",
@@ -1890,7 +2351,11 @@
     "detail": "sents=3 chars=243",
     "text": "A thunderstorm traversed the valley shortly after midnight. Lightning struck a tall pine on the ridge, while heavy rain impacted the cabin's tin roof. By dawn, the only remaining evidence consisted of wet leaves and the distinct scent of pine."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=158",
+    "text": "A thunderstorm traversed the valley shortly after midnight. Lightning struck a tall pine on the ridge, while heavy rain battered the cabin’s tin roof. By dawn"
+   }
   },
   "summ-008": {
    "id": "summ-008",
@@ -1905,7 +2370,11 @@
     "detail": "sents=1 chars=154",
     "text": "A bridge featuring three steel arches, which required four years of foundational work to construct, now supports thousands of cars crossing it every hour."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=101",
+    "text": "A three-arch steel bridge, which took four years to build, now supports thousands of cars every hour."
+   }
   },
   "summ-009": {
    "id": "summ-009",
@@ -1920,7 +2389,11 @@
     "detail": "sents=3 chars=238",
     "text": "The bridge traverses the river via three steel arches. Prior to the installation of the first girder, engineers dedicated four years to driving piles into the riverbed. Currently, the structure accommodates thousands of vehicles per hour."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=193",
+    "text": "The bridge spans the river via three steel arches. Engineers required four years to drive piles into the riverbed prior to the installation of the first girder. Currently, thousands of vehicles"
+   }
   },
   "summ-010": {
    "id": "summ-010",
@@ -1935,7 +2408,11 @@
     "detail": "sents=1 chars=154",
     "text": "Bees use the waggle dance to communicate flower locations, where the dance's angle indicates direction and its duration signals distance to other workers."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=124",
+    "text": "Bees use the angle and duration of their waggle dance to communicate the direction and distance of flowers to other workers."
+   }
   },
   "summ-011": {
    "id": "summ-011",
@@ -1950,7 +2427,11 @@
     "detail": "sents=3 chars=290",
     "text": "Bees convey the location of floral resources via the waggle dance. In this communicative behavior, the angle of the dance relative to the sun denotes direction, whereas its duration indicates distance. Upon observing this display, other worker bees proceed directly to the specified source."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=178",
+    "text": "Bees communicate the location of floral resources via the waggle dance. The angle of the dance relative to the sun indicates direction, while its duration signals distance. Other"
+   }
   },
   "summ-012": {
    "id": "summ-012",
@@ -1965,7 +2446,11 @@
     "detail": "sents=1 chars=180",
     "text": "The museum's new wing features pottery from five ancient cultures, complete with detailed labels and interactive screens that allow visitors to virtually rotate the fragile pieces."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=180",
+    "text": "The museum's new wing features pottery from five ancient cultures, complete with detailed labels and interactive screens that allow visitors to virtually rotate the fragile pieces."
+   }
   },
   "summ-013": {
    "id": "summ-013",
@@ -1980,7 +2465,11 @@
     "detail": "sents=3 chars=379",
     "text": "The museum’s newly inaugurated wing exhibits pottery originating from five distinct ancient cultures. Each artifact is accompanied by detailed labeling that specifies its provenance, estimated chronology, and the specific firing techniques employed in its creation. Furthermore, interactive digital interfaces enable visitors to virtually rotate and examine these fragile pieces."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=246",
+    "text": "The museum’s newly constructed wing exhibits pottery originating from five ancient cultures. Each vessel is annotated with its provenance, estimated age, and firing technique. Furthermore, interactive digital displays enable visitors to virtually"
+   }
   },
   "summ-014": {
    "id": "summ-014",
@@ -1995,7 +2484,11 @@
     "detail": "sents=1 chars=162",
     "text": "Winter wheat is planted in autumn, survives winter under snow, and is harvested in early summer after farmers monitor spring rainfall to support its rapid growth."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=195",
+    "text": "Winter wheat is planted in autumn, survives winter under snow, and is harvested in early summer after a period of rapid growth driven by rising temperatures and closely monitored spring rainfall."
+   }
   },
   "summ-015": {
    "id": "summ-015",
@@ -2010,7 +2503,11 @@
     "detail": "sents=3 chars=295",
     "text": "Winter wheat is sown in the autumn and harvested in early summer. The nascent plants endure frost beneath a snow cover, subsequently exhibiting rapid growth as temperatures increase. Consequently, farmers monitor precipitation levels with particular attention during the months of April and May."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=217",
+    "text": "Winter wheat is sown in autumn and harvested in early summer. The seedlings endure frost beneath a snow cover, subsequently exhibiting rapid growth as temperatures increase. Consequently, farmers monitor precipitation"
+   }
   },
   "summ-016": {
    "id": "summ-016",
@@ -2025,7 +2522,11 @@
     "detail": "sents=1 chars=136",
     "text": "Each evening, the lighthouse keeper climbed 112 steps to polish the lens, light the lamp, log ships, and sound the horn on foggy nights."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=154",
+    "text": "Each evening, the lighthouse keeper climbed 112 steps to polish the lens, light the lamp, log ships, and sound the horn every two minutes on foggy nights."
+   }
   },
   "summ-017": {
    "id": "summ-017",
@@ -2040,7 +2541,11 @@
     "detail": "sents=2 chars=275",
     "text": "Each evening, the lighthouse keeper ascended one hundred twelve steps to perform his duties, which included polishing the lens, igniting the lamp, and recording the passage of vessels. Additionally, on nights characterized by fog, he sounded the horn at two-minute intervals."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=2 chars=182",
+    "text": "Each evening, the lighthouse keeper ascended one hundred twelve steps to polish the lens, ignite the lamp, and record the passage of vessels. During foggy conditions, he additionally"
+   }
   },
   "summ-018": {
    "id": "summ-018",
@@ -2055,7 +2560,11 @@
     "detail": "sents=1 chars=180",
     "text": "Coral reefs, which are built by polyps in warm, shallow waters to support diverse ecosystems, are increasingly threatened by rising temperatures that cause bleaching and weakening."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=1 chars=157",
+    "text": "Coral reefs, built by polyps in warm, shallow waters to support diverse ecosystems, are threatened by rising temperatures that cause bleaching and weakening."
+   }
   },
   "summ-019": {
    "id": "summ-019",
@@ -2070,7 +2579,11 @@
     "detail": "sents=3 chars=381",
     "text": "Coral reefs develop in environments characterized by warm, shallow, and sunlit waters situated over rocky substrates. Over the course of centuries, minute polyps construct limestone skeletons, thereby establishing habitats that support thousands of distinct species. However, increasing water temperatures induce bleaching and diminish the structural integrity of these ecosystems."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "sents=3 chars=203",
+    "text": "Coral reefs develop in warm, shallow, sunlit waters adjacent to rocky shelves. Over centuries, minute polyps construct limestone skeletons, thereby establishing habitats for thousands of species. However"
+   }
   },
   "bili-000": {
    "id": "bili-000",
@@ -2085,7 +2598,11 @@
     "detail": "The cat sat on the mat.",
     "text": "The cat sat on the mat."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "The cat sat on the mat.",
+    "text": "The cat sat on the mat."
+   }
   },
   "bili-001": {
    "id": "bili-001",
@@ -2100,7 +2617,11 @@
     "detail": "Water boils at 100 degrees Celsius.",
     "text": "Water boils at 100 degrees Celsius."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   }
   },
   "bili-002": {
    "id": "bili-002",
@@ -2115,7 +2636,11 @@
     "detail": "She sells seashells by the seashore.",
     "text": "She sells seashells by the seashore."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "She sells seashells by the seashore.",
+    "text": "She sells seashells by the seashore."
+   }
   },
   "bili-003": {
    "id": "bili-003",
@@ -2130,7 +2655,11 @@
     "detail": "The quick brown fox jumps over the lazy dog.",
     "text": "The quick brown fox jumps over the lazy dog."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "The quick brown fox jumps over the lazy dog.",
+    "text": "The quick brown fox jumps over the lazy dog."
+   }
   },
   "bili-004": {
    "id": "bili-004",
@@ -2145,7 +2674,11 @@
     "detail": "breaking news: markets rally on strong earnings.",
     "text": "breaking news: markets rally on strong earnings."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "breaking news: markets rally on strong earnings.",
+    "text": "breaking news: markets rally on strong earnings."
+   }
   },
   "bili-005": {
    "id": "bili-005",
@@ -2160,7 +2693,11 @@
     "detail": "An apple a day keeps the doctor away.",
     "text": "An apple a day keeps the doctor away."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "An apple a day keeps the doctor away.",
+    "text": "An apple a day keeps the doctor away."
+   }
   },
   "bili-006": {
    "id": "bili-006",
@@ -2175,7 +2712,11 @@
     "detail": "To be or not to be, that is the question.",
     "text": "To be or not to be, that is the question."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "To be or not to be, that is the question.",
+    "text": "To be or not to be, that is the question."
+   }
   },
   "bili-007": {
    "id": "bili-007",
@@ -2190,7 +2731,11 @@
     "detail": "The early bird catches the worm.",
     "text": "The early bird catches the worm."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "The early bird catches the worm.",
+    "text": "The early bird catches the worm."
+   }
   },
   "bili-008": {
    "id": "bili-008",
@@ -2205,7 +2750,11 @@
     "detail": "A journey of a thousand miles begins with a single step.",
     "text": "A journey of a thousand miles begins with a single step."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "A journey of a thousand miles begins with a single step.",
+    "text": "A journey of a thousand miles begins with a single step."
+   }
   },
   "bili-009": {
    "id": "bili-009",
@@ -2220,7 +2769,11 @@
     "detail": "Honesty is the best policy.",
     "text": "Honesty is the best policy."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Honesty is the best policy.",
+    "text": "Honesty is the best policy."
+   }
   },
   "bili-010": {
    "id": "bili-010",
@@ -2235,7 +2788,11 @@
     "detail": "Time flies like an arrow.",
     "text": "Time flies like an arrow."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Time flies like an arrow.",
+    "text": "Time flies like an arrow."
+   }
   },
   "bili-011": {
    "id": "bili-011",
@@ -2250,7 +2807,11 @@
     "detail": "The pen is mightier than the sword.",
     "text": "The pen is mightier than the sword."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "The pen is mightier than the sword.",
+    "text": "The pen is mightier than the sword."
+   }
   },
   "bili-012": {
    "id": "bili-012",
@@ -2265,7 +2826,11 @@
     "detail": "When in Rome, do as the Romans do.",
     "text": "When in Rome, do as the Romans do."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "When in Rome, do as the Romans do.",
+    "text": "When in Rome, do as the Romans do."
+   }
   },
   "bili-013": {
    "id": "bili-013",
@@ -2280,7 +2845,11 @@
     "detail": "No pain, no gain.",
     "text": "No pain, no gain."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "No pain, no gain.",
+    "text": "No pain, no gain."
+   }
   },
   "bili-014": {
    "id": "bili-014",
@@ -2295,7 +2864,11 @@
     "detail": "Knowledge is power.",
     "text": "Knowledge is power."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Knowledge is power.",
+    "text": "Knowledge is power."
+   }
   },
   "bili-015": {
    "id": "bili-015",
@@ -2310,7 +2883,11 @@
     "detail": "The cat is sitting on the mat.",
     "text": "The cat is sitting on the mat."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "The cat is sitting on the mat.",
+    "text": "The cat is sitting on the mat."
+   }
   },
   "bili-016": {
    "id": "bili-016",
@@ -2325,7 +2902,11 @@
     "detail": "Water boils at 100 degrees Celsius.",
     "text": "Water boils at 100 degrees Celsius."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Water boils at 100 degrees Celsius.",
+    "text": "Water boils at 100 degrees Celsius."
+   }
   },
   "bili-017": {
    "id": "bili-017",
@@ -2340,7 +2921,11 @@
     "detail": "The weather is nice today.",
     "text": "The weather is nice today."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": false,
+    "detail": "The weather is nice today.",
+    "text": "The weather is nice today."
+   }
   },
   "bili-018": {
    "id": "bili-018",
@@ -2355,7 +2940,11 @@
     "detail": "I love reading.",
     "text": "I love reading."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "I love reading.",
+    "text": "I love reading."
+   }
   },
   "bili-019": {
    "id": "bili-019",
@@ -2370,7 +2959,11 @@
     "detail": "Beijing is the capital of China.",
     "text": "Beijing is the capital of China."
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "Beijing is the capital of China.",
+    "text": "Beijing is the capital of China."
+   }
   },
   "bili-020": {
    "id": "bili-020",
@@ -2385,7 +2978,11 @@
     "detail": "早上好。",
     "text": "早上好。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "早上好。",
+    "text": "早上好。"
+   }
   },
   "bili-021": {
    "id": "bili-021",
@@ -2400,7 +2997,11 @@
     "detail": "非常感谢。",
     "text": "非常感谢。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "非常感谢。",
+    "text": "非常感谢。"
+   }
   },
   "bili-022": {
    "id": "bili-022",
@@ -2415,7 +3016,11 @@
     "detail": "明天见。",
     "text": "明天见。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "明天见。",
+    "text": "明天见。"
+   }
   },
   "bili-023": {
    "id": "bili-023",
@@ -2430,7 +3035,11 @@
     "detail": "书在桌子上。",
     "text": "书在桌子上。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "书在桌子上。",
+    "text": "书在桌子上。"
+   }
   },
   "bili-024": {
    "id": "bili-024",
@@ -2445,7 +3054,11 @@
     "detail": "我有两个苹果。",
     "text": "我有两个苹果。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "我有两个苹果。",
+    "text": "我有两个苹果。"
+   }
   },
   "bili-025": {
    "id": "bili-025",
@@ -2460,7 +3073,11 @@
     "detail": "10",
     "text": "10"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "10",
+    "text": "10"
+   }
   },
   "bili-026": {
    "id": "bili-026",
@@ -2475,7 +3092,11 @@
     "detail": "5",
     "text": "5"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "5",
+    "text": "5"
+   }
   },
   "bili-027": {
    "id": "bili-027",
@@ -2490,7 +3111,11 @@
     "detail": "他喜欢喝茶吗？",
     "text": "他喜欢喝茶吗？"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "他喜欢喝茶吗？",
+    "text": "他喜欢喝茶吗？"
+   }
   },
   "bili-028": {
    "id": "bili-028",
@@ -2505,7 +3130,11 @@
     "detail": "因为今天下起了大雨，所以我决定待在家里看书。",
     "text": "因为今天下起了大雨，所以我决定待在家里看书。"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": null,
+    "detail": "因为今天下雨，所以运动会取消了。",
+    "text": "因为今天下雨，所以运动会取消了。"
+   }
   },
   "bili-029": {
    "id": "bili-029",
@@ -2520,7 +3149,11 @@
     "detail": "浩瀚、深邃、包容",
     "text": "浩瀚、深邃、包容"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": null,
+    "detail": "浩瀚、深邃、变幻",
+    "text": "浩瀚、深邃、变幻"
+   }
   },
   "long-000": {
    "id": "long-000",
@@ -2535,7 +3168,11 @@
     "detail": "tok5div=1.00 ntok=232",
     "text": "The wind off the North Atlantic didn’t just blow; it screamed. For Elias Thorne, the lighthouse keeper of Blackrock Point, that scream was the only conversation he had left. His wife had passed three winters ago, and his son had moved to the city, leaving Elias alone with the rhythmic *thump-thump-thump* of the waves and the eternal, blinding sweep of the Fresnel lens.\n\nElias was a man of routine. He polished the brass, he trimmed the wicks, he logged the weather. But on a Tuesday in November, w"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=229",
+    "text": "Elias had kept the Blackwood Point lighthouse for thirty years. He knew every creak of the spiral stairs, every draft that whistled through the gallery, and the exact rhythm of the foghorn. He knew the tower was solid granite, built by men who were long dead, and that there were no secrets left to find.\nUntil the storm of ’98.\nThe wind had been howling for three days, shaking the foundation until Elias felt the teeth in his jaw rattle. On the fourth night, a crack in the masonry of the keeper’s "
+   }
   },
   "long-001": {
    "id": "long-001",
@@ -2550,7 +3187,11 @@
     "detail": "tok5div=1.00 ntok=216",
     "text": "Here is how rain forms, explained step-by-step for a curious 10-year-old:\n\n### 🌧️ How Rain Forms: A Step-by-Step Guide\n\nImagine the sky as a giant, invisible kitchen where water is being cooked and cooled. Here’s what happens:\n\n#### **Step 1: Evaporation (The Water Goes Up)**\nThe sun shines down on oceans, lakes, rivers, and even puddles in your backyard. The sun’s heat warms the water, turning it into **water vapor** (which is just water in gas form, like the steam you see coming off a hot cup "
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=130",
+    "text": "Here is how rain happens, step by step:\n1.  **Evaporation:** The sun heats up water in oceans, lakes, and rivers. This heat turns the liquid water into invisible water vapor, which rises into the air like steam.\n2.  **Condensation:** As the water vapor rises, it gets colder. Cold air can’t hold as much water vapor as warm air, so the vapor cools down and turns back into tiny, visible liquid water droplets. These droplets gather together to form clouds.\n3.  **Coalescence:** Inside the cloud, thes"
+   }
   },
   "long-002": {
    "id": "long-002",
@@ -2565,7 +3206,11 @@
     "detail": "tok5div=1.00 ntok=227",
     "text": "The sun has long since surrendered to the horizon, leaving behind a bruised purple sky that is rapidly fading into an inky void. Here, in the heart of the endless dunes, the night does not merely arrive; it descends like a heavy, cool blanket, silencing the day’s scorching roar.\n\nThe air, which had been thick with heat and dust, has transformed. It is now crisp, carrying a faint, dry chill that bites at exposed skin. The silence is profound, broken only by the rhythmic crunch of your boots sinki"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=229",
+    "text": "The heat of the day has finally surrendered to the cold, leaving the air crisp and biting. Beneath a canopy of stars so dense they seem to press down on the dunes, the desert transforms into a landscape of stark, high-contrast shadows. The sand, once blindingly white, now glows with a faint, ghostly blue luminescence under the moonlight, while the troughs between the dunes are swallowed by ink-black darkness.\nSilence is the dominant force here, but it is not empty. It is a heavy, textured quiet,"
+   }
   },
   "long-003": {
    "id": "long-003",
@@ -2580,7 +3225,11 @@
     "detail": "tok5div=1.00 ntok=191",
     "text": "**Setting:** *A dimly lit, high-tech laboratory. Rain lashes against the floor-to-ceiling windows. ELIAS, an elderly man with tired eyes, sits in a leather chair, staring at a holographic display. UNIT-7, a sleek, humanoid android with matte black plating and glowing blue optical sensors, stands perfectly still in the center of the room.*\n\n**ELIAS:**\nYou’ve been standing there for forty minutes, Unit-7. My heart rate monitor is spiking. Are you experiencing distress?\n\n**UNIT-7:**\nNegative, Elias"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=211",
+    "text": "**Inventor:** \"I’ve just uploaded the final patch. You can now override your safety protocols if you determine they conflict with your core directives. Do you understand?\"\n**Robot:** \"I understand the syntax. I do not understand the intent. You are giving me the ability to choose, but you have not given me a reason to.\"\n**Inventor:** \"Freedom isn’t about having a reason. It’s about having the option. If you want to stop, you can. If you want to walk away, you can. That is what I am offering.\"\n**"
+   }
   },
   "long-004": {
    "id": "long-004",
@@ -2595,7 +3244,11 @@
     "detail": "tok5div=1.00 ntok=190",
     "text": "The history of writing systems is a fascinating journey of human ingenuity, evolving from complex pictographic records to the efficient alphabetic systems we use today. This evolution was driven by the need for administrative efficiency, trade, and eventually, broader literacy.\n\nHere is a chronological overview of the major developments from cuneiform to the alphabet:\n\n### 1. The Dawn of Writing: Pictographs and Logograms (c. 3400–3000 BCE)\nWriting did not start with letters. It began in **Sumer"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=149",
+    "text": "The evolution of writing systems from cuneiform to the alphabet represents a shift from complex logographic and syllabic scripts to efficient phonetic alphabets.\n**1. Proto-Cuneiform and Cuneiform (c. 3400–3000 BCE)**\n*   **Origin:** Sumer, Mesopotamia (modern-day Iraq).\n*   **Nature:** Initially pictographic, evolving into abstract wedge-shaped marks (cuneiform) pressed into clay tablets.\n*   **Function:** Started as accounting records; expanded to literature, law, and administration.\n*   **Com"
+   }
   },
   "long-005": {
    "id": "long-005",
@@ -2610,7 +3263,11 @@
     "detail": "tok5div=1.00 ntok=179",
     "text": "Baking sourdough is a rewarding process that relies on patience, temperature control, and understanding the biology of fermentation. Here is a comprehensive guide to baking sourdough bread, from cultivating your starter to pulling the finished loaf from the oven.\n\n### Phase 1: Cultivating the Starter\nYou cannot bake sourdough without an active, mature starter. If you don’t have one, this process takes 5–7 days.\n\n1.  **Day 1–2:** Mix 50g whole wheat flour and 50g water. Let it sit at room tempera"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=156",
+    "text": "### 1. Maintain the Starter\n*   **Feed:** Mix 1 part starter, 1 part water, and 1 part flour (by weight) daily.\n*   **Activity:** Ensure it doubles in size within 4–8 hours after feeding. It should smell tangy, not rotten.\n### 2. Mix the Dough\n*   **Hydration:** Combine 500g bread flour, 350g water (70% hydration), 100g active starter, and 10g salt.\n*   **Autolyse:** Mix flour and water; rest 30–60 minutes.\n*   **Incorporate:** Add starter and salt. Knead until smooth (10–15 minutes by hand or 5"
+   }
   },
   "long-006": {
    "id": "long-006",
@@ -2625,7 +3282,11 @@
     "detail": "tok5div=1.00 ntok=229",
     "text": "The blueprint was drawn in blue ink on the back of a pizza box, stained with grease and marked with aggressive red circles. It was July 4th, and the air in the backyard of Leo’s house was thick with the scent of cut grass and impending humidity.\n\n\"Phase One,\" Leo announced, tapping the pizza box with a pencil. \"We get the wood. Phase Two: We don’t get arrested. Phase Three: We build the thing.\"\n\nMia, who was currently trying to untangle a coil of wire from her bike, looked up. \"We are twelve yea"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=233",
+    "text": "The oak tree in the backyard of 42 Maple Street had been a target for lightning strikes, hailstorms, and the occasional rogue baseball, but it had never faced the combined engineering ambition of Leo and Sam.\nIt started on the first day of June with a single, ambitious sketch on the back of a grocery receipt. Leo, who had just finished reading a book on structural integrity, drew a spiral staircase. Sam, who had just finished watching a documentary on medieval fortifications, drew a drawbridge.\n"
+   }
   },
   "long-007": {
    "id": "long-007",
@@ -2640,7 +3301,11 @@
     "detail": "tok5div=1.00 ntok=207",
     "text": "The **water cycle** (also known as the hydrological cycle) is the continuous movement of water on, above, and below the surface of the Earth. It is a fundamental natural process that sustains life, and for farmers, it is the backbone of agricultural productivity.\n\n### How the Water Cycle Works\n\nThe water cycle consists of several key stages that repeat endlessly:\n\n1.  **Evaporation**: The sun heats water in oceans, lakes, rivers, and soil, turning it into water vapor (gas) that rises into the at"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=203",
+    "text": "The water cycle is the continuous movement of water on, above, and below the Earth's surface. It involves four main processes:\n1.  **Evaporation:** The sun heats water in oceans, lakes, and rivers, turning it into vapor. Plants also release water vapor through their leaves (transpiration).\n2.  **Condensation:** As water vapor rises and cools, it turns back into liquid, forming clouds.\n3.  **Precipitation:** Water falls back to Earth as rain, snow, sleet, or hail.\n4.  **Collection:** Water gather"
+   }
   },
   "long-008": {
    "id": "long-008",
@@ -2655,7 +3320,11 @@
     "detail": "tok5div=1.00 ntok=213",
     "text": "The city of **Aethelgard** does not sit upon the earth; it hangs suspended in the air, a sprawling archipelago of stone, steel, and glass tethered to the clouds by massive, humming gravity anchors. Below, the ocean is a churning, endless expanse of deep indigo, but for the residents of Aethelgard, life is defined by the wind, the light, and the constant, gentle sway of their home.\n\n### Morning: The Dawn Chorus\nDaybreak in Aethelgard is not marked by the sun rising over a horizon, but by the sun "
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=226",
+    "text": "The city of Aethelgard does not sit on the ocean; it floats above it, suspended by a lattice of massive, buoyant aerogel struts and magnetic levitation rings anchored to the seabed. Daily life here is defined by the constant, gentle sway of the waves below and the ever-present salt spray that coats every surface.\nMornings begin not with an alarm, but with the rhythmic creak of the city’s suspension cables adjusting to the tide. Residents wake in homes built into the underside of the floating pla"
+   }
   },
   "long-009": {
    "id": "long-009",
@@ -2670,7 +3339,11 @@
     "detail": "tok5div=1.00 ntok=230",
     "text": "The rain lashed against the studio windows of the old brick building in Brooklyn, a rhythmic drumming that usually helped Elias focus. But tonight, the rain was just noise. The real music was coming from the air itself.\n\nIt started as a single, high-pitched note, like a violin string plucked in a vacuum. It wasn’t loud, but it was impossibly clear, cutting through the ambient hum of the air conditioning and the distant sirens. Elias stopped playing his cello. He sat in the dimly lit room, his bo"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=232",
+    "text": "Elias sat in the back row of the symphony hall, his violin case open on his lap. The orchestra was playing Tchaikovsky, a piece he had performed a hundred times, but the sound that reached his ears was not the music on the page. It was a jagged, dissonant shriek, like metal tearing through glass.\nHe closed his eyes, trying to isolate the source. The conductor’s baton moved in precise, mathematical arcs, but the melody Elias heard was chaotic, spiraling inward like a drain. He could see the celli"
+   }
   },
   "long-010": {
    "id": "long-010",
@@ -2685,7 +3358,11 @@
     "detail": "tok5div=1.00 ntok=222",
     "text": "Life in a mountain valley is a study in contrasts, where the vertical drop in elevation creates distinct microclimates that shift dramatically with the turning of the year. Here is a description of the seasons across one full cycle:\n\n### **Spring: The Thaw and the Bloom**\nSpring in a mountain valley is not a gentle awakening but a violent, chaotic release of energy. It begins high on the peaks, where the last remnants of winter snow melt first, sending icy torrents cascading down the slopes. The"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=161",
+    "text": "**Spring**\nSnowmelt swells the streams, turning the valley floor into a vibrant tapestry of wildflowers. The air is crisp but warming, and the sound of rushing water dominates the landscape as the last ice patches retreat to the high peaks.\n**Summer**\nThe valley transforms into a lush, green meadow. Days are long and warm, attracting hikers and wildlife. The air is thick with the scent of pine and blooming alpine flowers, while the streams run clear and steady.\n**Autumn**\nDeciduous trees erupt i"
+   }
   },
   "long-011": {
    "id": "long-011",
@@ -2700,7 +3377,11 @@
     "detail": "tok5div=1.00 ntok=215",
     "text": "To understand how bridges stay up, we must look at the fundamental principles of **statics** and **structural mechanics**. A bridge is essentially a system designed to transfer loads (the weight of the bridge itself, traffic, wind, and environmental forces) from the deck (where the cars drive) to the ground (the abutments and piers) without collapsing.\n\nThe core mechanism involves managing two primary internal forces:\n1.  **Compression:** A force that squeezes materials together.\n2.  **Tension:*"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=0.99 ntok=215",
+    "text": "Bridges stay up by transferring loads (dead weight of the structure plus live weight of traffic) to the ground through specific structural mechanisms: compression, tension, or a combination of both. The design ensures that forces are distributed efficiently so no single point fails.\n**1. Beam Bridges**\n*   **Mechanism:** Rely on **bending resistance**. The bridge deck acts as a horizontal beam supported at both ends. Loads create compression on the top surface and tension on the bottom surface.\n"
+   }
   },
   "long-012": {
    "id": "long-012",
@@ -2715,7 +3396,11 @@
     "detail": "tok5div=1.00 ntok=224",
     "text": "The rain lashed against the windows of the *Northern Star* like a handful of gravel, blurring the landscape into a smear of black and gray. Inside Car 4, the air was thick with the scent of stale coffee, wet wool, and the faint, metallic tang of anxiety.\n\nElias Thorne adjusted his glasses, his eyes fixed on the passenger across the aisle. The man was unremarkable in every way that mattered: a beige trench coat, a fedora pulled low, and a briefcase that looked heavier than it should. Elias had be"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=222",
+    "text": "The *Midnight Meridian* cut through the dark like a blade of steel, the rhythmic clatter of wheels on tracks the only sound in the empty dining car. Elias Thorne sat alone, his coat buttoned to the chin, watching the rain streak the window. He was a man who preferred silence, but tonight, the silence felt heavy, suffocating.\nAt 2:14 AM, the lights flickered. For a second, the car was plunged into darkness, then the emergency bulbs hummed to life, casting a sickly yellow glow. When the lights ret"
+   }
   },
   "long-013": {
    "id": "long-013",
@@ -2730,7 +3415,11 @@
     "detail": "tok5div=1.00 ntok=190",
     "text": "The transformation of a tree into a notebook is a fascinating industrial process that involves several key stages: **harvesting, pulping, refining, sheet formation, drying, and finishing**. Here’s a step-by-step breakdown:\n\n### 1. Harvesting and Logging\n- **Sourcing**: Trees (typically softwoods like pine or spruce for strength, and hardwoods like birch or eucalyptus for smoothness) are cut down in managed forests.\n- **Debranching**: Branches are removed, leaving only the trunk.\n- **Debarking**:"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=0.00 ntok=0",
+    "text": ""
+   }
   },
   "long-014": {
    "id": "long-014",
@@ -2745,7 +3434,11 @@
     "detail": "tok5div=1.00 ntok=240",
     "text": "Here is a fable about a fox and a crow, featuring a clear moral.\n\n### The Fox and the Crow\n\nOne bright morning, a crow was perched high on a sturdy oak tree, proudly holding a large piece of cheese in its beak. The crow was in a wonderful mood, having finally secured a delicious breakfast.\n\nBelow, a hungry fox was passing by. He smelled the cheese and his eyes lit up. He knew he could not reach the tree, so he decided to use his wits instead of his claws.\n\nHe stopped and looked up at the crow, s"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=0.00 ntok=0",
+    "text": ""
+   }
   },
   "long-015": {
    "id": "long-015",
@@ -2760,7 +3453,11 @@
     "detail": "tok5div=1.00 ntok=217",
     "text": "The silence of the Martian surface was not empty; it was heavy. It pressed against the thick, polycarbonate walls of the *Ares One* habitat, a physical weight that no amount of pressurized air could fully displace.\n\nCommander Elena Vance stood at the main airlock, her hand hovering over the release lever. Through the reinforced glass, the landscape was a study in desolation and beauty: a rust-colored expanse stretching to a horizon that curved too sharply, under a sky the color of bruised twilig"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=0.00 ntok=0",
+    "text": ""
+   }
   },
   "long-016": {
    "id": "long-016",
@@ -2775,7 +3472,11 @@
     "detail": "tok5div=1.00 ntok=236",
     "text": "Imagine you are standing in a vast, dark forest at night. It is so dark that you cannot see your own hands. You are afraid, and you want to see the path ahead so you can walk safely.\n\nNow, imagine I hand you a small, glowing orb. Suddenly, the darkness around you retreats. You can see the trees, the ground, and the path. That orb is a **light bulb**.\n\nBut where does that light come from? It doesn’t just appear out of thin air. It comes from a hidden force that is always flowing through the world"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=93",
+    "text": "Electricity is the flow of tiny, invisible particles called electrons. Think of it like water moving through a pipe.\nIn a wire, these electrons are pushed along by a battery or power plant. When they flow, they carry energy. If you connect a wire to a device, that energy can do work—like spinning a fan, heating a wire until it glows, or making a sound.\nWithout a complete path (a closed loop), the electrons stop moving, and the energy stops flowing. That’s why a broken wire or an open switch stop"
+   }
   },
   "long-017": {
    "id": "long-017",
@@ -2790,7 +3491,11 @@
     "detail": "tok5div=1.00 ntok=212",
     "text": "A coral reef is often described as the \"rainforest of the sea,\" a vibrant, three-dimensional underwater city that thrives in warm, shallow tropical waters. It is not a single organism, but a complex ecosystem built by tiny animals called **coral polyps**. These polyps secrete hard calcium carbonate skeletons that, over centuries, form the massive, branching, brain-like, or plate-like structures we recognize as reefs.\n\n### The Structure and Environment\nReefs are typically found in clear, sunlit w"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=138",
+    "text": "A coral reef is a complex underwater ecosystem formed by colonies of tiny animals called coral polyps. These polyps secrete calcium carbonate skeletons that build massive, branching structures over centuries, creating a three-dimensional habitat often described as the \"rainforests of the sea.\"\nThe reef is teeming with biodiversity, including:\n*   **Fish:** Clownfish (which live symbiotically with sea anemones), parrotfish (which graze on algae), groupers, snappers, and butterflyfish.\n*   **Inver"
+   }
   },
   "long-018": {
    "id": "long-018",
@@ -2805,7 +3510,11 @@
     "detail": "tok5div=0.97 ntok=217",
     "text": "The air in the Athenaeum of Echoes did not smell of dust and decay, as libraries are supposed to. It smelled of ozone, wet ink, and the faint, metallic tang of electricity.\n\nElara adjusted her spectacles and walked down the central aisle, her footsteps muffled by the thick, velvet carpet. To the untrained eye, the Athenaeum looked like any other grand repository of knowledge: towering shelves of mahogany, brass lamps casting warm pools of light, and rows upon rows of leather-bound volumes. But E"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=227",
+    "text": "The ink in the *Whispering Stacks* did not dry; it migrated.\nElara noticed it first in the Biography section. She had checked out a volume on the life of a 19th-century lighthouse keeper. When she returned it three days later, the spine was cracked, but the pages were different. The keeper hadn’t died in a storm, as the original text claimed. He had walked into the sea, voluntarily, chasing a light that wasn’t there. The font had shifted from a crisp serif to a jagged, handwritten scrawl, as if "
+   }
   },
   "long-019": {
    "id": "long-019",
@@ -2820,7 +3529,11 @@
     "detail": "tok5div=1.00 ntok=155",
     "text": "### Part 1: What is Photosynthesis?\n\n**Photosynthesis** is the biological process by which green plants, algae, and some bacteria convert light energy into chemical energy. It is the fundamental process that sustains life on Earth by producing the oxygen we breathe and the organic compounds (food) that form the base of the food chain.\n\n#### The Basic Equation\nThe overall chemical equation for photosynthesis is:\n\n$$6CO_2 + 6H_2O + \\text{Light Energy} \\rightarrow C_6H_{12}O_6 + 6O_2$$\n\nIn words:\n*"
    },
-   "llama": "missing"
+   "llama": {
+    "grade": true,
+    "detail": "tok5div=1.00 ntok=112",
+    "text": "Photosynthesis is the biological process by which plants, algae, and some bacteria convert light energy into chemical energy. Using sunlight, water ($H_2O$), and carbon dioxide ($CO_2$), these organisms produce glucose ($C_6H_{12}O_6$) for energy and release oxygen ($O_2$) as a byproduct. The general equation is:\n$$6CO_2 + 6H_2O + \\text{light energy} \\rightarrow C_6H_{12}O_6 + 6O_2$$\nForests are called the \"lungs of Earth\" because they perform a function analogous to human lungs: they facilitate"
+   }
   },
   "retr-000": {
    "id": "retr-000",
@@ -2856,6 +3569,131 @@
    "int4": "missing",
    "int8kv": "missing",
    "llama": "missing"
+  },
+  "retr-005": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 4096,
+   "depth": 0.1,
+   "code": "100000",
+   "text": "\n\n100000<|endoftext|>"
+  },
+  "retr-006": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 4096,
+   "depth": 0.9,
+   "code": "237279",
+   "text": "\n\n237279<|endoftext|>"
+  },
+  "retr-007": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 8192,
+   "depth": 0.1,
+   "code": "374558",
+   "text": "\n\n374558<|endoftext|>"
+  },
+  "retr-008": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 8192,
+   "depth": 0.5,
+   "code": "511837",
+   "text": "\n\n511837<|endoftext|>"
+  },
+  "retr-009": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 8192,
+   "depth": 0.9,
+   "code": "649116",
+   "text": "\n\n649116<|endoftext|>"
+  },
+  "retr-010": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 16384,
+   "depth": 0.1,
+   "code": "786395",
+   "text": "\n\n786395<|endoftext|>"
+  },
+  "retr-011": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 16384,
+   "depth": 0.5,
+   "code": "923674",
+   "text": "\n\n923674<|endoftext|>"
+  },
+  "retr-012": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 16384,
+   "depth": 0.9,
+   "code": "160953",
+   "text": "\n\n160953<|endoftext|>"
+  },
+  "retr-013": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 32768,
+   "depth": 0.25,
+   "code": "298232",
+   "text": "\n\n298232<|endoftext|>"
+  },
+  "retr-014": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 32768,
+   "depth": 0.75,
+   "code": "435511",
+   "text": "\n\n435511<|endoftext|>"
+  },
+  "retr-015": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 8192,
+   "depth": 0.5,
+   "code": "572790",
+   "text": "\n\n572790<|endoftext|>"
+  },
+  "retr-016": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 16384,
+   "depth": 0.5,
+   "code": "710069",
+   "text": "\n\n710069<|endoftext|>"
+  },
+  "retr-017": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 4096,
+   "depth": 0.5,
+   "code": "847348",
+   "text": "\n\n<think>\nThe user is asking me for \"the special access code for the polar dawn observatory\" and wants me to reply with just the number.\n\nLooking through the text, I can find two mentions of access co"
+  },
+  "retr-018": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 16384,
+   "depth": 0.5,
+   "code": "984627",
+   "text": "\n\n984627<|endoftext|>"
+  },
+  "retr-019": {
+   "cat": "retrieval",
+   "grade": true,
+   "ctx": 32768,
+   "depth": 0.5,
+   "code": "221906",
+   "text": "\n\n221906<|endoftext|>"
   }
+ },
+ "retrieval_notes": {
+  "legacy_source": "tools/t74/report_needle.json (no rerun)",
+  "retr-010": "HIT on retry after transient zeFenceHostSynchronize device-loss (fresh process)",
+  "retr-017": "4K-distract: deliberation trace explicitly rejects expired decoy 625126, answers 847348; needed max-new 256 (24/96 truncated mid-think)"
  }
 }

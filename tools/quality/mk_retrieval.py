@@ -102,6 +102,11 @@ def main():
             h = emb[torch.tensor(ids[ch * M:(ch + 1) * M])].numpy().astype("float32")
             h.tofile(os.path.join(d, f"ch_{ch}.bin"))
         q = tokenizer.encode(tk, QUESTION.format(place=place))
+        # Merged path needs FULL ids (context + question tail, cf. 64K
+        # merge: P=65043, impP=TC=65024); guard requires P >= TC.
+        full = ids + q
+        with open(os.path.join(d, "ids.txt"), "w") as f:
+            f.write(",".join(map(str, full)))
         with open(os.path.join(d, "q.txt"), "w") as f:
             f.write(",".join(map(str, q)))
         print(f"{c['id']}: ctx={g['ctx']} chunks={g['ctx']//M} code={code}",

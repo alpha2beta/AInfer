@@ -1,0 +1,1 @@
+{"gen": "```python\ndef dot(a, b):\n    return sum(x * y for x, y in zip(a, b))\n```", "stderr_tail": ""}

@@ -1,0 +1,1 @@
+{"gen": "def transpose(matrix):\n    return [list(row) for row in zip(*matrix)]", "stderr_tail": ""}

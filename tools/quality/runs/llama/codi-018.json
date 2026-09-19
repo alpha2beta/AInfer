@@ -1,0 +1,1 @@
+{"gen": "```python\ndef binary_search(xs, x):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == x:\n            return mid\n        elif xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n```", "stderr_tail": ""}
