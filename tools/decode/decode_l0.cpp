@@ -797,6 +797,7 @@ int main(int argc, char **argv) {
       {"gemvm2.spv", "_ZTS10Int4GemvM2"},
       {"gemvm3.spv", "_ZTS10Int4GemvM3"},
       {"chunkgemmdb.spv", "_ZTS11ChunkGemmDB"},
+      {"chunkflashattn.spv", "_ZTS14ChunkFlashAttn"},
   };
   enum K {
     NORM,
@@ -839,6 +840,7 @@ int main(int argc, char **argv) {
     GEMVM2,
     GEMVM3,
     CGEMMDB,
+    CFA,
     NK
   };
   ze_kernel_handle_t kh[NK] = {nullptr};
@@ -883,6 +885,7 @@ int main(int argc, char **argv) {
   CHECK(zeKernelSetGroupSize(kh[WVG], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CGEMM], 16, 1, 1)); // chunk prefill: same
   CHECK(zeKernelSetGroupSize(kh[CGEMMDB], 16, 1, 1)); // paired-slice GEMM: same
+  CHECK(zeKernelSetGroupSize(kh[CFA], 16, 1, 1)); // fused flash attn: SG16 groups
   CHECK(zeKernelSetGroupSize(kh[CQK], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CWV], 16, 1, 1));
 
@@ -2449,6 +2452,13 @@ int main(int argc, char **argv) {
         const bool gemmDB =
             (std::getenv("AINFER_GEMM_DB") != nullptr &&
              std::getenv("AINFER_GEMM_DB")[0] == '1');
+        // AINFER_FLASH=1 selects fused online-softmax attention
+        // (ChunkFlashAttn) replacing CQK+CSM+cvt+CWV + the score matrix.
+        // Tolerance-gated (worst-rel 5e-6), not bitwise: online summation
+        // order differs at 1-ulp level. Default keeps the 3-stage path.
+        const bool flashAttn =
+            (std::getenv("AINFER_FLASH") != nullptr &&
+             std::getenv("AINFER_FLASH")[0] == '1');
         auto cgemmW = [&](void *Wp, void *Ws, int nn, int kk, void *Ah,
                           void *Y) {
           int mm = M;
@@ -2641,6 +2651,23 @@ int main(int argc, char **argv) {
           setarg(kh[CKV], 6, sizeof(int), &pfMmA);
           launch(R, kh[CKV], M * 1024);
           cvtYa(dQnh_, dQn_, M * QN);
+          if (flashAttn) {
+            int pp = base, ww = W, kb = 512;
+            setarg(kh[CFA], 0, sizeof(void *), &dQnh_);
+            setarg(kh[CFA], 1, sizeof(void *), &kcS);
+            setarg(kh[CFA], 2, sizeof(void *), &vcS);
+            setarg(kh[CFA], 3, sizeof(void *), &dCore_);
+            setarg(kh[CFA], 4, sizeof(int), &pp);
+            setarg(kh[CFA], 5, sizeof(int), &pfMmA);
+            setarg(kh[CFA], 6, sizeof(int), &ww);
+            setarg(kh[CFA], 7, sizeof(int), &kb);
+            setarg(kh[CFA], 8, (size_t)8 * 256 * 2, nullptr);
+            setarg(kh[CFA], 9, (size_t)256 * 16 * 2, nullptr);
+            setarg(kh[CFA], 10, (size_t)16 * 256 * 2, nullptr);
+            setarg(kh[CFA], 11, (size_t)8 * 16 * 4, nullptr);
+            setarg(kh[CFA], 12, (size_t)8 * 256 * 4, nullptr);
+            launch(R, kh[CFA], (uint32_t)(((M + 7) / 8) * 24));
+          } else {
           {
             int pp = base, ww = W, ss = TC;
             setarg(kh[CQK], 0, sizeof(void *), &dQnh_);
@@ -2676,6 +2703,7 @@ int main(int argc, char **argv) {
             setarg(kh[CWV], 6, (size_t)16 * 16 * 2, nullptr);
             setarg(kh[CWV], 7, (size_t)8 * 16 * 4, nullptr);
             launch(R, kh[CWV], (uint32_t)(M * 64));
+          }
           }
           setarg(kh[GMUL], 0, sizeof(void *), &dAttF_);
           setarg(kh[GMUL], 1, sizeof(void *), &dCore_);

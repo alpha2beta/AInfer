@@ -357,6 +357,18 @@ add_test(NAME gemvm3_replay
                         ${CMAKE_CURRENT_BINARY_DIR}/report_gemvm3.json)
 set_tests_properties(gemvm3_replay PROPERTIES TIMEOUT 1200)
 
+# Fused FlashAttention probe: ChunkFlashAttn vs host fp32 FA reference.
+add_executable(chunkflash_replay chunkflash_replay.cpp)
+target_include_directories(chunkflash_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunkflash_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunkflash_replay spv_mods)
+add_test(NAME chunkflash_replay
+  COMMAND chunkflash_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkflashattn.spv
+                            ${CMAKE_CURRENT_BINARY_DIR}/report_chunkflash.json)
+set_tests_properties(chunkflash_replay PROPERTIES TIMEOUT 1200)
+
 # T7.4 long-context scan: AttnCore at T=1K/2K/4K (same SPIR-V, 4K sizing).
 add_executable(attnfar_replay attnfar_replay.cpp)
 target_include_directories(attnfar_replay PRIVATE

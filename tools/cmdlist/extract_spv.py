@@ -71,6 +71,7 @@ WANTED = {
     "_ZTS13ChunkKvAppend": "chunkkvappend.spv",
     "_ZTS9ChunkRope": "chunkrope.spv",
     "_ZTS11ChunkQkGemm": "chunkqkgemm.spv",
+    "_ZTS14ChunkFlashAttn": "chunkflashattn.spv",
     "_ZTS11ChunkWvGemm": "chunkwvgemm.spv",
     "_ZTS15ChunkSoftmaxRow": "chunksoftmaxrow.spv",
 }

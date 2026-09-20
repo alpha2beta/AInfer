@@ -1374,6 +1374,194 @@ struct ChunkWvGemm {
   }
 };
 
+// Prefill fused FlashAttention (T7.4 full layers): online-softmax QK+PV over
+// key blocks, replacing ChunkQkGemm + ChunkSoftmaxRow + ChunkWvGemm + the
+// (M*24)xW score matrix traffic (1.6 GB/chunk at 64K). One SG16 subgroup
+// per (m8-tile, q-head): 8 queries sharing kv-head k2 = hh/6 process Kb=512
+// key blocks with joint_matrix DPAS (8x16 tiles), FP32 online max/sum,
+// rescale-and-accumulate O (8x256). Causal: keys t >= P+m+1 skipped
+// (whole blocks) or lane-masked (partial). Scores carry the /16 attention
+// scale (QK convention). Output = UNGATED attn (GMUL stays downstream),
+// layout dCore_ [(m*24+hh)*256]. exp() per element; max is exact (order-
+// independent), sums differ at 1-ulp level from row-softmax order — gate
+// at worst-rel 1e-6, not bitwise. All members live (guard below).
+struct ChunkFlashAttn {
+  const sycl::half *Q; // (M*24)*256 fp16 queries, roped+normed (dQnh_)
+  const uint16_t *Kc;  // decode-layout BF16 K cache, slot t at (t*4+kv)*256
+  const uint16_t *Vc;  // decode-layout BF16 V cache
+  float *O;            // (M*24)*256 fp32 out (dCore_ layout)
+  int P;               // chunk base (prefix length)
+  int M;               // chunk rows
+  int W;               // valid slots = P+M
+  int KB;              // key block size (512)
+  sycl::local_accessor<sycl::half, 1> sQ; // 8*256 Q tile (once per group)
+  sycl::local_accessor<sycl::half, 1> sKs; // 16*16 K slice (streamed per kt)
+  sycl::local_accessor<sycl::half, 1> sVs; // 1*256 V row (streamed per c)
+  sycl::local_accessor<float, 1> sC; // 8*16 scores (reused for P)
+  // NOTE: Oacc lives in registers (128 floats/lane); sO removed to keep
+  // SLM at ~5.5KB (28.5KB collapsed occupancy and ran slower than 3-stage).
+  // All members live by construction (every member is referenced above).
+  void operator()(sycl::nd_item<1> it) const {
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    int m8 = gid / 24, hh = gid % 24;
+    int k2 = hh / 6;
+    int m0 = m8 * 8;
+    if (m0 >= M)
+      return;
+    int lid = (int)sg.get_local_id()[0];
+    // Stage 8 queries (rows m0..m0+7, head hh). Guard tail rows past M.
+    for (int u = 0; u < 128; ++u) {
+      int idx = lid * 128 + u, r = idx / 256, c = idx % 256;
+      sycl::half v = sycl::half(0);
+      if (r < 8 && m0 + r < M)
+        v = Q[((size_t)(m0 + r) * 24 + hh) * 256 + c];
+      sQ[(size_t)r * 256 + c] = v;
+    }
+    sg.barrier();
+    // FP32 online state per query row (replicated per lane; identical math).
+    float mx[8], ls[8], resc[8];
+    for (int r = 0; r < 8; ++r) {
+      mx[r] = -1e30f;
+      ls[r] = 0;
+      resc[r] = 0;
+    }
+    // Zero the SLM O accumulators: first tile does sO*0 which is NaN if
+    // SLM garbage contains NaN/Inf (uninitialized-local lesson).
+    for (int u = 0; u < 128; ++u) {
+      int idx = lid * 128 + u, r = idx / 256, d = idx % 256;
+      sO[(size_t)r * 256 + d] = 0.0f;
+    }
+    sg.barrier();
+    // Key blocks of KB; sub-tiles of 16 keys (c0).
+    for (int kb = 0; kb < W; kb += KB) {
+      int row_valid = 0;
+      for (int r = 0; r < 8; ++r)
+        if (m0 + r < M && kb < P + m0 + r + 1)
+          row_valid = 1;
+      if (!row_valid)
+        continue;
+      for (int c0 = 0; c0 < KB && kb + c0 < W; c0 += 16) {
+        // Stage K/V sub-tiles (256x16, 16x256), BF16->fp16 (qb pattern).
+        for (int u = 0; u < 256; ++u) {
+          int idx = lid * 256 + u, i = idx / 16, n2 = idx % 16;
+          int t = kb + c0 + n2;
+          sycl::half vk = sycl::half(0);
+          if (i < 256 && t < W) {
+            uint32_t uk = (uint32_t)Kc[((size_t)t * 4 + k2) * 256 + i] << 16;
+            float fk;
+            __builtin_memcpy(&fk, &uk, 4);
+            vk = sycl::half(fk);
+          }
+          sKs[(size_t)i * 16 + n2] = vk;
+        }
+        for (int u = 0; u < 256; ++u) {
+          int idx = lid * 256 + u, i = idx / 256, n2 = idx % 256;
+          int t = kb + c0 + i;
+          sycl::half vv = sycl::half(0);
+          if (i < 16 && t < W) {
+            uint32_t uv = (uint32_t)Vc[((size_t)t * 4 + k2) * 256 + n2] << 16;
+            float fv;
+            __builtin_memcpy(&fv, &uv, 4);
+            vv = sycl::half(fv);
+          }
+          sVs[(size_t)i * 256 + n2] = vv;
+        }
+        sg.barrier();
+        // QK DPAS: 8 queries x 16 keys over 16 K-steps (one 8x16 acc).
+        mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, 8,
+                         16, mx::layout::dynamic>
+            acc;
+        mx::joint_matrix_fill(sg, acc, 0.0f);
+        for (int kt = 0; kt < 256; kt += 16) {
+          mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, 8, 16,
+                           mx::layout::row_major>
+              ta;
+          mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, 16, 16,
+                           mx::layout::row_major>
+              tb;
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+              mpQ(&sQ[(size_t)kt]);
+          mx::joint_matrix_load(sg, ta, mpQ, 256);
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+              mpK(&sKs[(size_t)kt * 16]);
+          mx::joint_matrix_load(sg, tb, mpK, 16);
+          mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+        }
+        mx::joint_matrix_store(
+            sg, acc,
+            sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+                &sC[0]),
+            16, mx::layout::row_major);
+        sg.barrier();
+        // Per-row online update: max over valid keys, P into sC, rescale.
+        for (int r = 0; r < 8; ++r) {
+          int m = m0 + r;
+          int tlim = (m < M) ? (P + m + 1) : kb;
+          float m_old = mx[r], l_old = ls[r];
+          float m_new = m_old;
+          float psum[16];
+          for (int c = 0; c < 16; ++c) {
+            int t = kb + c0 + c;
+            float s = (t < tlim) ? sC[(size_t)r * 16 + c] * (1.0f / 16.0f)
+                                 : -1e30f;
+            if (s > m_new)
+              m_new = s;
+            psum[c] = s;
+          }
+          float R = (m_old <= -1e29f) ? 0.0f : sycl::exp(m_old - m_new);
+          float l_new = l_old * R;
+          for (int c = 0; c < 16; ++c) {
+            int t = kb + c0 + c;
+            float pw = (t < tlim) ? sycl::exp(psum[c] - m_new) : 0.0f;
+            l_new += pw;
+            sC[(size_t)r * 16 + c] = pw;
+          }
+          resc[r] = R;
+          mx[r] = m_new;
+          ls[r] = l_new;
+        }
+        sg.barrier();
+        // PV accumulate, lane-disjoint (rr,d) pairs over sO.
+        for (int dd = lid; dd < 8 * 256; dd += 16) {
+          int rr = dd / 256, d = dd % 256;
+          float ov = sO[(size_t)rr * 256 + d] * resc[rr];
+          for (int c = 0; c < 16; ++c)
+            ov += sC[(size_t)rr * 16 + c] * (float)sVs[(size_t)c * 256 + d];
+          sO[(size_t)rr * 256 + d] = ov;
+        }
+      }
+    }
+    // Epilogue: normalize + write valid rows (zeros for padding rows).
+    for (int u = 0; u < 128; ++u) {
+      int idx = lid * 128 + u, r = idx / 256, d = idx % 256;
+      int m = m0 + r;
+      float inv = (r < 8 && m < M && ls[r] > 0) ? (1.0f / ls[r]) : 0.0f;
+      float v = (r < 8 && m < M) ? sO[(size_t)r * 256 + d] * inv : 0.0f;
+      if (r < 8 && m < M)
+        O[((size_t)m * 24 + hh) * 256 + d] = v;
+    }
+  }
+};
+
+// Dead-strip guard (Concat2 lesson): raw-L0 never calls this, but the
+// reference retains the entry point in the bundle for extract_spv.
+void launch_chunkflashattn(sycl::queue &q, const sycl::half *Q,
+                           const uint16_t *Kc, const uint16_t *Vc, float *O,
+                           int P, int M, int W, int KB) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sQ(8 * 256, h);
+    sycl::local_accessor<sycl::half, 1> sKs(256 * 16, h);
+    sycl::local_accessor<sycl::half, 1> sVs(16 * 256, h);
+    sycl::local_accessor<float, 1> sC(8 * 16, h);
+    sycl::local_accessor<float, 1> sO(8 * 256, h);
+    int nG = (M + 7) / 8;
+    h.parallel_for(sycl::nd_range<1>({(size_t)nG * 24 * 16}, {16}),
+                   ChunkFlashAttn{Q, Kc, Vc, O, P, M, W, KB, sQ, sKs, sVs, sC,
+                                  sO});
+  }).wait();
+}
+
 // T7.4 chunked prefill: row softmax over M*24 rows (SoftmaxRow is fixed at
 // 24 decode rows). Identical math (scalar max + ESIMD exp/sum + normalize);
 // -FLT_MAX causal entries flow through (exp -> 0, max stays finite). The
