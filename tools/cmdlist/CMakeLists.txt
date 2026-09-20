@@ -26,7 +26,7 @@ find_program(SYCL_POST_LINK sycl-post-link
 if(NOT LLVM_SPIRV OR NOT SYCL_POST_LINK)
   message(FATAL_ERROR "llvm-spirv/sycl-post-link not found (needed for T5.3 SPIR-V)")
 endif()
-set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
+set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkgemmdb chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
 set(SPV_FILES "")
 foreach(m IN LISTS SPV_MODS)
   list(APPEND SPV_FILES ${CMAKE_CURRENT_BINARY_DIR}/${m}.spv)
@@ -477,6 +477,18 @@ add_test(NAME chunkgemm_replay
   COMMAND chunkgemm_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkgemm.spv
                             ${CMAKE_CURRENT_BINARY_DIR}/report_chunkgemm.json)
 set_tests_properties(chunkgemm_replay PROPERTIES TIMEOUT 1200)
+
+# Prefill GEMM slice pairs: ChunkGemmDB vs CPU fp32 ref (tol 1e-3).
+add_executable(gemmdb_replay gemmdb_replay.cpp)
+target_include_directories(gemmdb_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(gemmdb_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(gemmdb_replay spv_mods)
+add_test(NAME gemmdb_replay
+  COMMAND gemmdb_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkgemmdb.spv
+                            ${CMAKE_CURRENT_BINARY_DIR}/report_gemmdb.json)
+set_tests_properties(gemmdb_replay PROPERTIES TIMEOUT 1200)
 
 # T7.4 chunked prefill: causal chunk-attention over a cache prefix.
 add_executable(chunkattn_replay chunkattn_replay.cpp)

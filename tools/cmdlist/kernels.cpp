@@ -1834,6 +1834,139 @@ void launch_chunkgemm(sycl::queue &q, const sycl::half *A, const uint8_t *P,
   }).wait();
 }
 
+// Prefill GEMM slice pairs (Pillar 9 port): same math as ChunkGemm, but
+// each iteration loads TWO K-slices (kt, kt+16) then runs 8 back-to-back
+// DPAS under ONE barrier instead of 2 barriers for 4+4 — halves barrier
+// count (the binding cost under 50x group oversubscription: 29ms at 1.57
+// TFLOPS = 0.5% of roof). Two SLM banks (sA0/sB0, sA1/sB1). All members
+// live (guard below). K multiple of 32 (true: scales group by 128).
+struct ChunkGemmDB {
+  const sycl::half *A;
+  const uint8_t *P;
+  const uint16_t *S;
+  float *C;
+  int M, K, TN;
+  sycl::local_accessor<sycl::half, 1> sA0;
+  sycl::local_accessor<sycl::half, 1> sB0;
+  sycl::local_accessor<sycl::half, 1> sA1;
+  sycl::local_accessor<sycl::half, 1> sB1;
+  sycl::local_accessor<float, 1> sC;
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16, UR = 4;
+    auto sg = it.get_sub_group();
+    int nBc = TN / 16;
+    int gid = (int)it.get_group(0);
+    int br = gid / nBc, bc = gid % nBc;
+    if (br * 32 >= M)
+      return; // partial final block guard (also keeps M live for L0 args)
+    int lid = (int)sg.get_local_id()[0];
+    int G = K / 128;
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc[UR];
+    for (int r = 0; r < UR; ++r)
+      mx::joint_matrix_fill(sg, acc[r], 0.0f);
+    // Paired slices per barrier (no runtime accessor selection: SYCL
+    // accessor bases must be compile-time-known per statement, so both
+    // banks are written out explicitly, mirroring ChunkGemm line for line).
+    for (int kt = 0; kt < K; kt += 32) {
+      for (int r = 0; r < UR; ++r)
+        for (int u = 0; u < 8; ++u) {
+          int idx = lid * 8 + u, rr = idx / TC, c = idx % TC;
+          int ar = br * TR * UR + r * TR + rr;
+          sA0[r * 128 + rr * TC + c] =
+              ar < M ? A[(size_t)ar * K + kt + c] : sycl::half(0);
+          sA1[r * 128 + rr * TC + c] =
+              ar < M ? A[(size_t)ar * K + kt + 16 + c] : sycl::half(0);
+        }
+      int g0 = kt / 128, g1 = (kt + 16) / 128;
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        int n = bc * 16 + n2;
+        size_t li0 = (size_t)n * K + kt + i;
+        uint8_t by0 = P[li0 / 2];
+        int nib0 = (li0 & 1) ? (by0 >> 4) : (by0 & 0xF);
+        if (nib0 >= 8)
+          nib0 -= 16;
+        uint32_t ub0 = S[(size_t)n * G + g0];
+        ub0 <<= 16;
+        float sc0;
+        __builtin_memcpy(&sc0, &ub0, 4);
+        sB0[i * 16 + n2] = sycl::half((float)nib0 * sc0);
+        size_t li1 = (size_t)n * K + kt + 16 + i;
+        uint8_t by1 = P[li1 / 2];
+        int nib1 = (li1 & 1) ? (by1 >> 4) : (by1 & 0xF);
+        if (nib1 >= 8)
+          nib1 -= 16;
+        uint32_t ub1 = S[(size_t)n * G + g1];
+        ub1 <<= 16;
+        float sc1;
+        __builtin_memcpy(&sc1, &ub1, 4);
+        sB1[i * 16 + n2] = sycl::half((float)nib1 * sc1);
+      }
+      sg.barrier();
+      for (int r = 0; r < UR; ++r) {
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                         mx::layout::row_major>
+            ta;
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                         mx::layout::row_major>
+            tb;
+        {
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+              mpA(&sA0[r * 128]);
+          mx::joint_matrix_load(sg, ta, mpA, TC);
+          mx::joint_matrix_load(
+              sg, tb,
+              sB0.template get_multi_ptr<sycl::access::decorated::legacy>(),
+              16);
+        }
+        mx::joint_matrix_mad(sg, acc[r], ta, tb, acc[r]);
+        {
+          sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+              mpA(&sA1[r * 128]);
+          mx::joint_matrix_load(sg, ta, mpA, TC);
+          mx::joint_matrix_load(
+              sg, tb,
+              sB1.template get_multi_ptr<sycl::access::decorated::legacy>(),
+              16);
+        }
+        mx::joint_matrix_mad(sg, acc[r], ta, tb, acc[r]);
+      }
+    }
+    for (int r = 0; r < UR; ++r) {
+      mx::joint_matrix_store(
+          sg, acc[r],
+          sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+              &sC[r * 128]),
+          16, mx::layout::row_major);
+    }
+    sg.barrier();
+    for (int u = 0; u < 32; ++u) {
+      int idx = lid * 32 + u, r = idx / 128, rest = idx % 128;
+      int rr = rest / 16, c = rest % 16;
+      int row = br * TR * UR + r * TR + rr;
+      if (row < M)
+        C[(size_t)row * TN + bc * 16 + c] = sC[r * 128 + rr * 16 + c];
+    }
+  }
+};
+
+// Dead-strip guard (Concat2 lesson): raw-L0 never calls this, but the
+// reference retains the entry point in the bundle for extract_spv.
+void launch_chunkgemmdb(sycl::queue &q, const sycl::half *A, const uint8_t *P,
+                        const uint16_t *S, float *C, int M, int K, int TN) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA0(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sB0(256, h);
+    sycl::local_accessor<sycl::half, 1> sA1(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sB1(256, h);
+    sycl::local_accessor<float, 1> sC(128 * 4, h);
+    h.parallel_for(sycl::nd_range<1>({(size_t)(M / 32) * (TN / 16) * 16}, {16}),
+                   ChunkGemmDB{A, P, S, C, M, K, TN, sA0, sB0, sA1, sB1, sC});
+  }).wait();
+}
+
 // T7.4 chunk production: KV append + RoPE over a token chunk. ChunkKvAppend
 // writes M (Kn,V) rows into the single-slot BF16 cache at global positions
 // base+m (base = Ctrl[1]); ChunkRope rotates M Q/K head-blocks in place at

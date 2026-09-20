@@ -796,6 +796,7 @@ int main(int argc, char **argv) {
       {"concat.spv", "_ZTS7Concat2"},
       {"gemvm2.spv", "_ZTS10Int4GemvM2"},
       {"gemvm3.spv", "_ZTS10Int4GemvM3"},
+      {"chunkgemmdb.spv", "_ZTS11ChunkGemmDB"},
   };
   enum K {
     NORM,
@@ -837,6 +838,7 @@ int main(int argc, char **argv) {
     CONCAT,
     GEMVM2,
     GEMVM3,
+    CGEMMDB,
     NK
   };
   ze_kernel_handle_t kh[NK] = {nullptr};
@@ -880,6 +882,7 @@ int main(int argc, char **argv) {
   CHECK(zeKernelSetGroupSize(kh[QKG], 16, 1, 1)); // DPAS kernels: SG16 groups
   CHECK(zeKernelSetGroupSize(kh[WVG], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CGEMM], 16, 1, 1)); // chunk prefill: same
+  CHECK(zeKernelSetGroupSize(kh[CGEMMDB], 16, 1, 1)); // paired-slice GEMM: same
   CHECK(zeKernelSetGroupSize(kh[CQK], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CWV], 16, 1, 1));
 
@@ -2441,9 +2444,30 @@ int main(int argc, char **argv) {
           setarg(kh[CVT2], 1, sizeof(void *), &X);
           launch(R, kh[CVT2], nn);
         };
+        // AINFER_GEMM_DB=1 selects the double-buffered slice-pair GEMM
+        // (ChunkGemmDB: 8 DPAS per barrier vs 4). Default keeps ChunkGemm.
+        const bool gemmDB =
+            (std::getenv("AINFER_GEMM_DB") != nullptr &&
+             std::getenv("AINFER_GEMM_DB")[0] == '1');
         auto cgemmW = [&](void *Wp, void *Ws, int nn, int kk, void *Ah,
                           void *Y) {
           int mm = M;
+          if (gemmDB) {
+            setarg(kh[CGEMMDB], 0, sizeof(void *), &Ah);
+            setarg(kh[CGEMMDB], 1, sizeof(void *), &Wp);
+            setarg(kh[CGEMMDB], 2, sizeof(void *), &Ws);
+            setarg(kh[CGEMMDB], 3, sizeof(void *), &Y);
+            setarg(kh[CGEMMDB], 4, sizeof(int), &mm);
+            setarg(kh[CGEMMDB], 5, sizeof(int), &kk);
+            setarg(kh[CGEMMDB], 6, sizeof(int), &nn);
+            setarg(kh[CGEMMDB], 7, (size_t)512 * 2, nullptr);
+            setarg(kh[CGEMMDB], 8, (size_t)256 * 2, nullptr);
+            setarg(kh[CGEMMDB], 9, (size_t)512 * 2, nullptr);
+            setarg(kh[CGEMMDB], 10, (size_t)256 * 2, nullptr);
+            setarg(kh[CGEMMDB], 11, (size_t)512 * 4, nullptr);
+            launch(R, kh[CGEMMDB], ((mm + 31) / 32) * (nn / 16));
+            return;
+          }
           setarg(kh[CGEMM], 0, sizeof(void *), &Ah);
           setarg(kh[CGEMM], 1, sizeof(void *), &Wp);
           setarg(kh[CGEMM], 2, sizeof(void *), &Ws);
