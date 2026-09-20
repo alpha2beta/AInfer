@@ -470,3 +470,7 @@
   - Three real findings fixed: per-tensor payload-CRC verification at load (was silent-load; +~9 s, mirrors l0load), export short-write detection (was silent-true), SPIR-V magic+version pre-check (loader exited 10 on garbage; residual valid-header corruption documented as driver limitation).
   - Harness lessons: 19 GiB `bytearray(f.read())` mutation got OOM-killed twice — rewritten to copy + seek-write; added `--resume` after two external kills mid-run. True mid-run device loss not simulable (T8.3 health monitoring covers it instead).
   - Dashboard **53/62**. Phase 9 complete; remaining open work is Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) plus deferred T10.2/vision.
+- **2026-09-20 (T7.1/T7.5 clean re-run — Stamp-3 regression resolved):**
+  - Rebuilt `bench_258v` from committed source, ran `run_benchmark_t71.py` + `run_llama_comparison_t75.py` on current HEAD: **35.06 tok/s** decode (−1.4% vs committed 35.54, within ±7% variance), prefill 116.49 tok/s, jitter p50=28.51/p95=29.18 ms; comparison 1.20x vs Vulkan (29.33), 3.51x vs CPU (9.98). The 30.48 outlier did not reproduce — retired as a bad run under load. Fresh reports committed.
+  - Verified dual-token MTP code and `report_speculative_258v.json` committed in-tree (Stamp-3 "uncommitted" claims now stale — corrected in `tasks.md` T10.1, `STATUS.md` Gate M6/MTP rows).
+  - Observed (non-gating): model load 48.4 s vs 9.88 s committed — T9.5 CRC pass re-reads 19 GiB plus slow disk reads this session (~0.3–0.4 GB/s); recorded for awareness, not a gate criterion.

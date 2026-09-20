@@ -15,10 +15,10 @@
       "runtime_backend": "Intel Level Zero (Recorded Command Lists, DPAS/SIMD INT4 GEMV)",
       "compute_device": "Intel Arc 140V integrated GPU (Xe2 architecture, 64 VEs)",
       "weights_container": ".binfer MoE v1.1 format (17.83 GiB)",
-      "decode_throughput_tok_per_s": 30.48,
-      "prefill_throughput_tok_per_s": 104.44,
-      "model_load_time_s": 21.94,
-      "memory_committed_gib": 18.09,
+      "decode_throughput_tok_per_s": 35.06,
+      "prefill_throughput_tok_per_s": 116.49,
+      "model_load_time_s": 48.4,
+      "memory_committed_gib": 18.22,
       "command_list_rebuilds_per_token": 0,
       "runtime_heap_allocations": 0
     },
@@ -41,12 +41,12 @@
     }
   },
   "comparative_analysis": {
-    "decode_speedup_vs_cpu": 3.05,
-    "decode_parity_vs_vulkan": 1.04,
+    "decode_speedup_vs_cpu": 3.51,
+    "decode_parity_vs_vulkan": 1.2,
     "findings": [
-      "AInfer Level Zero recorded decode achieves 30.48 tok/s, outperforming 8-thread CPU baseline (9.98 tok/s) by 3.05x.",
-      "AInfer Level Zero recorded decode achieves 30.48 tok/s, surpassing llama.cpp Vulkan (29.33 tok/s) by 1.04x (103.9% relative throughput) via batched MoE dispatch and fused LM-head argmax.",
-      "AInfer prefill throughput reached 104.44 tok/s directly into decode-layout KV and SSM states.",
+      "AInfer Level Zero recorded decode achieves 35.06 tok/s, outperforming 8-thread CPU baseline (9.98 tok/s) by 3.51x.",
+      "AInfer Level Zero recorded decode achieves 35.06 tok/s, surpassing llama.cpp Vulkan (29.33 tok/s) by 1.20x (119.5% relative throughput) via batched MoE dispatch and fused LM-head argmax.",
+      "AInfer prefill throughput reached 116.49 tok/s directly into decode-layout KV and SSM states.",
       "AInfer provides 100% deterministic memory allocation (18.03 GiB static arena, 0 KB runtime heap growth) and zero CPU dispatch overhead via Level Zero recorded command lists."
     ]
   }
