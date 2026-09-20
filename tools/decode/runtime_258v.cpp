@@ -244,12 +244,15 @@ bool AInferRuntime258V::allocate_static_arenas() {
   std::memset(&h_ctrl_, 0, sizeof(h_ctrl_));
   std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
-  // Sub-allocate workspace buffers
-  uint8_t *w_ptr = (uint8_t *)workspace_arena_;
-  auto bump_f32 = [&](size_t count) -> float * {
-    float *p = (float *)w_ptr;
-    size_t sz = (count * sizeof(float) + 63) & ~63ULL;
-    w_ptr += sz;
+  // Sub-allocate workspace buffers through the checked arena (T9.1):
+  // every sub-allocation is overflow-checked at allocate time and recorded
+  // in a ledger (replaces unchecked w_ptr arithmetic).
+  workspace_bump_.reset(workspace_arena_, workspace_bytes_);
+  auto bump_f32 = [&](size_t count, const char *nm = "anon") -> float * {
+    float *p = workspace_bump_.bump_f32(count, nm);
+    if (!p) {
+      std::fprintf(stderr, "FATAL: workspace bump failed for '%s' (%zu floats)\n", nm, count);
+    }
     return p;
   };
 
@@ -292,7 +295,7 @@ bool AInferRuntime258V::allocate_static_arenas() {
   d_stage1_idxs_ = (uint32_t *)bump_f32(1024);
 
   // Sub-allocate chunked prefill workspaces (MAX_PREFILL_CHUNK = 32)
-  d_x_chunk_ = bump_f32(MAX_PREFILL_CHUNK * HIDDEN_DIM);
+  d_x_chunk_ = bump_f32(MAX_PREFILL_CHUNK * HIDDEN_DIM, "d_x_chunk");
   d_x_norm_chunk_ = bump_f32(MAX_PREFILL_CHUNK * HIDDEN_DIM);
   d_x_mid_chunk_ = bump_f32(MAX_PREFILL_CHUNK * HIDDEN_DIM);
   d_x_post_chunk_ = bump_f32(MAX_PREFILL_CHUNK * HIDDEN_DIM);
@@ -335,26 +338,19 @@ bool AInferRuntime258V::allocate_static_arenas() {
   d_sorted_tokens_ = (int *)bump_f32(MAX_PREFILL_CHUNK * TOP_K);
   d_sorted_slots_ = (int *)bump_f32(MAX_PREFILL_CHUNK * TOP_K);
 
-  size_t used_workspace = (size_t)(w_ptr - (uint8_t *)workspace_arena_);
-  if (used_workspace > workspace_bytes_) {
-    std::fprintf(stderr, "FATAL: Workspace overflow: used %zu > allocated %zu\n", used_workspace, (size_t)workspace_bytes_);
+  // Final ledger consistency check (per-allocation overflow already fails
+  // fast inside CheckedArena::bump; this guards ledger/total drift).
+  if (workspace_bump_.used > workspace_bytes_) {
+    std::fprintf(stderr, "FATAL: Workspace overflow: used %zu > allocated %zu\n",
+                 workspace_bump_.used, (size_t)workspace_bytes_);
     return false;
   }
 
   CHECK_L0(zeMemAllocShared(ctx_, &dmem_desc, &hmem_desc, MAX_PREFILL_CHUNK * sizeof(int), 64, dev_, (void **)&d_tokens_chunk_));
 
-  // Map root tensor device addresses
-  auto get_pay = [&](const std::string &nm) -> void * {
-    auto it = entries_.find(nm);
-    if (it == entries_.end()) return nullptr;
-    return (char *)pay_arena_ + (it->second.d_off - pay_lo_);
-  };
-  auto get_sc = [&](const std::string &nm) -> void * {
-    auto it = entries_.find(nm);
-    if (it == entries_.end() || it->second.sc_bytes == 0) return nullptr;
-    return (char *)sc_arena_ + (it->second.sc_off - sc_lo_);
-  };
-
+  // Map root tensor device addresses via centralized checked resolvers.
+  auto get_pay = [&](const std::string &nm) -> void * { return checked_pay(nm); };
+  auto get_sc = [&](const std::string &nm) -> void * { return checked_sc(nm); };
   d_embed_tokens_ = get_pay("embed_tokens.weight");
   d_final_norm_w_ = get_pay("norm.weight");
   d_lm_head_w_ = get_pay("lm_head.weight");
@@ -376,6 +372,11 @@ bool AInferRuntime258V::allocate_static_arenas() {
     if (lb.is_full_attn) {
       lb.full_slot = full_slot_cnt++;
       lb.linear_slot = -1;
+      if (lb.full_slot < 0 || lb.full_slot >= NUM_FULL_ATTN_LAYERS) {
+        std::fprintf(stderr, "[slots] full_slot %d out of range [0,%d) at layer %d\n",
+                     lb.full_slot, NUM_FULL_ATTN_LAYERS, l);
+        return false;
+      }
       lb.q_proj_w = get_pay(prefix + "self_attn.q_proj.weight");
       lb.q_proj_s = get_sc(prefix + "self_attn.q_proj.weight");
       lb.k_proj_w = get_pay(prefix + "self_attn.k_proj.weight");
@@ -387,12 +388,25 @@ bool AInferRuntime258V::allocate_static_arenas() {
       lb.q_norm_w = get_pay(prefix + "self_attn.q_norm.weight");
       lb.k_norm_w = get_pay(prefix + "self_attn.k_norm.weight");
 
+      size_t slot_span = 0, slot_end = 0;
+      if (!checked_mul_add((size_t)lb.full_slot, 2 * layer_kv_bytes, 0, &slot_span) ||
+          __builtin_add_overflow(slot_span, 2 * layer_kv_bytes, &slot_end) ||
+          slot_end > kv_cache_bytes_) {
+        std::fprintf(stderr, "[slots] KV slot %d overflows arena (%zu bytes)\n",
+                     lb.full_slot, (size_t)kv_cache_bytes_);
+        return false;
+      }
       size_t slot_offset = (size_t)lb.full_slot * (2 * layer_kv_bytes);
       lb.k_cache = (char *)kv_cache_arena_ + slot_offset;
       lb.v_cache = (char *)kv_cache_arena_ + slot_offset + layer_kv_bytes;
     } else {
       lb.linear_slot = linear_slot_cnt++;
       lb.full_slot = -1;
+      if (lb.linear_slot < 0 || lb.linear_slot >= NUM_DELTANET_LAYERS) {
+        std::fprintf(stderr, "[slots] linear_slot %d out of range [0,%d) at layer %d\n",
+                     lb.linear_slot, NUM_DELTANET_LAYERS, l);
+        return false;
+      }
       lb.qkv_w = get_pay(prefix + "linear_attn.in_proj_qkv.weight");
       lb.qkv_s = get_sc(prefix + "linear_attn.in_proj_qkv.weight");
       lb.z_w = get_pay(prefix + "linear_attn.in_proj_z.weight");
@@ -408,8 +422,20 @@ bool AInferRuntime258V::allocate_static_arenas() {
       lb.out_proj_w = get_pay(prefix + "linear_attn.out_proj.weight");
       lb.out_proj_s = get_sc(prefix + "linear_attn.out_proj.weight");
 
-      lb.ssm_state = (char *)ssm_recr_arena_ + (size_t)lb.linear_slot * layer_ssm_recr_bytes;
-      lb.conv_state = (char *)ssm_conv_arena_ + (size_t)lb.linear_slot * layer_ssm_conv_bytes;
+      size_t ssm_off = 0, conv_off = 0;
+      size_t ssm_end = 0, conv_end = 0;
+      if (!checked_mul_add((size_t)lb.linear_slot, layer_ssm_recr_bytes, 0, &ssm_off) ||
+          __builtin_add_overflow(ssm_off, layer_ssm_recr_bytes, &ssm_end) ||
+          ssm_end > total_ssm_recr_bytes ||
+          !checked_mul_add((size_t)lb.linear_slot, layer_ssm_conv_bytes, 0, &conv_off) ||
+          __builtin_add_overflow(conv_off, layer_ssm_conv_bytes, &conv_end) ||
+          conv_end > total_ssm_conv_bytes) {
+        std::fprintf(stderr, "[slots] SSM/conv slot %d overflows arena at layer %d\n",
+                     lb.linear_slot, l);
+        return false;
+      }
+      lb.ssm_state = (char *)ssm_recr_arena_ + ssm_off;
+      lb.conv_state = (char *)ssm_conv_arena_ + conv_off;
     }
 
     // MoE weights
@@ -432,6 +458,122 @@ bool AInferRuntime258V::allocate_static_arenas() {
   reset_state();
 
   return true;
+}
+
+// T9.1: centralized init-time audit — every bound pointer must be non-null
+// and contained in its arena; every slot index in range; workspace ledger
+// consistent. Returns false (fatal) on the first violation with diagnosis.
+bool AInferRuntime258V::verify_bindings() const {
+  auto in_range = [](const void *p, const void *base, uint64_t bytes,
+                     const char *what) -> bool {
+    uintptr_t a = (uintptr_t)p, b = (uintptr_t)base;
+    if (!p || a < b || a - b >= bytes) {
+      std::fprintf(stderr, "[verify_bindings] %s out of arena (ptr=%p base=%p size=%llu)\n",
+                   what, p, base, (unsigned long long)bytes);
+      return false;
+    }
+    return true;
+  };
+  const uint64_t pay_size = pay_hi_ - pay_lo_;
+  const uint64_t sc_size = sc_hi_ - sc_lo_;
+
+#define VB_PTR(field, arena, arenabytes, what)                                 \
+  do {                                                                         \
+    if (!(field) || !in_range((field), (arena), (arenabytes), (what))) {       \
+      if (!(field))                                                            \
+        std::fprintf(stderr, "[verify_bindings] null binding: %s\n", (what));  \
+      return false;                                                            \
+    }                                                                          \
+  } while (0)
+
+  VB_PTR(d_embed_tokens_, pay_arena_, pay_size, "embed_tokens.weight");
+  VB_PTR(d_final_norm_w_, pay_arena_, pay_size, "norm.weight");
+  VB_PTR(d_lm_head_w_, pay_arena_, pay_size, "lm_head.weight");
+  if (!d_ctrl_) {
+    std::fprintf(stderr, "[verify_bindings] null control block\n");
+    return false;
+  }
+
+  for (int l = 0; l < TOTAL_LAYERS; ++l) {
+    const LayerBinding &lb = layers_[l];
+    char ctx[64];
+    std::snprintf(ctx, sizeof(ctx), "layer %d", l);
+    if (lb.is_full_attn) {
+      if (lb.full_slot < 0 || lb.full_slot >= NUM_FULL_ATTN_LAYERS) {
+        std::fprintf(stderr, "[verify_bindings] %s: bad full_slot %d\n", ctx, lb.full_slot);
+        return false;
+      }
+      VB_PTR(lb.k_cache, kv_cache_arena_, kv_cache_bytes_, "k_cache");
+      VB_PTR(lb.v_cache, kv_cache_arena_, kv_cache_bytes_, "v_cache");
+      VB_PTR(lb.q_proj_w, pay_arena_, pay_size, "q_proj_w");
+      VB_PTR(lb.o_proj_w, pay_arena_, pay_size, "o_proj_w");
+    } else {
+      if (lb.linear_slot < 0 || lb.linear_slot >= NUM_DELTANET_LAYERS) {
+        std::fprintf(stderr, "[verify_bindings] %s: bad linear_slot %d\n", ctx, lb.linear_slot);
+        return false;
+      }
+      VB_PTR(lb.qkv_w, pay_arena_, pay_size, "qkv_w");
+      VB_PTR(lb.out_proj_w, pay_arena_, pay_size, "out_proj_w");
+    }
+    VB_PTR(lb.router_w, pay_arena_, pay_size, "router_w");
+    VB_PTR(lb.exp_gu_w, pay_arena_, pay_size, "exp_gu_w");
+    VB_PTR(lb.exp_dn_w, pay_arena_, pay_size, "exp_dn_w");
+  }
+
+  // Workspace ledger consistency
+  if (workspace_bump_.used > workspace_bytes_) {
+    std::fprintf(stderr, "[verify_bindings] workspace ledger overflow\n");
+    return false;
+  }
+  for (const auto &e : workspace_bump_.ledger) {
+    size_t end = 0;
+    if (__builtin_add_overflow(e.offset, e.bytes, &end) || end > workspace_bytes_) {
+      std::fprintf(stderr, "[verify_bindings] ledger entry '%s' out of range\n", e.name);
+      return false;
+    }
+  }
+#undef VB_PTR
+  return true;
+}
+
+void *AInferRuntime258V::checked_pay(const std::string &nm) const {
+  auto it = entries_.find(nm);
+  if (it == entries_.end()) return nullptr;
+  const uint64_t pay_arena_size = pay_hi_ - pay_lo_;
+  if (it->second.d_off < pay_lo_) {
+    std::fprintf(stderr, "[get_pay] OOB tensor '%s' (off below arena base)\n", nm.c_str());
+    return nullptr;
+  }
+  uint64_t rel = it->second.d_off - pay_lo_;
+  uint64_t end = 0;
+  if (__builtin_add_overflow(rel, it->second.d_bytes, &end) || end > pay_arena_size) {
+    std::fprintf(stderr, "[get_pay] OOB tensor '%s' (off=%llu bytes=%llu arena=%llu)\n",
+                 nm.c_str(), (unsigned long long)rel,
+                 (unsigned long long)it->second.d_bytes,
+                 (unsigned long long)pay_arena_size);
+    return nullptr;
+  }
+  return (char *)pay_arena_ + rel;
+}
+
+void *AInferRuntime258V::checked_sc(const std::string &nm) const {
+  auto it = entries_.find(nm);
+  if (it == entries_.end() || it->second.sc_bytes == 0) return nullptr;
+  const uint64_t sc_arena_size = sc_hi_ - sc_lo_;
+  if (it->second.sc_off < sc_lo_) {
+    std::fprintf(stderr, "[get_sc] OOB tensor '%s' (off below arena base)\n", nm.c_str());
+    return nullptr;
+  }
+  uint64_t rel = it->second.sc_off - sc_lo_;
+  uint64_t end = 0;
+  if (__builtin_add_overflow(rel, it->second.sc_bytes, &end) || end > sc_arena_size) {
+    std::fprintf(stderr, "[get_sc] OOB tensor '%s' (off=%llu bytes=%llu arena=%llu)\n",
+                 nm.c_str(), (unsigned long long)rel,
+                 (unsigned long long)it->second.sc_bytes,
+                 (unsigned long long)sc_arena_size);
+    return nullptr;
+  }
+  return (char *)sc_arena_ + rel;
 }
 
 bool AInferRuntime258V::upload_weights(const std::string &path) {
@@ -978,6 +1120,12 @@ bool AInferRuntime258V::init(const std::string &binfer_path, const std::string &
   std::printf("[AInfer 258V] 3. Allocating static unified memory arenas (T5.1)\n");
   if (!allocate_static_arenas()) return false;
 
+  std::printf("[AInfer 258V] 3b. Verifying bindings with checked spans (T9.1)\n");
+  if (!verify_bindings()) {
+    std::fprintf(stderr, "[AInfer 258V] Binding verification FAILED\n");
+    return false;
+  }
+
   std::printf("[AInfer 258V]    Payload Arena:   %.2f GiB\n", (pay_hi_ - pay_lo_) / (1024.0 * 1024.0 * 1024.0));
   std::printf("[AInfer 258V]    Scale Arena:     %.2f MiB\n", (sc_hi_ - sc_lo_) / (1024.0 * 1024.0));
   std::printf("[AInfer 258V]    KV Cache Arena:  %.2f MiB (10 full layers @ %u ctx)\n", kv_cache_bytes_ / (1024.0 * 1024.0), max_ctx_);
@@ -1346,7 +1494,18 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_tail_list(int 
   ze_command_list_handle_t list = nullptr;
   CHECK_L0_RET_NULL(zeCommandListCreate(ctx_, dev_, &ldesc, &list));
 
-  float *d_x_last = d_x_chunk_ + (size_t)(B - 1) * HIDDEN_DIM;
+  // T9.1: checked slice of the d_x_chunk span instead of raw arithmetic.
+  // B is range-validated at function entry; the slice re-verifies against
+  // the recorded allocation.
+  ArenaSpan<float> x_span;
+  float *d_x_last = nullptr;
+  if (workspace_bump_.span_f32("d_x_chunk", &x_span)) {
+    d_x_last = x_span.slice((size_t)(B - 1) * HIDDEN_DIM, HIDDEN_DIM, "d_x_last").get();
+  }
+  if (!d_x_last) {
+    std::fprintf(stderr, "[tail] chunk tail index B=%d out of recorded range\n", B);
+    return nullptr;
+  }
   // Ensure d_x_ holds the terminal hidden state for subsequent decode/MTP drafting
   CHECK_L0_RET_NULL(zeCommandListAppendMemoryCopy(list, d_x_, d_x_last, HIDDEN_DIM * sizeof(float), nullptr, 0, nullptr));
   CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
@@ -1400,6 +1559,17 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     std::fprintf(stderr, "Prompt size %d exceeds max context %u\n", P, max_ctx_);
     return false;
   }
+  // T9.2: reject out-of-vocabulary prompt IDs before anything dispatches
+  // (device embed gather clamps as last resort, but invalid IDs must not
+  // reach the command lists at all).
+  {
+    char guard_err[256];
+    if (!StepGuard::check_prompt_ids(prompt_ids.data(), prompt_ids.size(),
+                                     guard_err, sizeof(guard_err))) {
+      std::fprintf(stderr, "Prefill rejected prompt: %s\n", guard_err);
+      return false;
+    }
+  }
 
   // Chunked in-memory prefill using batched GEMM & state updates (T3.1 / T5.2)
   int pos = 0;
@@ -1414,6 +1584,16 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     h_ctrl_.position = pos;
     h_ctrl_.active_length = pos + B;
     h_ctrl_.token_id = prompt_ids[pos];
+    // T9.2: per-chunk step validation before submission.
+    {
+      char guard_err[256];
+      if (!StepGuard::check(h_ctrl_.position, h_ctrl_.active_length,
+                            h_ctrl_.token_id, B, max_ctx_,
+                            guard_err, sizeof(guard_err))) {
+        std::fprintf(stderr, "Prefill rejected chunk params: %s\n", guard_err);
+        return false;
+      }
+    }
     std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
     // Execute chunk forward pass across all 40 layers in a single recorded command list
@@ -1458,9 +1638,16 @@ bool AInferRuntime258V::decode_step(int *out_next_token) {
   h_ctrl_.position += 1;
   h_ctrl_.active_length += 1;
 
-  if (h_ctrl_.position >= (int)max_ctx_) {
-    std::fprintf(stderr, "Decode reached max context limit %u\n", max_ctx_);
-    return false;
+  // T9.2: validate all dynamic step params before submission (replaces
+  // the old position-only check; token_id and active_length are now covered).
+  {
+    char guard_err[256];
+    if (!StepGuard::check(h_ctrl_.position, h_ctrl_.active_length,
+                          h_ctrl_.token_id, 1, max_ctx_,
+                          guard_err, sizeof(guard_err))) {
+      std::fprintf(stderr, "Decode rejected step params: %s\n", guard_err);
+      return false;
+    }
   }
 
   std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
@@ -2090,17 +2277,9 @@ bool AInferRuntime258V::init_mtp() {
     return false;
   }
 
-  auto get_pay = [&](const std::string &nm) -> void * {
-    auto it = entries_.find(nm);
-    if (it == entries_.end()) return nullptr;
-    return (char *)pay_arena_ + (it->second.d_off - pay_lo_);
-  };
-  auto get_sc = [&](const std::string &nm) -> void * {
-    auto it = entries_.find(nm);
-    if (it == entries_.end() || it->second.sc_bytes == 0) return nullptr;
-    return (char *)sc_arena_ + (it->second.sc_off - sc_lo_);
-  };
-
+  // Map root tensor device addresses via centralized checked resolvers.
+  auto get_pay = [&](const std::string &nm) -> void * { return checked_pay(nm); };
+  auto get_sc = [&](const std::string &nm) -> void * { return checked_sc(nm); };
   // Map 10 INT4 MTP weights directly from payloads and scales
   mtp_.fc_w = get_pay("mtp.fc.weight");
   mtp_.fc_s = get_sc("mtp.fc.weight");
@@ -2511,6 +2690,9 @@ bool AInferRuntime258V::init_speculative_verification() {
   size_t total_ssm_bytes = (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float);
   CHECK_L0(zeMemAllocDevice(ctx_, &ddesc, total_conv_bytes, 4096, dev_, &d_conv_snap_));
   CHECK_L0(zeMemAllocDevice(ctx_, &ddesc, total_ssm_bytes, 4096, dev_, &d_ssm_snap_));
+  // T9.1: record checked views for slot slicing at record time.
+  conv_snap_span_ = ArenaSpan<uint8_t>{(uint8_t *)d_conv_snap_, total_conv_bytes, "d_conv_snap"};
+  ssm_snap_span_ = ArenaSpan<uint8_t>{(uint8_t *)d_ssm_snap_, total_ssm_bytes, "d_ssm_snap"};
 
   // Zero out snapshots initially
   uint32_t zero = 0;
@@ -2654,8 +2836,12 @@ bool AInferRuntime258V::init_speculative_verification() {
       append_gemm(d_b_chunk_, lb.b_w, lb.b_s, d_x_norm_chunk_, H_V, HIDDEN_DIM);
       CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
-      // Conv1D with Intermediate State Snapshot
-      void *conv_snap_ptr = (char *)d_conv_snap_ + (size_t)lb.linear_slot * (C_QKV * 3 * sizeof(float));
+      // Conv1D with Intermediate State Snapshot (T9.1: checked slot slice)
+      void *conv_snap_ptr = conv_snap_span_
+                                .slice((size_t)lb.linear_slot * (C_QKV * 3 * sizeof(float)),
+                                       C_QKV * 3 * sizeof(float), "conv_snap_slot")
+                                .get();
+      if (!conv_snap_ptr) return false;
       CHECK_L0(zeKernelSetArgumentValue(k_conv_m2_spec_, 0, sizeof(void *), &d_qkv_conv_chunk_));
       CHECK_L0(zeKernelSetArgumentValue(k_conv_m2_spec_, 1, sizeof(void *), &d_qkv_chunk_));
       CHECK_L0(zeKernelSetArgumentValue(k_conv_m2_spec_, 2, sizeof(void *), &lb.conv_state));
@@ -2689,8 +2875,12 @@ bool AInferRuntime258V::init_speculative_verification() {
       CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_gate_prep_batch_, &gcnt_gate, nullptr, 0, nullptr));
       CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
-      // DeltaNet Recurrence with Intermediate SSM State Snapshot
-      void *ssm_snap_ptr = (char *)d_ssm_snap_ + (size_t)lb.linear_slot * (H_V * S_V * S_V * sizeof(float));
+      // DeltaNet Recurrence with Intermediate SSM State Snapshot (T9.1)
+      void *ssm_snap_ptr = ssm_snap_span_
+                               .slice((size_t)lb.linear_slot * (H_V * S_V * S_V * sizeof(float)),
+                                      H_V * S_V * S_V * sizeof(float), "ssm_snap_slot")
+                               .get();
+      if (!ssm_snap_ptr) return false;
       CHECK_L0(zeKernelSetArgumentValue(k_recr_m2_spec_, 0, sizeof(void *), &d_attn_out_chunk_));
       CHECK_L0(zeKernelSetArgumentValue(k_recr_m2_spec_, 1, sizeof(void *), &lb.ssm_state));
       CHECK_L0(zeKernelSetArgumentValue(k_recr_m2_spec_, 2, sizeof(void *), &ssm_snap_ptr));
@@ -2891,7 +3081,16 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
     if (!mtp_draft_step(&pending_draft_token_)) return false;
   }
 
-  // Check context bounds
+  // Check context bounds (T9.2: full step-parameter validation, not just position)
+  {
+    char guard_err[256];
+    if (!StepGuard::check(h_ctrl_.position, h_ctrl_.active_length,
+                          h_ctrl_.selected_token, 2, max_ctx_,
+                          guard_err, sizeof(guard_err))) {
+      std::fprintf(stderr, "[Speculative] Rejected pre-step params: %s\n", guard_err);
+      return false;
+    }
+  }
   if (h_ctrl_.position + 2 >= (int)max_ctx_) {
     std::fprintf(stderr, "[Speculative] Context limit reached at pos %d\n", h_ctrl_.position);
     return false;

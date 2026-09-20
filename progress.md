@@ -14,8 +14,8 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 9 (Memory Safety and Operational Hardening — T9.1–T9.5); Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) still open
-- **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7 signed off — M7 re-verified 2026-09-19 with genuine PASSED report)
+- **Current Focus:** Phase 9 (Memory Safety and Operational Hardening — T9.1–T9.4 done, T9.5 open); Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) still open
+- **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7 signed off — M7 re-verified 2026-09-19 with genuine PASSED report; Phase 9 underway at 4/5)
 
 ### Baseline Stamp 0 (2026-09-17)
 
@@ -115,10 +115,10 @@
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, long-context tiers | ✅ **Done** | 6 / 6 |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline, llama.cpp comp | ✅ **Done** | 5 / 5 |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
-| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[ ]` Pending | 0 / 5 |
+| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[~]` In Progress (T9.1–T9.4 Done) | 4 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done; dual-token extension uncommitted) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **48 / 62** |
+| **Total** | | | | **52 / 62** |
 
 ---
 
@@ -226,10 +226,10 @@
 
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
-| **T9.1** | Typed arena spans & checked offset math | `[ ]` | Centralized memory indexing abstraction |
-| **T9.2** | Kernel execution guards & argument validation | `[ ]` | Guard partial tiles and expert index bounds |
-| **T9.3** | ASan & UBSan test verification | `[ ]` | Host validation builds clean under sanitizers |
-| **T9.4** | Automated fuzzing harness | `[ ]` | Fuzz `.binfer` MoE parser and CLI inputs |
+| **T9.1** | Typed arena spans & checked offset math | `[x]` | `ArenaSpan`/`CheckedArena`/`checked_pay|sc`, `verify_bindings()` audit, 29/29 unit tests |
+| **T9.2** | Kernel execution guards & argument validation | `[x]` | 8 device guard sites + host `StepGuard`, 25/25 unit tests, M4 7/7 bit-exact |
+| **T9.3** | ASan & UBSan test verification | `[x]` | `run_sanitizers.sh` 7/7 stages green, zero findings |
+| **T9.4** | Automated fuzzing harness | `[x]` | binfer 1M iters + cache-import 2k (ASan) + CLI 2M diff-fuzz, 0 findings; 20 pre-fix bugs fixed |
 | **T9.5** | Fault injection testing | `[ ]` | Corrupt files, short writes, device loss tests |
 
 ### Phase 10: Exploratory & Deferred Scope
@@ -453,3 +453,15 @@
 - **2026-09-19 (T8.4 re-verification — Gate M7 re-signed):**
   - Started `server_258v.py` on :8088, ran harness at true default (100 requests, concurrency 2, server PID tracked). Run 1 (cold interpreter): 100/100 requests OK but FAILED on +5,432 KB RSS — trajectory proved warmup transient (+5 MB in first 10, flat +420 KB over next 90). Run 2 (warm server): **100/100, RSS +20 KB, checkpoints flat, `"status": "PASSED"`**. Report overwritten with the Run-2 artifact; T8.4 `[~]`→`[x]`, Gate M7 re-signed, dashboard **48/62**.
   - Methodology lesson: baseline RSS after ~10 warmup requests (or assert checkpoint slope req 10→100), not after 1 — recorded in T8.4, harness not yet modified.
+- **2026-09-19 (T9.1 typed spans + checked arithmetic — DONE, Phase 9 at 1/5):**
+  - Added `ArenaSpan<T>` (checked `at()`/`slice`), `CheckedArena` bump allocator (fail-fast overflow + ledger, replaces raw `w_ptr` arithmetic), `checked_mul_add` (`runtime_258v.h`). Centralized container-offset resolution into range-checked `checked_pay()`/`checked_sc()` (all call sites delegate). Hardened slot math, MTP snapshot slices, chunk-tail index. New `verify_bindings()` init audit (step 3b) over all 40 layers. New host-only `tools/decode/test_arena_spans.cpp`: 29/29 checks pass. Full M4 suite 7/7 bit-exact with checks active. Dashboard **49/62**.
+- **2026-09-19 (T9.2 execution guards — DONE, Phase 9 at 2/5):**
+  - Device guards in `all_kernels.cl` (8 sites): expert-index clamp in both decode MoE GEMVs, contribution-skip in down-accum, token clamp in both embed gathers, position early-out in all 3 rope/KV kernels (reads clamp, writes skip — verified barrier-safe uniformity). Host `StepGuard` (nested pure struct): step bounds + prompt-ID scan, wired into `decode_step`/`prefill`/`speculative_step`. New `tools/decode/test_exec_guards.cpp`: 25 checks pass.
+  - Honest catch: first validator draft (`active_length > position`) FAILED T5.5 — diagnostic import legitimately restores equality (field is host-informational, no kernel indexes it). Invariant corrected to `≤` with reasoning recorded in code + tests + docs. M4 7/7 bit-exact with final guards (silent on valid inputs). Dashboard **50/62**.
+- **2026-09-19 (T9.3 sanitizers — DONE, Phase 9 at 3/5):**
+  - GCC 16.2.1 ASan+UBSan (probe-verified) with leak detection on, `halt_on_error`. New repeatable gate `tools/decode/run_sanitizers.sh` (script-as-preset; no CMake preset infra exists yet): 7/7 stages green — arena spans 29/29, exec guards 25/25, l0load 712/712, negatives 12/12, full M4 7/7 bit-exact — zero sanitizer findings, no suppressions needed (L0 driver coexists cleanly). Dashboard **51/62**.
+- **2026-09-20 (T9.4 fuzzing — DONE, Phase 9 at 4/5):**
+  - `tools/fuzz/fuzz_binfer.py` (structure-aware, seed = real 8 KiB container header): **1,000,000 iters, 0 findings, worst case 39.1 ms** (no hangs). Pre-fix shakedown found 20 real escapes (`MemoryError`/`OverflowError` via unbounded u64 section/payload lengths bypassing the relative length check) — fixed with absolute span gates vs file size, `n ≤ 100k` / `scount ≤ 1024` early caps, widened exception catch; post-fix full 1M clean.
+  - `tools/fuzz/fuzz_cache_import.cpp` (ASan+UBSan, in-process `import_diagnostic_cache`, valid exported cache as seed): **2000 iters, 0 findings, worst 0.30 s** — header/geometry/payload mutants all rejected cleanly.
+  - `tools/fuzz/fuzz_cli_parse.cpp` (differential vs independent oracle): **2,000,000 iters + 38 fixed edge cases, 0 findings**; one grammar mismatch fixed (explicit digit-scan replaced `stol` whitespace/`+` quirks).
+  - Dashboard **52/62**. Only T9.5 remains in Phase 9.

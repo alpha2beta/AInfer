@@ -10,6 +10,7 @@
 //   - p50/p90/p95/p99 inter-token jitter (ms)
 //   - static arena memory footprint and RSS telemetry
 
+#include "../decode/cli_parse.h"
 #include "../decode/runtime_258v.h"
 
 #include <algorithm>
@@ -116,22 +117,42 @@ int main(int argc, char **argv) {
     if (arg.rfind("--spv=", 0) == 0) {
       spv_path = arg.substr(6);
     } else if (arg.rfind("--max-ctx=", 0) == 0) {
-      max_ctx = std::stoul(arg.substr(10));
+      if (!parse_cli_u32(arg.substr(10), max_ctx, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid --max-ctx= value: '%s'\n", arg.substr(10).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--decode-tokens=", 0) == 0) {
-      decode_tokens = std::stoi(arg.substr(16));
+      if (!parse_cli_int(arg.substr(16), decode_tokens, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid --decode-tokens= value: '%s'\n", arg.substr(16).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--warmup-runs=", 0) == 0) {
-      warmup_runs = std::stoi(arg.substr(14));
+      if (!parse_cli_int(arg.substr(14), warmup_runs, 0, 1048576)) {
+        std::fprintf(stderr, "Invalid --warmup-runs= value: '%s'\n", arg.substr(14).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--measured-runs=", 0) == 0) {
-      measured_runs = std::stoi(arg.substr(16));
+      if (!parse_cli_int(arg.substr(16), measured_runs, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid --measured-runs= value: '%s'\n", arg.substr(16).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--report=", 0) == 0) {
       report_path = arg.substr(9);
     } else if (arg.rfind("--prompt-len=", 0) == 0) {
-      synth_prompt_len = std::stoi(arg.substr(13));
+      if (!parse_cli_int(arg.substr(13), synth_prompt_len, 0, 1048576)) {
+        std::fprintf(stderr, "Invalid --prompt-len= value: '%s'\n", arg.substr(13).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--ids=", 0) == 0) {
       std::stringstream ss(arg.substr(6));
       std::string item;
       while (std::getline(ss, item, ',')) {
-        if (!item.empty()) prompt_ids.push_back(std::stoi(item));
+        int tok = 0;
+        if (!item.empty() && !parse_cli_token(item, tok)) {
+          std::fprintf(stderr, "Invalid --ids= token id: '%s'\n", item.c_str());
+          return 2;
+        }
+        if (!item.empty()) prompt_ids.push_back(tok);
       }
     } else if (arg.rfind("--ids-file=", 0) == 0) {
       std::ifstream f(arg.substr(11));
@@ -141,7 +162,12 @@ int main(int argc, char **argv) {
           std::stringstream ss(line);
           std::string item;
           while (std::getline(ss, item, ',')) {
-            if (!item.empty()) prompt_ids.push_back(std::stoi(item));
+            int tok = 0;
+            if (!item.empty() && !parse_cli_token(item, tok)) {
+              std::fprintf(stderr, "Invalid --ids-file= token id: '%s'\n", item.c_str());
+              return 2;
+            }
+            if (!item.empty()) prompt_ids.push_back(tok);
           }
         }
       }

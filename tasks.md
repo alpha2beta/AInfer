@@ -472,27 +472,31 @@ Phase gate M7: Persistent HTTP service operational, robust against client discon
 ## Phase 9: Memory Safety and Operational Hardening
 
 ### T9.1 Typed arena spans and checked offset arithmetic
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T5.1
 - Do: Implement typed arena span abstraction encapsulating base pointer, byte size, alignment, data type, and tensor identity. Centralize all offset arithmetic with checked bounds.
+  DONE 2026-09-19: Added `ArenaSpan<T>` (checked `at()`/`slice()`, null+diagnostic on OOB), `CheckedArena` bump allocator (per-allocation overflow fail-fast + name ledger, replaces unchecked `w_ptr` arithmetic), and `checked_mul_add` (`runtime_258v.h`). Centralized all container-offset resolution into range-checked `checked_pay()`/`checked_sc()` (all 3 call sites delegate; OOB container offsets now fatal init errors instead of wild pointers). Hardened layer slot math (`full_slot`/`linear_slot` range + arena-end checks), MTP snapshot slot slices, and the chunk-tail `(B-1)` index (ledger span slice). New `verify_bindings()` init-time audit (null + arena-containment over all 40 layers + ledger consistency) runs as init step 3b. New host-only unit test `tools/decode/test_arena_spans.cpp` (29 checks incl. SIZE_MAX wraparound, exact-fit, mul-overflow — all pass). Full Gate M4 suite (7/7) re-verified bit-exact with checks active; `verify_bindings` silent on real init (zero false positives).
 - Done: Buffer indexing and memory slicing use checked typed spans across all runtime components.
 
 ### T9.2 Kernel execution guards and argument count validation
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T4.2, T5.3
 - Do: Add runtime validation verifying kernel argument counts, type sizes, expert index bounds, and sequence length limits before command list recording or submission.
+  DONE 2026-09-19: Device-side guards in `all_kernels.cl` (reads clamp, writes skip — clamping a write would corrupt a valid slot): expert-index clamp in `moe_expert_gemv_ctrl` + `moe_gateup_all8_ctrl`, contribution-skip in `moe_down_accum_all8_ctrl`, token clamp in both embed gathers (incl. negative IDs), position early-out in all 3 rope/KV-append kernels (verified barrier-safe: uniform per workgroup / uniform arg). Host-side `StepGuard` (nested, pure, unit-testable): position/active_length/token_id/chunk bounds + `check_prompt_ids` O(P) scan, wired into `decode_step` (replaces position-only check), `prefill` (entry scan + per-chunk), `speculative_step`. New `test_exec_guards.cpp` (25 checks, all pass). Full M4 suite 7/7 bit-exact — after one honest catch: the first validator draft required `active_length > position` and FAILED T5.5, because diagnostic import legitimately restores `active_length == position` (a host-informational field no kernel indexes). Invariant corrected to `position ≤ active_length` with the reasoning recorded; validator, tests, and docs updated together.
 - Done: Guard checks prevent out-of-bounds dispatch or argument mismatch at submission time.
 
 ### T9.3 AddressSanitizer and UndefinedBehaviorSanitizer integration
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.8, T5.1
 - Do: Configure ASan and UBSan build presets. Run full host test suite and loader validation under sanitizers.
+  DONE 2026-09-19: GCC 16.2.1 `-fsanitize=address,undefined` (probe-verified working) with `detect_leaks=1`, `halt_on_error=1`. New repeatable gate `tools/decode/run_sanitizers.sh` (the "preset": no CMake preset infra exists yet per open T1.8/X2, so a script is the honest equivalent): 7/7 stages green, exit 0 — (1) `test_arena_spans` 29/29, (2) `test_exec_guards` 25/25, (3) `l0load` full 712-tensor load 712/712 verified, (4) `negatives.py` 12/12 rejections, (5) full M4 runtime suite 7/7 bit-exact — all with zero ASan/UBSan findings (stderr clean, leak check on). Device kernels out of scope for sanitizers (host code only); Level Zero driver coexists cleanly (no suppressions needed).
 - Done: Host test suite and loader pass cleanly with zero ASan/UBSan violations.
 
 ### T9.4 Automated fuzzing harness
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T3.5, T5.5
 - Do: Implement fuzzing harness targeting `.binfer` MoE metadata parsing, diagnostic cache headers, and CLI argument parsing.
+  DONE 2026-09-20: Three harnesses, all green with zero findings. (1) `tools/fuzz/fuzz_binfer.py`: structure-aware mutational fuzzer over `binfer.py cmd_validate` (byte flips, truncation, huge n/scount, section shuffle) — **1,000,000 iters, 0 findings, worst case 39.1 ms** (no hangs). This run found 20 real bugs pre-fix (`MemoryError`/`OverflowError` escapes via unbounded u64 section/payload lengths bypassing the relative `ln vs nbytes` check) — fixed with absolute span gates (`off/nbytes/ln/d_bytes` vs file size) + `n ≤ 100k` / `scount ≤ 1024` early caps + widened exception catch; post-fix full 1M clean. (2) `tools/fuzz/fuzz_cache_import.cpp` (ASan+UBSan): in-process `import_diagnostic_cache` fuzzer (header overwrites, huge geometry/position, payload corruption, truncation) — **2000 iters, 0 findings, worst 0.30 s**, clean rejections only. (3) `tools/fuzz/fuzz_cli_parse.cpp`: differential fuzzer for `cli_parse.h` vs independent oracle — **2,000,000 iters + 38 fixed edge cases, 0 findings**; one grammar mismatch found and fixed (explicit digit-scan replaced `stol`, which skipped whitespace/accepted `+` quirks).
 - Done: Fuzzer runs millions of iterations with zero unhandled crashes or undefined behaviors.
 
 ### T9.5 Fault injection testing

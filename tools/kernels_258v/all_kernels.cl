@@ -13,6 +13,10 @@
 #define H_K 16
 #define C_QKV 8192
 #define HEAD_DIM 256
+#define VOCAB_SIZE 248320
+// T9.2: OOB index policy — READS clamp into range (fail-safe, no fault),
+// WRITES skip (clamping a write would corrupt a valid slot). Guards are
+// no-ops on valid inputs (verified by M4 suite).
 #define ROTARY_DIM 64
 #define ROTARY_HALF 32
 #define NUM_Q_HEADS 16
@@ -1083,6 +1087,7 @@ __kernel void rope_and_kv_append_bf16(
     uint pos,
     uint max_ctx
 ) {
+    if (pos >= max_ctx) return; // T9.2: skip OOB cache write (uniform arg)
     int gid = get_global_id(0);
     __local float s_buf[HEAD_DIM];
 
@@ -1229,6 +1234,7 @@ __kernel void embed_gather(
     int gid = get_global_id(0);
     if (gid >= HIDDEN_DIM) return;
     int token_id = ctrl[0];
+    if (token_id < 0 || token_id >= VOCAB_SIZE) token_id = 0; // T9.2: clamp OOB embed read
     ushort b = emb_table[(size_t)token_id * HIDDEN_DIM + gid];
     out[gid] = bf16_to_fp32(b);
 }
@@ -1243,6 +1249,7 @@ __kernel void rope_and_kv_append_ctrl(
     uint max_ctx
 ) {
     uint pos = (uint)ctrl[1];
+    if (pos >= max_ctx) return; // T9.2: skip OOB cache write (uniform: no barrier crossed yet)
     int gid = get_global_id(0);
     __local float s_buf[HEAD_DIM];
 
@@ -1408,6 +1415,7 @@ __kernel void moe_expert_gemv_ctrl(
     if (m >= M) return;
 
     uint eid = top_idx[k_slot];
+    if (eid >= NUM_EXPERTS) eid = 0; // T9.2: clamp OOB expert read
     size_t row_idx = (size_t)eid * M + m;
     int num_groups = K / GROUP_SIZE;
     __global const uchar *row_w = w_bank + row_idx * (K / 2);
@@ -1547,6 +1555,7 @@ __kernel void moe_expert_down_accum_ctrl(
     if (m >= M) return;
 
     uint eid = top_idx[k_slot];
+    if (eid >= NUM_EXPERTS) eid = 0; // T9.2: clamp OOB expert read
     size_t row_idx = (size_t)eid * M + m;
     int num_groups = K / GROUP_SIZE;
     __global const uchar *row_w = w_bank + row_idx * (K / 2);
@@ -1972,6 +1981,7 @@ __kernel void moe_down_accum_all8_ctrl(
     for (int k = 0; k < 8; ++k) {
         uint eid = top_idx[k];
         float wt = top_wt[k];
+        if (eid >= NUM_EXPERTS) continue; // T9.2: skip OOB expert (no contribution)
         size_t row_idx = (size_t)eid * M + m;
 
         __global const uchar *row_w = w_bank + row_idx * (K / 2);
@@ -2213,6 +2223,7 @@ __kernel void embed_gather_batch(
     int b = gid / HIDDEN_DIM;
     int d = gid % HIDDEN_DIM;
     int token_id = tokens[b];
+    if (token_id < 0 || token_id >= VOCAB_SIZE) token_id = 0; // T9.2: clamp OOB embed read
     ushort val = emb_table[(size_t)token_id * HIDDEN_DIM + d];
     out[gid] = bf16_to_fp32(val);
 }
@@ -2614,6 +2625,7 @@ __kernel void rope_and_kv_append_batch(
     int b = get_group_id(0);
     if (b >= B) return;
     uint pos = (uint)ctrl[1] + (uint)b;
+    if (pos >= max_ctx) return; // T9.2: skip OOB cache write (group-uniform)
     int gid = get_local_id(0);
     __local float s_buf[HEAD_DIM];
 

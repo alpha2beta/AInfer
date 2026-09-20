@@ -579,8 +579,12 @@ def cmd_validate(path=None):
     with open(path, "rb") as f:
         try:
             return _validate_inner(f, size)
-        except (struct.error, ValueError, OSError, UnicodeDecodeError) as e:
-            fail(f"unparseable/truncated: {e}")
+        except (struct.error, ValueError, OSError, UnicodeDecodeError,
+                MemoryError, OverflowError, RecursionError) as e:
+            # T9.4: a validator must NEVER crash on malformed input, whatever
+            # the exception class (fuzzer-verified: MemoryError/OverflowError
+            # escaped here before the span gates above existed).
+            fail(f"unparseable/truncated: {type(e).__name__}: {e}")
             print("INVALID:", ERRORS)
             return 1
 
@@ -598,6 +602,19 @@ def _validate_inner(f, size):
     n = struct.unpack("<Q", f.read(8))[0]
     table_off = struct.unpack("<Q", f.read(8))[0]
     scount = struct.unpack("<I", f.read(4))[0]
+    # T9.4: early sanity caps on untrusted counts. The loops below
+    # (`range(scount)`, `[read_entry(f) for _ in range(n)]`) do not raise
+    # on EOF short reads, so absurd counts would spin effectively forever
+    # (CPU-DoS on a crafted file). Real container: n=712, scount=6 —
+    # margins below are >100x and reject nothing legitimate.
+    if n > 100_000:
+        fail(f"tensor count implausible: {n}")
+        print("INVALID:", ERRORS)
+        return 1
+    if scount > 1024:
+        fail(f"section count implausible: {scount}")
+        print("INVALID:", ERRORS)
+        return 1
     if struct.unpack("<I", f.read(4))[0] != ALIGN:
         fail("bad alignment field")
     total = struct.unpack("<Q", f.read(8))[0]
@@ -619,6 +636,13 @@ def _validate_inner(f, size):
             fail(f"missing section {sid}")
 
     for sid, (off, nbytes, crc) in sects.items():
+        # T9.4: absolute span gate — a section claiming offsets/sizes beyond
+        # the real file size is invalid, and reading unbounded u64 lengths
+        # (MemoryError/OverflowError escape) must never happen. The old
+        # relative check (ln vs nbytes) was bypassable with huge nbytes.
+        if off > size or nbytes > size:
+            fail(f"section {sid} span out of range")
+            continue
         f.seek(off)
         if sid == 5:
             # dir body is raw entries without a length prefix
@@ -628,7 +652,7 @@ def _validate_inner(f, size):
             continue
 
         ln = struct.unpack("<Q", f.read(8))[0]
-        if ln > max(1 << 26, nbytes):
+        if ln > size:
             fail(f"section {sid} length implausible")
             continue
         body = f.read(ln)
@@ -696,8 +720,13 @@ def _validate_inner(f, size):
         if b0 < a1:
             fail(f"overlap {an} vs {bn}")
 
-    # payload CRCs
+    # payload CRCs (T9.4: skip entries whose span is already out of range —
+    # reading an unbounded d_bytes would MemoryError-escape instead of
+    # failing cleanly; the span violation is recorded either way)
     for e in entries:
+        if e["d_off"] > size or e["d_bytes"] > size or e["d_off"] + e["d_bytes"] > size:
+            fail(f"payload span out of range {e['name']}")
+            continue
         f.seek(e["d_off"])
         data = f.read(e["d_bytes"])
         if len(data) != e["d_bytes"] or (binascii.crc32(data) & 0xFFFFFFFF) != e["crc"]:

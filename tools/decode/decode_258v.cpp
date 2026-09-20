@@ -9,14 +9,20 @@
 //   --report=<file>          Write execution metrics to JSON report
 //   --benchmark=<N>          Benchmark steady-state decode across N tokens
 
+#include "cli_parse.h"
 #include "runtime_258v.h"
 
 #include <chrono>
+#include <climits>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 
 using namespace ainfer;
+
+// NOTE (T9.4): integer parsing lives in the shared header cli_parse.h
+// (parse_cli_int / parse_cli_token). The local helper was removed to avoid
+// ambiguity with the shared one.
 
 int main(int argc, char **argv) {
   if (argc < 2) {
@@ -42,7 +48,12 @@ int main(int argc, char **argv) {
       std::stringstream ss(arg.substr(6));
       std::string item;
       while (std::getline(ss, item, ',')) {
-        if (!item.empty()) prompt_ids.push_back(std::stoi(item));
+        int tok = 0;
+        if (!item.empty() && !parse_cli_int(item, tok, INT_MIN, INT_MAX)) {
+          std::fprintf(stderr, "Invalid --ids= token id: '%s'\n", item.c_str());
+          return 2;
+        }
+        if (!item.empty()) prompt_ids.push_back(tok);
       }
     } else if (arg.rfind("--ids-file=", 0) == 0) {
       std::ifstream ff(arg.substr(11));
@@ -52,7 +63,12 @@ int main(int argc, char **argv) {
           std::stringstream ss(line);
           std::string item;
           while (std::getline(ss, item, ',')) {
-            if (!item.empty()) prompt_ids.push_back(std::stoi(item));
+            int tok = 0;
+            if (!item.empty() && !parse_cli_int(item, tok, INT_MIN, INT_MAX)) {
+              std::fprintf(stderr, "Invalid --ids-file= token id: '%s'\n", item.c_str());
+              return 2;
+            }
+            if (!item.empty()) prompt_ids.push_back(tok);
           }
         }
       }
@@ -63,15 +79,24 @@ int main(int argc, char **argv) {
     } else if (arg.rfind("--out-file=", 0) == 0) {
       out_file = arg.substr(11);
     } else if (arg.rfind("--max-new=", 0) == 0) {
-      max_new = std::stoi(arg.substr(10));
+      if (!parse_cli_int(arg.substr(10), max_new, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid --max-new= value: '%s'\n", arg.substr(10).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--max-ctx=", 0) == 0) {
-      max_ctx = std::stoi(arg.substr(10));
+      if (!parse_cli_int(arg.substr(10), max_ctx, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid --max-ctx= value: '%s'\n", arg.substr(10).c_str());
+        return 2;
+      }
     } else if (arg.rfind("--spv=", 0) == 0) {
       spv_path = arg.substr(6);
     } else if (arg.rfind("--report=", 0) == 0) {
       report_path = arg.substr(9);
     } else if (arg.rfind("--benchmark=", 0) == 0) {
-      bench_tokens = std::stoi(arg.substr(12));
+      if (!parse_cli_int(arg.substr(12), bench_tokens, 0, 1048576)) {
+        std::fprintf(stderr, "Invalid --benchmark= value: '%s'\n", arg.substr(12).c_str());
+        return 2;
+      }
     }
   }
 
@@ -106,12 +131,21 @@ int main(int argc, char **argv) {
       std::string max_new_str;
       std::getline(ss, case_id, ',');
       std::getline(ss, max_new_str, ',');
-      int case_max_new = std::stoi(max_new_str);
+      int case_max_new = 0;
+      if (!parse_cli_int(max_new_str, case_max_new, 1, 1048576)) {
+        std::fprintf(stderr, "Invalid batch max-new: '%s' (case %s)\n", max_new_str.c_str(), case_id.c_str());
+        return 2;
+      }
 
       std::vector<int> c_prompt;
       std::string tok_str;
       while (std::getline(ss, tok_str, ',')) {
-        if (!tok_str.empty()) c_prompt.push_back(std::stoi(tok_str));
+        int tok = 0;
+        if (!tok_str.empty() && !parse_cli_int(tok_str, tok, INT_MIN, INT_MAX)) {
+          std::fprintf(stderr, "Invalid batch token id: '%s' (case %s)\n", tok_str.c_str(), case_id.c_str());
+          return 2;
+        }
+        if (!tok_str.empty()) c_prompt.push_back(tok);
       }
 
       runtime.reset_state();
@@ -176,7 +210,12 @@ int main(int argc, char **argv) {
       std::vector<int> c_tokens;
       std::string tok_str;
       while (std::getline(ss, tok_str, ',')) {
-        if (!tok_str.empty()) c_tokens.push_back(std::stoi(tok_str));
+        int tok = 0;
+        if (!tok_str.empty() && !parse_cli_int(tok_str, tok, INT_MIN, INT_MAX)) {
+          std::fprintf(stderr, "Invalid teacher-forced token id: '%s'\n", tok_str.c_str());
+          return 2;
+        }
+        if (!tok_str.empty()) c_tokens.push_back(tok);
       }
 
       runtime.reset_state();

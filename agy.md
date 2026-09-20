@@ -1,4 +1,4 @@
-# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-19, 48/62 done, Gate M7 re-verified)
+# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-20, 52/62 done, Phase 9 at 4/5)
 
 ## What it is
 
@@ -8,7 +8,7 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ---
 
-## Overall Health: Green (48/62 done; Phases 0/3/4/5/6/7/8 passed, Gates M0/M2b/M3/M4/M5/M6/M7 signed off — M7 re-verified 2026-09-19)
+## Overall Health: Green (52/62 done; Phases 0/3/4/5/6/7/8 passed, Gates M0/M2b/M3/M4/M5/M6/M7 signed off; Phase 9 at 4/5 with T9.1–T9.4 done)
 
 | Phase | Milestone | Scope | Status |
 |---|---|---|---|
@@ -21,7 +21,7 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, needle tests | ✅ Done (6/6; 187/200 passed 93.5%, BF16 KV default) |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline model | ✅ Done (5/5; 35.54 tok/s committed, beats llama.cpp Vulkan by 1.21x — see uncommitted-regression note in `STATUS.md`) |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation | ✅ Done (4/4; 100/100 requests, +20 KB RSS, PASSED) |
-| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing | `[ ]` Pending (0/5) |
+| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing | `[~]` In Progress (4/5; T9.1–T9.4 done) |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 single-token done; dual-token uncommitted; T10.2 deferred) |
 
 ---

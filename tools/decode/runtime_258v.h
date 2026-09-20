@@ -80,6 +80,121 @@ struct alignas(64) RuntimeControl {
   int pad[7];            // 128 bytes total (aligned to 64 bytes)
 };
 
+// T9.1: Typed arena spans with checked bounds.
+//
+// Device memory is host-addressable here (unified memory / shared
+// allocations), so all bounds checks run on the host at init/record time
+// with zero device-side overhead. Violations emit a diagnostic to stderr
+// and yield null/empty, which callers must treat as fatal init errors
+// (see verify_bindings()). Runtime Gens/Decodes never do unchecked
+// pointer arithmetic after this.
+template <typename T>
+struct ArenaSpan {
+  T *data = nullptr;
+  size_t count = 0; // element count (not bytes)
+  const char *name = "unnamed";
+
+  size_t size_bytes() const { return count * sizeof(T); }
+  bool empty() const { return data == nullptr || count == 0; }
+
+  // Checked element access: nullptr + diagnostic on out-of-range.
+  T *at(size_t i) const {
+    if (!data || i >= count) {
+      std::fprintf(stderr, "[ArenaSpan:%s] OOB access index %zu of %zu\n",
+                   name, i, count);
+      return nullptr;
+    }
+    return data + i;
+  }
+
+  // Checked sub-slice [off, off+n): empty span + diagnostic on violation.
+  ArenaSpan<T> slice(size_t off, size_t n, const char *sname = nullptr) const {
+    ArenaSpan<T> out{nullptr, 0, sname ? sname : name};
+    if (!data || n > count || off > count - n) {
+      std::fprintf(stderr,
+                   "[ArenaSpan:%s] OOB slice off=%zu n=%zu of count=%zu\n",
+                   name, off, n, count);
+      return out;
+    }
+    out.data = data + off;
+    out.count = n;
+    return out;
+  }
+
+  // Raw access for Level Zero kernel args. Callers must have validated
+  // via at()/slice() or a verify pass first; null here means "invalid".
+  T *get() const { return data; }
+};
+
+// Overflow-safe size arithmetic for slot/offset computations.
+inline bool checked_mul_add(size_t a, size_t b, size_t c, size_t *out) {
+  size_t m;
+  if (__builtin_mul_overflow(a, b, &m)) return false;
+  if (__builtin_add_overflow(m, c, out)) return false;
+  return true;
+}
+
+// Bump allocator with per-allocation ledger and fail-fast overflow.
+// Replaces ad-hoc w_ptr arithmetic: every sub-allocation is range-checked
+// at allocate time (not just totaled at the end) and recorded for audits.
+struct CheckedArena {
+  uint8_t *base = nullptr;
+  size_t total = 0;
+  size_t used = 0;
+  struct Entry {
+    const char *name;
+    size_t offset;
+    size_t bytes;
+  };
+  std::vector<Entry> ledger;
+
+  void reset(void *base_ptr, size_t total_bytes) {
+    base = (uint8_t *)base_ptr;
+    total = total_bytes;
+    used = 0;
+    ledger.clear();
+  }
+
+  // Allocate `count` elements of size `elem_size`, 64B-aligned.
+  // Returns nullptr + diagnostic on overflow (callers treat as fatal).
+  void *bump(size_t count, size_t elem_size, const char *name = "anon") {
+    size_t need;
+    if (__builtin_mul_overflow(count, elem_size, &need)) {
+      std::fprintf(stderr, "[CheckedArena] size overflow for '%s'\n", name);
+      return nullptr;
+    }
+    size_t aligned = (need + 63) & ~63ULL;
+    size_t next;
+    if (__builtin_add_overflow(used, aligned, &next) || next > total) {
+      std::fprintf(stderr,
+                   "[CheckedArena] overflow: '%s' needs %zu bytes, %zu/%zu used\n",
+                   name, aligned, used, total);
+      return nullptr;
+    }
+    void *p = base + used;
+    ledger.push_back({name, used, aligned});
+    used = next;
+    return p;
+  }
+
+  float *bump_f32(size_t count, const char *name = "anon") {
+    return (float *)bump(count, sizeof(float), name);
+  }
+
+  // Look up a recorded span by allocation name (for audit/validation).
+  bool span_f32(const char *name, ArenaSpan<float> *out) const {
+    for (const auto &e : ledger) {
+      if (std::strcmp(e.name, name) == 0) {
+        out->data = (float *)(base + e.offset);
+        out->count = e.bytes / sizeof(float);
+        out->name = e.name;
+        return true;
+      }
+    }
+    return false;
+  }
+};
+
 // .binfer Directory Entry
 struct BinferEntry {
   char name[64];
@@ -259,6 +374,61 @@ public:
   uint32_t get_max_ctx() const { return max_ctx_; }
   int get_current_position() const { return h_ctrl_.position; }
   bool is_initialized() const { return (dev_ != nullptr && queue_ != nullptr && cmd_step_ != nullptr); }
+
+// T9.2: pure host-side step-parameter validator (no device access, so it
+// is unit-testable without a GPU). Validates the dynamic values that flow
+// into device control buffers BEFORE command-list submission:
+//   position      in [0, max_ctx)          (KV-cache slot bound)
+//   active_length in [position, max_ctx]   (bounded, non-decreasing vs
+//     position; equality is legitimate after diagnostic-cache import,
+//     which restores active_length == position. active_length is
+//     host-informational — no kernel indexes by it.)
+//   token_id      in [0, VOCAB_SIZE)       (embed-table bound)
+//   chunk_tokens  in [1, MAX_PREFILL_CHUNK] (chunk-buffer bound)
+// Returns true when valid; otherwise writes a diagnostic into err.
+struct StepGuard {
+  static bool check(int position, int active_length, int token_id,
+                    int chunk_tokens, uint32_t max_ctx, char *err,
+                    size_t errcap) {
+    auto fail = [&](const char *what, long long v, long long lo, long long hi) {
+      if (err && errcap) {
+        std::snprintf(err, errcap, "step param %s=%lld outside [%lld,%lld)",
+                      what, v, lo, hi);
+      }
+      return false;
+    };
+    if (position < 0 || (uint32_t)position >= max_ctx)
+      return fail("position", position, 0, max_ctx);
+    if (active_length < position || (uint32_t)active_length > max_ctx)
+      return fail("active_length", active_length, position, (long long)max_ctx + 1);
+    if (token_id < 0 || token_id >= VOCAB_SIZE)
+      return fail("token_id", token_id, 0, VOCAB_SIZE);
+    if (chunk_tokens < 1 || chunk_tokens > MAX_PREFILL_CHUNK)
+      return fail("chunk_tokens", chunk_tokens, 1, MAX_PREFILL_CHUNK + 1);
+    return true;
+  }
+
+  // Prompt-ID range scan (O(P) integer compares at prefill entry; device
+  // embed gather clamps as last resort, but invalid IDs must not dispatch).
+  static bool check_prompt_ids(const int *ids, size_t n, char *err,
+                               size_t errcap) {
+    if (!ids && n) {
+      if (err && errcap) std::snprintf(err, errcap, "null prompt ids");
+      return false;
+    }
+    for (size_t i = 0; i < n; ++i) {
+      if (ids[i] < 0 || ids[i] >= VOCAB_SIZE) {
+        if (err && errcap) {
+          std::snprintf(err, errcap, "prompt_ids[%zu]=%d outside [0,%d)",
+                        i, ids[i], VOCAB_SIZE);
+        }
+        return false;
+      }
+    }
+    return true;
+  }
+};
+
   bool check_device_health() const {
     if (!dev_) return false;
     return (zeDeviceGetStatus(dev_) == ZE_RESULT_SUCCESS);
@@ -298,6 +468,11 @@ private:
   bool load_model_metadata(const std::string &path);
   bool init_level_zero();
   bool allocate_static_arenas();
+  bool verify_bindings() const; // T9.1: init-time null + arena-containment audit
+  // T9.1: single range-checked container-offset resolvers (all call sites
+  // delegate here; container offsets are untrusted input).
+  void *checked_pay(const std::string &nm) const;
+  void *checked_sc(const std::string &nm) const;
   bool upload_weights(const std::string &path);
   bool compile_kernels(const std::string &spv_path);
   bool record_command_lists();
@@ -332,6 +507,7 @@ private:
   uint64_t kv_cache_bytes_ = 0;
   uint64_t ssm_state_bytes_ = 0;
   uint64_t workspace_bytes_ = 0;
+  CheckedArena workspace_bump_; // T9.1: checked bump ledger for workspace_arena_
 
   // Root weights
   void *d_embed_tokens_ = nullptr;
@@ -515,6 +691,8 @@ private:
 
   void *d_conv_snap_ = nullptr;        // [30 * 8192 * 3 * sizeof(float)]
   void *d_ssm_snap_ = nullptr;         // [30 * 32 * 128 * 128 * sizeof(float)]
+  ArenaSpan<uint8_t> conv_snap_span_;  // T9.1: checked view of d_conv_snap_
+  ArenaSpan<uint8_t> ssm_snap_span_;   // T9.1: checked view of d_ssm_snap_
   float *d_stage1_vals_1_ = nullptr;   // [1024]
   uint32_t *d_stage1_idxs_1_ = nullptr;// [1024]
   int *d_verify_tokens_ = nullptr;     // [2] USM shared

@@ -1,6 +1,6 @@
 # AInfer — Current Status (release truth)
 
-> Single-source current state. Updated 2026-09-19 (48/62 tasks done; Gate M7 re-verified PASSED — see §7).
+> Single-source current state. Updated 2026-09-20 (52/62 tasks done; Phase 9 underway at 4/5 — see §7).
 > `progress.md` is the engineering log; this file is the release overview.
 > If they disagree, this file wins — fix the other one.
 
@@ -119,6 +119,14 @@ Next: resolve the remaining critical finding (root-cause and commit the dual-tok
 **Prefill Scaling Update (2026-09-19):** `tools/bench_258v/bench_prefill` re-run recorded in `report_prefill_scaling.json`: P=8 (69.99 tok/s), P=16 (110.10), P=32 (162.31 tok/s), P=64 (216.27), P=128 (274.76), P=256 (**299.04 tok/s**, 3.34 ms/tok) — see T5.2/T7.2 and `optimization.md` Pillar 6.
 
 **Prefill Optimization Update (2026-09-19):** attention v2 (`gqa_attn_prefill_batch_v2`, subgroup-shuffle reduction, forced SIMD16) + recurrence v2 (`deltanet_recurrent_batch_v2`, double-buffered 4-step batching) lifted P=256 to **318.31 tok/s** (804.26 ms, 3.14 ms/tok), +6.5% over 299.04. Both kernels env-gated (`AINFER_ATTN_V1`/`AINFER_RECR_V1`); A/B harness `tools/kernels_258v/bench_attn_prefill.cpp` verified 1.68e-07 vs CPU; full M4 suite (7/7) re-verified bit-exact. See `optimization.md` Pillar 8.
+
+**T9.1 typed spans (2026-09-19, Phase 9 at 1/5):** `ArenaSpan<T>` + `CheckedArena` + `checked_mul_add` in `runtime_258v.h`; centralized range-checked `checked_pay()`/`checked_sc()`; hardened slot/snapshot/chunk-tail arithmetic; `verify_bindings()` init audit (step 3b); host-only `test_arena_spans.cpp` 29/29 pass; M4 7/7 bit-exact. Dashboard 49/62.
+
+**T9.2 execution guards (2026-09-19, Phase 9 at 2/5):** 8 device guard sites (expert clamp, accum skip, token clamp, rope position early-out; reads-clamp/writes-skip policy, barrier-safe); host `StepGuard` wired into decode/prefill/speculative paths; `test_exec_guards.cpp` 25 checks pass; M4 7/7 bit-exact. One honest correction: first validator draft over-constrained `active_length` and failed T5.5 (import legitimately restores equality) — invariant fixed to `≤` with reasoning recorded. Dashboard 50/62.
+
+**T9.3 sanitizers (2026-09-19, Phase 9 at 3/5):** GCC 16.2.1 ASan+UBSan, leak detection on. New gate `tools/decode/run_sanitizers.sh`: 7/7 stages green — spans 29/29, guards 25/25, l0load 712/712, negatives 12/12, M4 7/7 bit-exact — zero findings, no suppressions. Dashboard 51/62.
+
+**T9.4 fuzzing (2026-09-20, Phase 9 at 4/5):** `fuzz_binfer.py` **1M iters, 0 findings** (worst 39.1 ms); `fuzz_cache_import` (ASan) **2k iters, 0 findings**; `fuzz_cli_parse` differential **2M iters, 0 findings**. Pre-fix shakedown caught 20 real escapes (unbounded u64 lengths → `MemoryError`/`OverflowError`) plus one CLI grammar mismatch — all fixed before the clean runs. Dashboard 52/62. Next: T9.5 fault injection (last Phase 9 task).
 
 
 
