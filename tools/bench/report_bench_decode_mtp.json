@@ -1,0 +1,36 @@
+{
+ "schema": "b60-bench-v1",
+ "manifest_commit": "aad157a",
+ "prompt_tokens": 29,
+ "context_occupancy": 29,
+ "generated_tokens": 61,
+ "warm_state": "warm",
+ "model_load_seconds": null,
+ "tokenization_seconds": null,
+ "cache_initialization_seconds": null,
+ "prefill_seconds": null,
+ "prefill_tokens_per_second": null,
+ "first_decode_seconds": null,
+ "cold_ttft_seconds": null,
+ "warm_ttft_seconds": null,
+ "decode_tokens_per_second": 18.67,
+ "accepted_tokens_per_second": 18.668135634716613,
+ "mtp_acceptance_rate": 0.7143,
+ "peak_vram_bytes": null,
+ "metadata": {
+  "command": "./build-b60/tools/decode/decode_l0 <model> 1 1 <spvdir> --ids-file=/tmp/mtp_bench_ids.txt --max-new=60 --mtp (P=29 rain prompt)",
+  "run_type": "decode_only",
+  "kv_precision": "bf16",
+  "mtp_mode": "depth-2",
+  "chunk_size": 256,
+  "warm_state": "warm",
+  "comparison_class": "local_reproduced",
+  "evidence": "tools/bench/evidence/decode_mtp_depth2_70tok.json",
+  "boundaries": {
+   "model_load_included": false,
+   "tokenization_included": false,
+   "prefill_start": "first chunk-list exec (chunk path) or first loop step (decode path)",
+   "prefill_end": "last chunk-list fence (chunk path)"
+  }
+ }
+}

@@ -1,0 +1,45 @@
+{
+ "schema": "b60-bench-v1",
+ "git_commit": "aad157a",
+ "binfer_bytes": 15978603616,
+ "binfer_mtime": 1788801424.98,
+ "binfer_sha256_full": "3406eaf2ac4dbe0406375cbd922083f0dd924452259f52e32c552d2a288027ff",
+ "binfer_sha256_scope": "whole file (includes trailing 32 B checksum)",
+ "binfer_sha256_payload": "5ef77c128ee526a351051f54f16378d04eb868ea7e6f89703c41a1d58655911f",
+ "binfer_sha256_payload_scope": "bytes [0, checksum_offset) per binfer_spec \u00a711; conversion-time value, verified 2026-09-20 by re-hash",
+ "binfer_sha256": "3406eaf2ac4dbe0406375cbd922083f0dd924452259f52e32c552d2a288027ff",
+ "model_revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+ "tokenizer_sha256": {
+  "tokenizer.json": {
+   "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+   "crc32": "6b61f895"
+  },
+  "tokenizer_config.json": {
+   "sha256": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+   "crc32": "f3d608c1"
+  },
+  "vocab.json": {
+   "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+   "crc32": "da8db314"
+  },
+  "merges.txt": {
+   "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+   "crc32": "1824fcb5"
+  },
+  "chat_template.jinja": {
+   "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+   "crc32": "367cbad5"
+  }
+ },
+ "tokenizer_specials": 33,
+ "driver_level_zero": {
+  "ze_loader": "1.28.2-2",
+  "neo_opencl": "26.05.37020.3-1",
+  "igc": "1.0.17791.18+1-3",
+  "dpcpp": "2026.1.1-325"
+ },
+ "oneapi_version": "2026.1",
+ "gpu_name": "Intel Arc Pro B60 (8086:e211)",
+ "gpu_power": "unreadable (no sudo; sysfs perf/power not permitted)",
+ "notes": "B60-R1 manifest. Power/clock telemetry unavailable on this box; record nulls, do not estimate."
+}

@@ -1266,6 +1266,50 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
 ### T8.11 Publish controlled AInfer versus llama.cpp benchmark (P5)
 - Status: `[ ]` (open: review §3.2 controls; Gate D)
 
+## Phase 9: B60 Investigation Program (review_B60.md §8, IDs B60-R1–R8 stable)
+
+### B60-R1 Benchmark evidence normalization (P0)
+- Status: `[x]` (DONE 2026-09-20: `tools/bench/bench_schema.json`
+  (b60-bench-v1 contract: required/optional timing fields, run_type
+  decode_only|prefill_decode, comparison classes), `tools/bench_manifest.py`
+  collector → `tools/bench/report_manifest.json` (commit, binfer size +
+  full-file SHA-256 `3406eaf2…` + payload SHA-256 `5ef77c12…` with scopes,
+  model rev, pinned tokenizer hashes, L0/NEO/IGC/dpcpp versions, oneAPI
+  2026.1, B60 identity, power unreadable), `tools/bench_normalize.py`
+  (decode_l0 report + run metadata → schema result; `--check` gate).
+  Seeded: baseline decode 14.91, MTP depth-2 18.67/α0.714, prefill 4K
+  28.4 tok/s, each with durable evidence under `tools/bench/evidence/`.
+  Validator extended with `tools/*/bench_*.json`; gate 107/107.)
+
+### B60-R2 Prefill scaling sweep (P0)
+- Status: `[ ]` (open: P1→P64K per review §B60-R2; ties 30 tok/s figure to
+  defined prompt sizes; decomposes 80-min 64K)
+
+### B60-R3 Phase-level prefill profile (P0)
+- Status: `[ ]` (open: kernel/phase timing; projection vs recurrence vs
+  attention vs sync at P256/P4K/P64K; partial data exists in progress log)
+
+### B60-R4 Controlled baseline reproduction (P1)
+- Status: `[~]` (partial: llama SYCL/FP16+MTP + OV GenAI 23.3/1046 measured
+  on same B60 via `tools/ov_bench_qwen38.py`; OV+MTP blocked by VLM
+  packaging; needs schema-normalized reruns per B60-R1 contract)
+
+### B60-R5 DPAS projection feasibility (P1)
+- Status: `[~]` (partial: ChunkGemmDB paired-slice tried → negative on B60,
+  −34%, kept gated; go/no-go per §B60-R5 criteria pending dominant-shape
+  prototype at 1.8×/15% bars)
+
+### B60-R6 DeltaNet recurrence study (P1)
+- Status: `[ ]` (open: recurrence roofline + sequential floor)
+
+### B60-R7 Long-context attention investigation (P1)
+- Status: `[~]` (partial: `ChunkFlashAttn` + `AINFER_FLASH=1` gated;
+  synthetic gate passes at M=256/W=4096; 16-chunk trajectory gate
+  inconclusive; BF16/INT8-KV + 4K→64K scaling pending)
+
+### B60-R8 Continuation decision (P0)
+- Status: `[ ]` (open: needs R4, R5, R6, R7; deliverable `B60_decision.md`)
+
 ---
 
 ## Immediate Next Actions (from plan.md section 13)

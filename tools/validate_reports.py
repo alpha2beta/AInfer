@@ -2,7 +2,8 @@
 """T8.2: strict-parse every tracked JSON evidence report (Gate A).
 
 Scope: tools/*/report_*.json + tools/*/golden_*.json + tools/*/corpus_*.json
-+ reference/*.json + repo-root *.json (Stamp 14: golden/corpus were gaps).
++ tools/*/bench_*.json + reference/*.json + repo-root *.json (Stamp 14:
+golden/corpus were gaps; B60-R1: bench schema added).
 Exits 0 with a PASS line, or 1 listing each unparseable file.
 Host-only, no GPU. Registered as ctest `reports_json`.
 """
@@ -16,6 +17,7 @@ PATTERNS = [
     "tools/*/report_*.json",
     "tools/*/golden_*.json",
     "tools/*/corpus_*.json",
+    "tools/*/bench_*.json",
     "reference/*.json",
     "*.json",
 ]

@@ -1,0 +1,64 @@
+{
+  "schema": "b60-bench-v1",
+  "source": "review_B60.md Phase B60-R1 (evidence normalization)",
+  "rule": "Every headline number links a normalized result file. Prefill excludes model load and tokenization unless the boundaries object says otherwise. MTP accepted-token throughput is never confused with target-model evaluation rate.",
+  "manifest_required": [
+    "git_commit",
+    "binfer_bytes",
+    "binfer_sha256",
+    "model_revision",
+    "tokenizer_sha256",
+    "driver_level_zero",
+    "oneapi_version",
+    "gpu_name",
+    "gpu_power"
+  ],
+  "result_required": [
+    "prompt_tokens",
+    "context_occupancy",
+    "generated_tokens",
+    "prefill_seconds",
+    "prefill_tokens_per_second",
+    "decode_tokens_per_second",
+    "warm_state"
+  ],
+  "result_optional_null": [
+    "model_load_seconds",
+    "tokenization_seconds",
+    "cache_initialization_seconds",
+    "first_decode_seconds",
+    "cold_ttft_seconds",
+    "warm_ttft_seconds",
+    "accepted_tokens_per_second",
+    "mtp_acceptance_rate",
+    "peak_vram_bytes"
+  ],
+  "result_metadata_required": [
+    "command",
+    "run_type",
+    "kv_precision",
+    "mtp_mode",
+    "chunk_size",
+    "warm_state",
+    "boundaries",
+    "comparison_class",
+    "evidence"
+  ],
+  "run_type_enum": ["decode_only", "prefill_decode"],
+  "conditional": "decode_only runs MUST have null prefill_seconds and prefill_tokens_per_second (no prefill phase exists); prefill_decode runs MUST have both non-null",
+  "boundaries_required": [
+    "model_load_included",
+    "tokenization_included",
+    "prefill_start",
+    "prefill_end"
+  ],
+  "comparison_class_enum": [
+    "local_reproduced",
+    "same_class_external",
+    "different_checkpoint",
+    "unverified"
+  ],
+  "warm_state_enum": ["cold", "warm"],
+  "kv_enum": ["bf16", "int8"],
+  "mtp_mode_enum": ["off", "depth-1", "depth-2", "adaptive"]
+}
