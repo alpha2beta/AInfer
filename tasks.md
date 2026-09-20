@@ -1286,18 +1286,34 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   defined prompt sizes; decomposes 80-min 64K)
 
 ### B60-R3 Phase-level prefill profile (P0)
-- Status: `[ ]` (open: kernel/phase timing; projection vs recurrence vs
-  attention vs sync at P256/P4K/P64K; partial data exists in progress log)
+- Status: `[x]` (2026-09-20: profile at P256/P4K/P16K, clean 69f0941, BF16 KV
+  M=256, warmup discarded: linear flat ~133.7ms/layer-chunk (~75%@256,
+  ~71%@4K, ~59%@16K), full O(W) rising to 41% @16K, recurrence ~1.2ms/
+  layer-chunk (negligible). Priorities: projection/GEMM short ctx; full-
+  attention scaling long ctx; recurrence NOT primary bottleneck. Evidence
+  `tools/bench/evidence/r3_p*.json` + normalized `report_r3_p*.json`;
+  gate 126/126. P64K phase profile remains optional extension.)
 
 ### B60-R4 Controlled baseline reproduction (P1)
-- Status: `[~]` (partial: llama SYCL/FP16+MTP + OV GenAI 23.3/1046 measured
-  on same B60 via `tools/ov_bench_qwen38.py`; OV+MTP blocked by VLM
-  packaging; needs schema-normalized reruns per B60-R1 contract)
+- Status: `[~]` (2026-09-20: OV GenAI 2026.4.0 reproduced on same B60 and
+  schema-normalized, `tools/bench/report_r4_ov_{1..4}.json` (greedy, warmup
+  discarded, max-new=32; decode 25.8-26.2 tok/s; prefill 516 @235tok,
+  1044 @884tok; OV KV=f16 recorded in command note — schema kv enum is
+  bf16/int8 only). llama SYCL/FP16/114-MTP prior numbers remain classified
+  same_class_external (14.86/17.0/29.64 tps; pp 184-1008) — no llama build on
+  this box; schema-normalized llama rerun still open.)
 
 ### B60-R5 DPAS projection feasibility (P1)
-- Status: `[~]` (partial: ChunkGemmDB paired-slice tried → negative on B60,
-  −34%, kept gated; go/no-go per §B60-R5 criteria pending dominant-shape
-  prototype at 1.8×/15% bars)
+- Status: `[~]` (2026-09-20: ChunkGemmPP prototype DONE — planar nibble-
+  plane pack (K-group, K-index, N N-fastest) + f16 scales + SLM sext LUT,
+  no runtime repack, same B size. At 256x5120x17408: 2.27 TFLOPS =
+  1.45x vs ChunkGemm 1.57 (both CHUNK-OK, PP worst-rel 2.2e-4 within
+  1e-3 tol, bitwise deterministic). Dual-col PP2 = negative (0.80).
+  Kernel bar 1.8x NOT met; est. E2E ~ +22% (linear 71% x 1/1.45) but
+  unmeasured (decode_l0 not rewired); go criteria partially met — keep
+  iterating (barrier/slice amortization with planes+LUT, double-buffer)
+  or accept no-go. Reports `tools/cmdlist/report_gemmpp{,2}.json` +
+  bench evidence `r5_*`. R7 slim-Flash stash merged onto worktree.)
 
 ### B60-R6 DeltaNet recurrence study (P1)
 - Status: `[ ]` (open: recurrence roofline + sequential floor)

@@ -54,6 +54,8 @@ WANTED = {
     "_ZTS5Embed": "embed.spv",
     "_ZTS9ChunkGemm": "chunkgemm.spv",
     "_ZTS11ChunkGemmDB": "chunkgemmdb.spv",
+    "_ZTS11ChunkGemmPP": "chunkgemmpp.spv",
+    "_ZTS12ChunkGemmPP2": "chunkgemmpp2.spv",
     "_ZTS9ChunkAttn": "chunkattn.spv",
     "_ZTS12ChunkSsmConv": "chunkssmconv.spv",
     "_ZTS13ChunkSsmRecur": "chunkssmrecur.spv",

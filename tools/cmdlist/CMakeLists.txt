@@ -26,7 +26,7 @@ find_program(SYCL_POST_LINK sycl-post-link
 if(NOT LLVM_SPIRV OR NOT SYCL_POST_LINK)
   message(FATAL_ERROR "llvm-spirv/sycl-post-link not found (needed for T5.3 SPIR-V)")
 endif()
-set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkgemmdb chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
+set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkgemmdb chunkgemmpp chunkgemmpp2 chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
 set(SPV_FILES "")
 foreach(m IN LISTS SPV_MODS)
   list(APPEND SPV_FILES ${CMAKE_CURRENT_BINARY_DIR}/${m}.spv)
@@ -501,6 +501,22 @@ add_test(NAME gemmdb_replay
   COMMAND gemmdb_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkgemmdb.spv
                             ${CMAKE_CURRENT_BINARY_DIR}/report_gemmdb.json)
 set_tests_properties(gemmdb_replay PROPERTIES TIMEOUT 1200)
+
+# B60-R5 DPAS projection prototype: ChunkGemmPP (planar pack + f16 scales +
+# sext LUT) vs plane-dequant CPU fp32 ref (tol 1e-3).
+add_executable(chunkgemmpp_replay chunkgemmpp_replay.cpp)
+target_include_directories(chunkgemmpp_replay PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
+target_link_libraries(chunkgemmpp_replay PRIVATE
+  /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
+add_dependencies(chunkgemmpp_replay spv_mods)
+add_test(NAME chunkgemmpp_replay
+  COMMAND chunkgemmpp_replay ${CMAKE_CURRENT_BINARY_DIR}/chunkgemmpp.spv
+                            ${CMAKE_CURRENT_BINARY_DIR}/report_gemmpp.json)
+set_tests_properties(chunkgemmpp_replay PROPERTIES TIMEOUT 1200)
+
+# R5 A/B runs the PP2 variant via AINFER_PP2_VARIANT env instead of a
+# separate harness image (same numerics checker).
 
 # T7.4 chunked prefill: causal chunk-attention over a cache prefix.
 add_executable(chunkattn_replay chunkattn_replay.cpp)

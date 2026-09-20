@@ -1,0 +1,17 @@
+{
+ "device": "B60",
+ "kernel": "_ZTS11ChunkGemmPP",
+ "shape": [
+  256,
+  5120,
+  17408
+ ],
+ "iters": 3,
+ "replay_us": 20145.18,
+ "tflops": 2.27,
+ "worst_rel": 0.000217,
+ "ref_tol": 0.001,
+ "bitwise_deterministic": true,
+ "chunk_ok": true,
+ "note": "planar nibble-plane pack, f16 scales, SLM sext LUT; it=3"
+}

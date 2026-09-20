@@ -1396,7 +1396,7 @@ struct ChunkFlashAttn {
   int KB;              // key block size (512)
   sycl::local_accessor<sycl::half, 1> sQ; // 8*256 Q tile (once per group)
   sycl::local_accessor<sycl::half, 1> sKs; // 16*16 K slice (streamed per kt)
-  sycl::local_accessor<sycl::half, 1> sVs; // 1*256 V row (streamed per c)
+  sycl::local_accessor<sycl::half, 1> sVs; // 256 V row (streamed per c)
   sycl::local_accessor<float, 1> sC; // 8*16 scores (reused for P)
   // NOTE: Oacc lives in registers (128 floats/lane); sO removed to keep
   // SLM at ~5.5KB (28.5KB collapsed occupancy and ran slower than 3-stage).
@@ -1420,19 +1420,15 @@ struct ChunkFlashAttn {
     }
     sg.barrier();
     // FP32 online state per query row (replicated per lane; identical math).
-    float mx[8], ls[8], resc[8];
+    // Oacc in registers: lane-disjoint 128 floats each (dd = lid + 16*k).
+    float mx[8], ls[8], resc[8], myO[128];
     for (int r = 0; r < 8; ++r) {
       mx[r] = -1e30f;
       ls[r] = 0;
       resc[r] = 0;
     }
-    // Zero the SLM O accumulators: first tile does sO*0 which is NaN if
-    // SLM garbage contains NaN/Inf (uninitialized-local lesson).
-    for (int u = 0; u < 128; ++u) {
-      int idx = lid * 128 + u, r = idx / 256, d = idx % 256;
-      sO[(size_t)r * 256 + d] = 0.0f;
-    }
-    sg.barrier();
+    for (int k = 0; k < 128; ++k)
+      myO[k] = 0.0f;
     // Key blocks of KB; sub-tiles of 16 keys (c0).
     for (int kb = 0; kb < W; kb += KB) {
       int row_valid = 0;
@@ -1442,38 +1438,27 @@ struct ChunkFlashAttn {
       if (!row_valid)
         continue;
       for (int c0 = 0; c0 < KB && kb + c0 < W; c0 += 16) {
-        // Stage K/V sub-tiles (256x16, 16x256), BF16->fp16 (qb pattern).
-        for (int u = 0; u < 256; ++u) {
-          int idx = lid * 256 + u, i = idx / 16, n2 = idx % 16;
-          int t = kb + c0 + n2;
-          sycl::half vk = sycl::half(0);
-          if (i < 256 && t < W) {
-            uint32_t uk = (uint32_t)Kc[((size_t)t * 4 + k2) * 256 + i] << 16;
-            float fk;
-            __builtin_memcpy(&fk, &uk, 4);
-            vk = sycl::half(fk);
-          }
-          sKs[(size_t)i * 16 + n2] = vk;
-        }
-        for (int u = 0; u < 256; ++u) {
-          int idx = lid * 256 + u, i = idx / 256, n2 = idx % 256;
-          int t = kb + c0 + i;
-          sycl::half vv = sycl::half(0);
-          if (i < 16 && t < W) {
-            uint32_t uv = (uint32_t)Vc[((size_t)t * 4 + k2) * 256 + n2] << 16;
-            float fv;
-            __builtin_memcpy(&fv, &uv, 4);
-            vv = sycl::half(fv);
-          }
-          sVs[(size_t)i * 256 + n2] = vv;
-        }
-        sg.barrier();
-        // QK DPAS: 8 queries x 16 keys over 16 K-steps (one 8x16 acc).
+        // QK DPAS: 8 queries x 16 keys; K slice (16x16) streamed per kt
+        // into sKs (512B) to keep SLM at ~5.5KB total.
         mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, 8,
                          16, mx::layout::dynamic>
             acc;
         mx::joint_matrix_fill(sg, acc, 0.0f);
         for (int kt = 0; kt < 256; kt += 16) {
+          for (int u = 0; u < 16; ++u) {
+            int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+            int t = kb + c0 + n2;
+            sycl::half vk = sycl::half(0);
+            if (t < W) {
+              uint32_t uk =
+                  (uint32_t)Kc[((size_t)t * 4 + k2) * 256 + kt + i] << 16;
+              float fk;
+              __builtin_memcpy(&fk, &uk, 4);
+              vk = sycl::half(fk);
+            }
+            sKs[(size_t)i * 16 + n2] = vk;
+          }
+          sg.barrier();
           mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, 8, 16,
                            mx::layout::row_major>
               ta;
@@ -1484,9 +1469,10 @@ struct ChunkFlashAttn {
               mpQ(&sQ[(size_t)kt]);
           mx::joint_matrix_load(sg, ta, mpQ, 256);
           sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
-              mpK(&sKs[(size_t)kt * 16]);
+              mpK(&sKs[0]);
           mx::joint_matrix_load(sg, tb, mpK, 16);
           mx::joint_matrix_mad(sg, acc, ta, tb, acc);
+          sg.barrier();
         }
         mx::joint_matrix_store(
             sg, acc,
@@ -1522,22 +1508,41 @@ struct ChunkFlashAttn {
           ls[r] = l_new;
         }
         sg.barrier();
-        // PV accumulate, lane-disjoint (rr,d) pairs over sO.
-        for (int dd = lid; dd < 8 * 256; dd += 16) {
-          int rr = dd / 256, d = dd % 256;
-          float ov = sO[(size_t)rr * 256 + d] * resc[rr];
-          for (int c = 0; c < 16; ++c)
-            ov += sC[(size_t)rr * 16 + c] * (float)sVs[(size_t)c * 256 + d];
-          sO[(size_t)rr * 256 + d] = ov;
+        // Rescale register Oacc, then PV per key c with streamed V row.
+        for (int k = 0; k < 128; ++k) {
+          int dd = lid + 16 * k, rr = dd / 256;
+          myO[k] *= resc[rr];
+        }
+        for (int c = 0; c < 16; ++c) {
+          int t = kb + c0 + c;
+          // Stage one V row (256 half) cooperatively; masked keys read 0.
+          for (int u = 0; u < 16; ++u) {
+            int d = lid * 16 + u;
+            sycl::half vv = sycl::half(0);
+            if (d < 256 && t < W) {
+              uint32_t uv =
+                  (uint32_t)Vc[((size_t)t * 4 + k2) * 256 + d] << 16;
+              float fv;
+              __builtin_memcpy(&fv, &uv, 4);
+              vv = sycl::half(fv);
+            }
+            sVs[d] = vv;
+          }
+          sg.barrier();
+          for (int k = 0; k < 128; ++k) {
+            int dd = lid + 16 * k, rr = dd / 256, d = dd % 256;
+            myO[k] += sC[(size_t)rr * 16 + c] * (float)sVs[d];
+          }
+          sg.barrier();
         }
       }
     }
-    // Epilogue: normalize + write valid rows (zeros for padding rows).
-    for (int u = 0; u < 128; ++u) {
-      int idx = lid * 128 + u, r = idx / 256, d = idx % 256;
+    // Epilogue: normalize register Oacc + write valid rows.
+    for (int k = 0; k < 128; ++k) {
+      int dd = lid + 16 * k, r = dd / 256, d = dd % 256;
       int m = m0 + r;
       float inv = (r < 8 && m < M && ls[r] > 0) ? (1.0f / ls[r]) : 0.0f;
-      float v = (r < 8 && m < M) ? sO[(size_t)r * 256 + d] * inv : 0.0f;
+      float v = (r < 8 && m < M) ? myO[k] * inv : 0.0f;
       if (r < 8 && m < M)
         O[((size_t)m * 24 + hh) * 256 + d] = v;
     }
@@ -1551,14 +1556,13 @@ void launch_chunkflashattn(sycl::queue &q, const sycl::half *Q,
                            int P, int M, int W, int KB) {
   q.submit([&](sycl::handler &h) {
     sycl::local_accessor<sycl::half, 1> sQ(8 * 256, h);
-    sycl::local_accessor<sycl::half, 1> sKs(256 * 16, h);
-    sycl::local_accessor<sycl::half, 1> sVs(16 * 256, h);
+    sycl::local_accessor<sycl::half, 1> sKs(16 * 16, h);
+    sycl::local_accessor<sycl::half, 1> sVs(256, h);
     sycl::local_accessor<float, 1> sC(8 * 16, h);
-    sycl::local_accessor<float, 1> sO(8 * 256, h);
     int nG = (M + 7) / 8;
     h.parallel_for(sycl::nd_range<1>({(size_t)nG * 24 * 16}, {16}),
-                   ChunkFlashAttn{Q, Kc, Vc, O, P, M, W, KB, sQ, sKs, sVs, sC,
-                                  sO});
+                   ChunkFlashAttn{Q, Kc, Vc, O, P, M, W, KB, sQ, sKs, sVs,
+                                  sC});
   }).wait();
 }
 
@@ -2152,6 +2156,249 @@ void launch_chunkgemmdb(sycl::queue &q, const sycl::half *A, const uint8_t *P,
     sycl::local_accessor<float, 1> sC(128 * 4, h);
     h.parallel_for(sycl::nd_range<1>({(size_t)(M / 32) * (TN / 16) * 16}, {16}),
                    ChunkGemmDB{A, P, S, C, M, K, TN, sA0, sB0, sA1, sB1, sC});
+  }).wait();
+}
+
+// B60-R5 DPAS projection prototype (offline planar packed weights):
+// same DPAS math/tiling as ChunkGemm, but the INT4 B layout is pre-swizzled
+// offline into a single nibble PLANE in (K-group, K-index, N) order with
+// N fastest: per WI the 16 dequant values at a fixed K row come from 8
+// CONSECUTIVE bytes (vs 16 byte loads strided K/2=2560B in layout-0), and
+// scales are pre-converted to f16 (SS[g*TN+n]: contiguous per WI vs 16
+// strided bf16 loads). Nib->f16 sign extend goes through a 16-entry SLM
+// LUT built once at kernel start (kills the per-element i2f conversion).
+// Same B size (K*N/2) as layout-0, no runtime repack. DPAS structure/tile
+// shapes identical to ChunkGemm so the A/B isolates layout + dequant only.
+struct ChunkGemmPP {
+  const sycl::half *A;
+  const uint8_t *PL;    // nibble plane, byte j covers nibbles (n=2j, 2j+1)
+  const sycl::half *SS; // f16 scales SS[g*TN + n]
+  float *C;
+  int M, K, TN;
+  sycl::local_accessor<sycl::half, 1> sA;
+  sycl::local_accessor<sycl::half, 1> sB;
+  sycl::local_accessor<float, 1> sC;
+  sycl::local_accessor<sycl::half, 1> sLut; // 16
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16, UR = 4;
+    auto sg = it.get_sub_group();
+    int nBc = TN / 16;
+    int gid = (int)it.get_group(0);
+    int br = gid / nBc, bc = gid % nBc;
+    if (br * 32 >= M)
+      return;
+    int lid = (int)sg.get_local_id()[0];
+    // NIB LUT: index = raw 4-bit nibble, entry = sext(nib) in f16. Built
+    // once per work group; barrier guards the first read.
+    sLut[lid] = sycl::half(lid < 8 ? lid : lid - 16);
+    sg.barrier();
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc[UR];
+    for (int r = 0; r < UR; ++r)
+      mx::joint_matrix_fill(sg, acc[r], 0.0f);
+    for (int kt = 0; kt < K; kt += TC) {
+      for (int r = 0; r < UR; ++r)
+        for (int u = 0; u < 8; ++u) {
+          int idx = lid * 8 + u, rr = idx / TC, c = idx % TC;
+          int ar = br * TR * UR + r * TR + rr;
+          sA[r * 128 + rr * TC + c] =
+              ar < M ? A[(size_t)ar * K + kt + c] : sycl::half(0);
+        }
+      int g = kt / 128;   // K group (128 K rows per scale)
+      int gi = kt % 128;  // K row within group
+      // Per WI: 16 consecutive n at plane row (g, gi+lid) -> two u32 loads.
+      // Tile base n = bc*16 -> byte offset bc*8 (TN%16==0 keeps alignment).
+      size_t prow_i = (size_t)((g * 128 + gi + lid) * (size_t)TN / 2) +
+                      (size_t)bc * 8;
+      uint32_t pb0 = 0, pb1 = 0;
+      __builtin_memcpy(&pb0, PL + prow_i, 4);
+      __builtin_memcpy(&pb1, PL + prow_i + 4, 4);
+      int nib = 0;
+      sycl::half sc = sycl::half(0.f);
+      for (int u = 0; u < 16; ++u) {
+        int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+        int n = bc * 16 + n2;
+        // Plane layout packs consecutive n across bit positions: element n
+        // (row r) occupies bits [4n, 4n+4) of the 64-bit row word pair.
+        nib = (int)(n2 < 8 ? (pb0 >> (n2 * 4)) : (pb1 >> ((n2 - 8) * 4))) & 0xF;
+        sc = SS[(size_t)g * TN + n];
+        // sB[i*16+n2]: refill pattern identical to ChunkGemm.
+        sB[i * 16 + n2] = sLut[nib] * sc;
+      }
+      sg.barrier();
+      for (int r = 0; r < UR; ++r) {
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                         mx::layout::row_major>
+            ta;
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                         mx::layout::row_major>
+            tb;
+        sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+            mpA(&sA[r * 128]);
+        mx::joint_matrix_load(sg, ta, mpA, TC);
+        mx::joint_matrix_load(
+            sg, tb,
+            sB.template get_multi_ptr<sycl::access::decorated::legacy>(), 16);
+        mx::joint_matrix_mad(sg, acc[r], ta, tb, acc[r]);
+      }
+      sg.barrier();
+    }
+    for (int r = 0; r < UR; ++r) {
+      mx::joint_matrix_store(
+          sg, acc[r],
+          sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+              &sC[r * 128]),
+          16, mx::layout::row_major);
+    }
+    sg.barrier();
+    for (int u = 0; u < 32; ++u) {
+      int idx = lid * 32 + u, r = idx / 128, rest = idx % 128;
+      int rr = rest / 16, c = rest % 16;
+      int row = br * TR * UR + r * TR + rr;
+      if (row < M)
+        C[(size_t)row * TN + bc * 16 + c] = sC[r * 128 + rr * 16 + c];
+    }
+  }
+};
+
+// B60-R5 PP2: two 16-column tiles per sA refill (same nibble-plane B):
+// per barrier sA is refilled ONCE and reused by two DPAS per UR (sB0 for
+// columns bc*32..+15, sB1 for +16..+31), halving A-side SLM traffic and
+// barrier count per unit of DPAS. Requires TN % 32 == 0 (dominant shapes
+// 17408/34816/14336 all qualify). Two accumulator sets (acc, acc2).
+struct ChunkGemmPP2 {
+  const sycl::half *A;
+  const uint8_t *PL;
+  const sycl::half *SS;
+  float *C;
+  int M, K, TN;
+  sycl::local_accessor<sycl::half, 1> sA;
+  sycl::local_accessor<sycl::half, 1> sB0;
+  sycl::local_accessor<sycl::half, 1> sB1;
+  sycl::local_accessor<float, 1> sC;
+  sycl::local_accessor<float, 1> sC2; // second tile accumulator bank
+  sycl::local_accessor<sycl::half, 1> sLut; // 16
+  void operator()(sycl::nd_item<1> it) const {
+    constexpr int TR = 8, TC = 16, UR = 4;
+    auto sg = it.get_sub_group();
+    int nBc = TN / 32;
+    int gid = (int)it.get_group(0);
+    int br = gid / nBc, bc = gid % nBc;
+    if (br * 32 >= M)
+      return;
+    int lid = (int)sg.get_local_id()[0];
+    sLut[lid] = sycl::half(lid < 8 ? lid : lid - 16);
+    sg.barrier();
+    mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, TR, 16,
+                     mx::layout::dynamic>
+        acc[UR], acc2[UR];
+    for (int r = 0; r < UR; ++r) {
+      mx::joint_matrix_fill(sg, acc[r], 0.0f);
+      mx::joint_matrix_fill(sg, acc2[r], 0.0f);
+    }
+    for (int kt = 0; kt < K; kt += TC) {
+      for (int r = 0; r < UR; ++r)
+        for (int u = 0; u < 8; ++u) {
+          int idx = lid * 8 + u, rr = idx / TC, c = idx % TC;
+          int ar = br * TR * UR + r * TR + rr;
+          sA[r * 128 + rr * TC + c] =
+              ar < M ? A[(size_t)ar * K + kt + c] : sycl::half(0);
+        }
+      int g = kt / 128, gi = kt % 128;
+      size_t prowL = (size_t)((g * 128 + gi + lid) * (size_t)TN / 2);
+      for (int half = 0; half < 2; ++half) {
+        uint32_t pb0 = 0, pb1 = 0;
+        size_t bcol = (size_t)(bc * 32 + half * 16) / 2;
+        __builtin_memcpy(&pb0, PL + prowL + bcol, 4);
+        __builtin_memcpy(&pb1, PL + prowL + bcol + 4, 4);
+        for (int u = 0; u < 16; ++u) {
+          int idx = lid * 16 + u, i = idx / 16, n2 = idx % 16;
+          int n = bc * 32 + half * 16 + n2;
+          int nib = (int)(n2 < 8 ? (pb0 >> (n2 * 4))
+                                 : (pb1 >> ((n2 - 8) * 4))) & 0xF;
+          sycl::half sc = SS[(size_t)g * TN + n];
+          if (half == 0)
+            sB0[i * 16 + n2] = sLut[nib] * sc;
+          else
+            sB1[i * 16 + n2] = sLut[nib] * sc;
+        }
+      }
+      sg.barrier();
+      for (int r = 0; r < UR; ++r) {
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, TR, TC,
+                         mx::layout::row_major>
+            ta;
+        mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, TC, 16,
+                         mx::layout::row_major>
+            tb;
+        sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space>
+            mpA(&sA[r * 128]);
+        mx::joint_matrix_load(sg, ta, mpA, TC);
+        mx::joint_matrix_load(
+            sg, tb,
+            sB0.template get_multi_ptr<sycl::access::decorated::legacy>(), 16);
+        mx::joint_matrix_mad(sg, acc[r], ta, tb, acc[r]);
+        mx::joint_matrix_load(
+            sg, tb, sB1.template get_multi_ptr<sycl::access::decorated::legacy>(),
+            16);
+        mx::joint_matrix_mad(sg, acc2[r], ta, tb, acc2[r]);
+      }
+      sg.barrier();
+    }
+    for (int r = 0; r < UR; ++r) {
+      mx::joint_matrix_store(
+          sg, acc[r],
+          sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+              &sC[r * 128]),
+          16, mx::layout::row_major);
+      mx::joint_matrix_store(
+          sg, acc2[r],
+          sycl::multi_ptr<float, sycl::access::address_space::local_space>(
+              &sC2[r * 128]),
+          16, mx::layout::row_major);
+    }
+    sg.barrier();
+    for (int u = 0; u < 32; ++u) {
+      int idx = lid * 32 + u, r = idx / 128, rest = idx % 128;
+      int rr = rest / 16, c = rest % 16;
+      int row = br * TR * UR + r * TR + rr;
+      if (row < M) {
+        C[(size_t)row * TN + bc * 32 + c] = sC[r * 128 + rr * 16 + c];
+        C[(size_t)row * TN + bc * 32 + 16 + c] =
+            sC2[r * 128 + rr * 16 + c];
+      }
+    }
+  }
+};
+
+void launch_chunkgemmpp2(sycl::queue &q, const sycl::half *A, const uint8_t *PL,
+			 const sycl::half *SS, float *C, int M, int K, int TN) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sB0(256, h);
+    sycl::local_accessor<sycl::half, 1> sB1(256, h);
+    sycl::local_accessor<float, 1> sC(128 * 4, h);
+    sycl::local_accessor<float, 1> sC2(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sLut(16, h);
+    h.parallel_for(
+        sycl::nd_range<1>({(size_t)(M / 32) * (TN / 32) * 16}, {16}),
+        ChunkGemmPP2{A, PL, SS, C, M, K, TN, sA, sB0, sB1, sC, sC2, sLut});
+  }).wait();
+}
+
+// Launcher (dead-strip guard per Concat2 lesson: raw L0 streams the SPV
+// module; SYCL side is the reference/extract source).
+void launch_chunkgemmpp(sycl::queue &q, const sycl::half *A, const uint8_t *PL,
+                        const sycl::half *SS, float *C, int M, int K, int TN) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<sycl::half, 1> sA(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sB(256, h);
+    sycl::local_accessor<float, 1> sC(128 * 4, h);
+    sycl::local_accessor<sycl::half, 1> sLut(16, h);
+    h.parallel_for(
+        sycl::nd_range<1>({(size_t)(M / 32) * (TN / 16) * 16}, {16}),
+        ChunkGemmPP{A, PL, SS, C, M, K, TN, sA, sB, sC, sLut});
   }).wait();
 }
 

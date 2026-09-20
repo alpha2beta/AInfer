@@ -1,0 +1,36 @@
+{
+ "schema": "b60-bench-v1",
+ "manifest_commit": "aad157a",
+ "prompt_tokens": 35,
+ "context_occupancy": 16,
+ "generated_tokens": 2,
+ "warm_state": "warm",
+ "model_load_seconds": null,
+ "tokenization_seconds": null,
+ "cache_initialization_seconds": null,
+ "prefill_seconds": 1.2301,
+ "prefill_tokens_per_second": 28.452971303146086,
+ "first_decode_seconds": null,
+ "cold_ttft_seconds": null,
+ "warm_ttft_seconds": null,
+ "decode_tokens_per_second": 29.51,
+ "accepted_tokens_per_second": null,
+ "mtp_acceptance_rate": null,
+ "peak_vram_bytes": null,
+ "metadata": {
+  "command": "clean HEAD 69f0941: decode_l0 --prefill-chunks=1 CHUNK_M=16 --ids-file=r2/exact16/ids.txt --max-new=1",
+  "run_type": "prefill_decode",
+  "kv_precision": "bf16",
+  "mtp_mode": "off",
+  "chunk_size": 16,
+  "warm_state": "warm",
+  "comparison_class": "local_reproduced",
+  "evidence": "tools/bench/evidence/r2_exact16.json",
+  "boundaries": {
+   "model_load_included": false,
+   "tokenization_included": false,
+   "prefill_start": "first chunk-list exec (chunk path) or first loop step (decode path)",
+   "prefill_end": "last chunk-list fence (chunk path)"
+  }
+ }
+}

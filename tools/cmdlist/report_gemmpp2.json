@@ -1,0 +1,17 @@
+{
+ "device": "B60",
+ "kernel": "_ZTS12ChunkGemmPP2",
+ "shape": [
+  256,
+  5120,
+  17408
+ ],
+ "iters": 3,
+ "replay_us": 56977.14,
+ "tflops": 0.8,
+ "worst_rel": 0.000217,
+ "ref_tol": 0.001,
+ "bitwise_deterministic": true,
+ "chunk_ok": true,
+ "note": "dual 16-col variant; NEGATIVE (0.80 TFLOPS vs PP1 2.27, baseline 1.57)"
+}
