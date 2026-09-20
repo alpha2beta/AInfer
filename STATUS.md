@@ -1,6 +1,6 @@
 # AInfer — Current Status (release truth)
 
-> Single-source current state. Updated 2026-09-20 (52/62 tasks done; Phase 9 underway at 4/5 — see §7).
+> Single-source current state. Updated 2026-09-20 (53/62 tasks done; Phase 9 complete, Gate M8 passed — see §7).
 > `progress.md` is the engineering log; this file is the release overview.
 > If they disagree, this file wins — fix the other one.
 
@@ -60,6 +60,7 @@
 | **Gate M5** | Phase 6: Quality qualification | ✅ **PASSED (2026-09-18)** | `report_quality_eval.json`: 187/200 passed (93.5%); `report_teacher_forced.json`: >80% top-1 match on generation continuations vs unquantized BF16 Hugging Face forward pass; `report_divergence_analysis.json`: 13 divergences categorized as benign phrasing/mental math; `report_long_context.json`: 4K needle retrieval 6/6 passed (100.0%), 16K/32K/64K tiers qualified with >= 12.76 GB free RAM; `report_kv8_quality.json`: BF16 KV confirmed as production default |
 | **Gate M6** | Phase 7: Performance characterization | ✅ **PASSED (2026-09-18, Updated 2026-09-19)** | `report_bench_t71.json`: load 9.88s, cold TTFT 240.2ms, warm TTFT 237.3ms, prefill 88.49 tok/s (peak 89.73 tok/s), sustained decode 35.54 tok/s (single-cmd profiling 35.81 tok/s), jitter p50=28.1ms p95=28.6ms; `report_roofline.json`: 1294.22 MiB/tok active traffic, 47.33 GB/s achieved bandwidth; `report_llama_comparison.json`: 35.54 tok/s outperforms llama.cpp Vulkan (29.33 tok/s) by 1.21x (+21.2%) and CPU baseline (9.98 tok/s) by 3.56x. **2026-09-20 note:** these figures are the last *committed* (HEAD `14014e5`/`eb7d06c`) evidence and remain valid. A currently uncommitted working-tree re-run (entangled with the unfinished dual-token MTP work) shows a regressed 30.48 tok/s decode / 104.44 tok/s prefill — unresolved, not yet root-caused, and must not be cited until reconciled. |
 | **Gate M7** | Phase 8: Persistent HTTP service | ✅ **PASSED (re-verified 2026-09-19)** | `report_http_stress.json` (re-run): 100/100 requests passed, 3250 tokens, mean TTFT 783.75 ms, mean latency 2144.53 ms, `"status": "PASSED"`, RSS +20 KB over 100 requests (`"zero_leak_verified": true`, checkpoints flat). History: Stamp 3 flagged the prior artifact (`FAILED`, 20 requests, +6.5 MB); re-verification showed that growth was CPython warmup transient (Run 1: +5 MB in first 10, flat after), and the warm-server re-run is clean. SSE streaming, cancellation recovery, and health endpoints verified as before. |
+| **Gate M8** | Phase 9: Hardening (T9.1–T9.5) | ✅ **PASSED (2026-09-20)** | `tools/fuzz/report_fault_inject.json`: **19/19 fault cases pass** — truncated/bad-magic containers, missing files, payload-CRC corruption, garbage/missing SPV, bad-magic/geometry/CRC/truncated/insane-position caches, valid + ENOSPC exports, 4 CLI garbage classes (exit 2, never SIGABRT). Three runtime fixes landed from findings: per-tensor payload-CRC verification at load (was silent-load), export short-write detection (was silent-true), SPIR-V magic+version pre-check (loader exits 10 on malformed modules). Residual: valid-header-but-corrupt-body SPV can still terminate inside the loader (child-process isolation out of scope). |
 
 ---
 
@@ -126,7 +127,9 @@ Next: resolve the remaining critical finding (root-cause and commit the dual-tok
 
 **T9.3 sanitizers (2026-09-19, Phase 9 at 3/5):** GCC 16.2.1 ASan+UBSan, leak detection on. New gate `tools/decode/run_sanitizers.sh`: 7/7 stages green — spans 29/29, guards 25/25, l0load 712/712, negatives 12/12, M4 7/7 bit-exact — zero findings, no suppressions. Dashboard 51/62.
 
-**T9.4 fuzzing (2026-09-20, Phase 9 at 4/5):** `fuzz_binfer.py` **1M iters, 0 findings** (worst 39.1 ms); `fuzz_cache_import` (ASan) **2k iters, 0 findings**; `fuzz_cli_parse` differential **2M iters, 0 findings**. Pre-fix shakedown caught 20 real escapes (unbounded u64 lengths → `MemoryError`/`OverflowError`) plus one CLI grammar mismatch — all fixed before the clean runs. Dashboard 52/62. Next: T9.5 fault injection (last Phase 9 task).
+**T9.4 fuzzing (2026-09-20, Phase 9 at 4/5):** `fuzz_binfer.py` **1M iters, 0 findings** (worst 39.1 ms); `fuzz_cache_import` (ASan) **2k iters, 0 findings**; `fuzz_cli_parse` differential **2M iters, 0 findings**. Pre-fix shakedown caught 20 real escapes (unbounded u64 lengths → `MemoryError`/`OverflowError`) plus one CLI grammar mismatch — all fixed before the clean runs. Dashboard 52/62.
+
+**T9.5 fault injection (2026-09-20, Phase 9 at 5/5, Gate M8 PASSED):** `fault_inject.py` + `fault_driver.cpp` **19/19 pass** (`tools/fuzz/report_fault_inject.json`). Three runtime fixes from findings: per-tensor payload-CRC at load (was silent-load), export short-write detection (was silent-true), SPV magic+version pre-check (loader exited 10). Dashboard 53/62. Phase 9 complete.
 
 
 

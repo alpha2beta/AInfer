@@ -469,6 +469,7 @@ private:
   bool init_level_zero();
   bool allocate_static_arenas();
   bool verify_bindings() const; // T9.1: init-time null + arena-containment audit
+  bool verify_payload_crcs(const std::string &path); // T9.5: per-tensor payload CRCs vs directory
   // T9.1: single range-checked container-offset resolvers (all call sites
   // delegate here; container offsets are untrusted input).
   void *checked_pay(const std::string &nm) const;

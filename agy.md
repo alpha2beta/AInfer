@@ -1,4 +1,4 @@
-# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-20, 52/62 done, Phase 9 at 4/5)
+# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-20, 53/62 done, Phase 9 complete)
 
 ## What it is
 
@@ -8,7 +8,7 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ---
 
-## Overall Health: Green (52/62 done; Phases 0/3/4/5/6/7/8 passed, Gates M0/M2b/M3/M4/M5/M6/M7 signed off; Phase 9 at 4/5 with T9.1–T9.4 done)
+## Overall Health: Green (53/62 done; Phases 0/3/4/5/6/7/8/9 passed, Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 | Phase | Milestone | Scope | Status |
 |---|---|---|---|
@@ -21,7 +21,7 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, needle tests | ✅ Done (6/6; 187/200 passed 93.5%, BF16 KV default) |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline model | ✅ Done (5/5; 35.54 tok/s committed, beats llama.cpp Vulkan by 1.21x — see uncommitted-regression note in `STATUS.md`) |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation | ✅ Done (4/4; 100/100 requests, +20 KB RSS, PASSED) |
-| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing | `[~]` In Progress (4/5; T9.1–T9.4 done) |
+| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | ✅ Done (5/5) |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 single-token done; dual-token uncommitted; T10.2 deferred) |
 
 ---
@@ -37,7 +37,6 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ## Immediate Next Actions
 
-1. **Phase 9 hardening** (T9.1–T9.5): typed spans, execution guards, ASan/UBSan, fuzzing, fault injection — now unblocked with M7 green.
-2. **Root-cause and commit the dual-token MTP work** (Stamp-3 leftover): `int4_gemv_m2`/`--speculative` code and its regenerated benchmarks sit uncommitted with an unresolved decode regression — investigate before committing.
-3. **Phase 1 remainder (M1 still open):** T1.2 container/rollback, T1.5 allocation-policy report, T1.6 contention benchmark, T1.7 bandwidth profile, T1.8 `258v` CTest preset — plus standalone T2.5 allocation utility (currently waived via T5.1 proof).
-4. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.
+1. **Root-cause and commit the dual-token MTP work** (Stamp-3 leftover): `int4_gemv_m2`/`--speculative` code and its regenerated benchmarks sit uncommitted with an unresolved decode regression — investigate before committing.
+2. **Phase 1 remainder (M1 still open):** T1.2 container/rollback, T1.5 allocation-policy report, T1.6 contention benchmark, T1.7 bandwidth profile, T1.8 `258v` CTest preset — plus standalone T2.5 allocation utility (currently waived via T5.1 proof).
+3. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.

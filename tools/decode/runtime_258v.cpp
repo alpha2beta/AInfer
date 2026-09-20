@@ -609,6 +609,47 @@ bool AInferRuntime258V::upload_weights(const std::string &path) {
   return true;
 }
 
+// T9.5: verify every tensor payload against its directory-entry CRC.
+// Previously the runtime checked only directory + MoE-section CRCs, so a
+// single-bit flip inside a weight payload loaded silently (found by fault
+// injection: corrupted container initialized successfully). The Python
+// validator and l0load both check these CRCs; the serving runtime now does
+// too. Cost is one extra sequential read pass (~19 GB, ~9 s at measured
+// 2.2 GB/s streaming bandwidth).
+bool AInferRuntime258V::verify_payload_crcs(const std::string &path) {
+  std::ifstream f(path, std::ios::binary);
+  if (!f) return false;
+
+  const size_t CH = 64u << 20; // 64 MiB staging (same budget as upload)
+  std::vector<char> staging(CH);
+
+  size_t checked = 0;
+  for (const auto &kv : entries_) {
+    const BinferEntry &e = kv.second;
+    uint64_t done = 0;
+    uint32_t crc = 0;
+    while (done < e.d_bytes) {
+      size_t c = (size_t)std::min<uint64_t>(e.d_bytes - done, CH);
+      f.clear();
+      f.seekg((std::streamoff)(e.d_off + done));
+      f.read(staging.data(), c);
+      if ((size_t)f.gcount() != c) {
+        std::fprintf(stderr, "Payload CRC: short read on tensor '%s'\n", e.name);
+        return false;
+      }
+      crc = crc32_compute(crc, (const uint8_t *)staging.data(), c);
+      done += c;
+    }
+    if (crc != e.crc) {
+      std::fprintf(stderr, "Payload CRC mismatch on tensor '%s'\n", e.name);
+      return false;
+    }
+    ++checked;
+  }
+  std::printf("[AInfer 258V]    Payload CRCs verified: %zu tensors\n", checked);
+  return true;
+}
+
 bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   std::ifstream spv_f(spv_path, std::ios::binary);
   if (!spv_f) {
@@ -620,6 +661,28 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   spv_f.seekg(0, std::ios::beg);
   std::vector<uint8_t> spv(spv_size);
   spv_f.read((char *)spv.data(), spv_size);
+
+  // T9.5: validate the SPIR-V header BEFORE zeModuleCreate. The Level Zero
+  // loader terminates the whole process (exit 10, "InvalidModule ...") on
+  // malformed modules instead of returning a ze_result_t, so passing
+  // unchecked bytes through violates clean termination (found by fault
+  // injection: garbage bytes and valid-magic garbage both exited 10).
+  // Header is 5 words: magic 0x07230203, version 1.0-1.6, generator,
+  // bound, schema. Residual limitation: a module with a fully valid header
+  // but corrupt body can still terminate inside the loader — only isolating
+  // compilation in a child process would contain that (out of scope;
+  // realistic disk faults produce magic/version damage, which this catches).
+  static const uint8_t kSpvMagic[4] = {0x03, 0x02, 0x23, 0x07};
+  bool spv_ok = (spv_size >= 20 && std::memcmp(spv.data(), kSpvMagic, 4) == 0);
+  if (spv_ok) {
+    uint32_t spv_ver = 0;
+    std::memcpy(&spv_ver, spv.data() + 4, 4);
+    spv_ok = (spv_ver >= 0x00010000u && spv_ver <= 0x00010600u);
+  }
+  if (!spv_ok) {
+    std::fprintf(stderr, "Invalid SPIR-V module (bad magic/version or truncated header)\n");
+    return false;
+  }
 
   ze_module_desc_t mdesc = {ZE_STRUCTURE_TYPE_MODULE_DESC, nullptr, ZE_MODULE_FORMAT_IL_SPIRV,
                             spv_size, spv.data(), nullptr, nullptr};
@@ -1135,6 +1198,11 @@ bool AInferRuntime258V::init(const std::string &binfer_path, const std::string &
   std::printf("[AInfer 258V] 4. Streaming weights into static GPU arenas\n");
   auto t0 = std::chrono::steady_clock::now();
   if (!upload_weights(binfer_path)) return false;
+  std::printf("[AInfer 258V] 4b. Verifying tensor payload CRCs (T9.5)\n");
+  if (!verify_payload_crcs(binfer_path)) {
+    std::fprintf(stderr, "[AInfer 258V] Payload CRC verification FAILED\n");
+    return false;
+  }
   auto t1 = std::chrono::steady_clock::now();
   double upload_s = std::chrono::duration<double>(t1 - t0).count();
   double total_gb = ((pay_hi_ - pay_lo_) + (sc_hi_ - sc_lo_)) / 1e9;
@@ -2157,6 +2225,15 @@ bool AInferRuntime258V::export_diagnostic_cache(const std::string &cache_file, u
   out.write((const char *)kv_buf.data(), kv_buf.size());
   out.write((const char *)ssm_buf.data(), ssm_buf.size());
   out.write((const char *)conv_buf.data(), conv_buf.size());
+  // T9.5: short-write/ENOSPC visibility — ofstream failures set badbit but
+  // never throw, so an unchecked return here used to report success on a
+  // truncated file. Flush forces the error state before judging.
+  out.flush();
+  if (!out) {
+    std::fprintf(stderr, "Diagnostic cache export failed writing '%s' (short write or disk error)\n",
+                 cache_file.c_str());
+    return false;
+  }
   return true;
 }
 
@@ -2175,6 +2252,16 @@ bool AInferRuntime258V::import_diagnostic_cache(const std::string &cache_file, u
       hdr.ssm_bytes_total != (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float) ||
       hdr.conv_bytes_total != (size_t)NUM_DELTANET_LAYERS * C_QKV * 3 * sizeof(float)) {
     std::fprintf(stderr, "Diagnostic cache geometry mismatch\n");
+    return false;
+  }
+
+  // T9.5: the payload CRC does NOT cover the header, so a corrupt position
+  // would sail through checksum validation and poison h_ctrl_/d_ctrl_.
+  // Reject out-of-range positions at the boundary (StepGuard re-validates
+  // at submit time as defense in depth).
+  if (hdr.position >= max_ctx_) {
+    std::fprintf(stderr, "Diagnostic cache position %u out of range (max_ctx %u)\n",
+                 hdr.position, max_ctx_);
     return false;
   }
 

@@ -14,8 +14,8 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 9 (Memory Safety and Operational Hardening — T9.1–T9.4 done, T9.5 open); Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) still open
-- **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7 signed off — M7 re-verified 2026-09-19 with genuine PASSED report; Phase 9 underway at 4/5)
+- **Current Focus:** Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) and T10.2/vision (deferred); Phase 9 complete
+- **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
 
@@ -115,10 +115,10 @@
 | **Phase 6** | M5: Quality Qualified | 200-case corpus, teacher-forced agreement, long-context tiers | ✅ **Done** | 6 / 6 |
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline, llama.cpp comp | ✅ **Done** | 5 / 5 |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
-| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | `[~]` In Progress (T9.1–T9.4 Done) | 4 / 5 |
+| **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | ✅ **Done** | 5 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done; dual-token extension uncommitted) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **52 / 62** |
+| **Total** | | | | **53 / 62** |
 
 ---
 
@@ -230,7 +230,7 @@
 | **T9.2** | Kernel execution guards & argument validation | `[x]` | 8 device guard sites + host `StepGuard`, 25/25 unit tests, M4 7/7 bit-exact |
 | **T9.3** | ASan & UBSan test verification | `[x]` | `run_sanitizers.sh` 7/7 stages green, zero findings |
 | **T9.4** | Automated fuzzing harness | `[x]` | binfer 1M iters + cache-import 2k (ASan) + CLI 2M diff-fuzz, 0 findings; 20 pre-fix bugs fixed |
-| **T9.5** | Fault injection testing | `[ ]` | Corrupt files, short writes, device loss tests |
+| **T9.5** | Fault injection testing | `[x]` | 19/19 fault cases pass; 3 runtime fixes (payload CRC, export check, SPV pre-check) |
 
 ### Phase 10: Exploratory & Deferred Scope
 
@@ -465,3 +465,8 @@
   - `tools/fuzz/fuzz_cache_import.cpp` (ASan+UBSan, in-process `import_diagnostic_cache`, valid exported cache as seed): **2000 iters, 0 findings, worst 0.30 s** — header/geometry/payload mutants all rejected cleanly.
   - `tools/fuzz/fuzz_cli_parse.cpp` (differential vs independent oracle): **2,000,000 iters + 38 fixed edge cases, 0 findings**; one grammar mismatch fixed (explicit digit-scan replaced `stol` whitespace/`+` quirks).
   - Dashboard **52/62**. Only T9.5 remains in Phase 9.
+- **2026-09-20 (T9.5 fault injection — DONE, Phase 9 at 5/5, Gate M8 PASSED):**
+  - New `tools/fuzz/fault_inject.py` + `fault_driver.cpp`: **19/19 cases pass** (`tools/fuzz/report_fault_inject.json`) — container faults (rc 1 / init=false), cache faults incl. CRC-valid-but-insane position (import=false, sentinel untouched), ENOSPC export (now false), CLI garbage (exit 2, never SIGABRT).
+  - Three real findings fixed: per-tensor payload-CRC verification at load (was silent-load; +~9 s, mirrors l0load), export short-write detection (was silent-true), SPIR-V magic+version pre-check (loader exited 10 on garbage; residual valid-header corruption documented as driver limitation).
+  - Harness lessons: 19 GiB `bytearray(f.read())` mutation got OOM-killed twice — rewritten to copy + seek-write; added `--resume` after two external kills mid-run. True mid-run device loss not simulable (T8.3 health monitoring covers it instead).
+  - Dashboard **53/62**. Phase 9 complete; remaining open work is Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) plus deferred T10.2/vision.

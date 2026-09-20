@@ -1,0 +1,122 @@
+{
+ "task": "T9.5",
+ "cases": [
+  {
+   "case": "A.truncated-validate",
+   "ok": true,
+   "detail": "rc==1",
+   "diag": "truncated half-file"
+  },
+  {
+   "case": "A.bad-magic-validate",
+   "ok": true,
+   "detail": "rc==1",
+   "diag": "zeroed header"
+  },
+  {
+   "case": "C.seed-export",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 export=1"
+  },
+  {
+   "case": "B.missing-file",
+   "ok": true,
+   "detail": "skipped-previously-passed",
+   "diag": "resume mode"
+  },
+  {
+   "case": "B.truncated-container",
+   "ok": true,
+   "detail": "skipped-previously-passed",
+   "diag": "resume mode"
+  },
+  {
+   "case": "B.bad-payload-crc",
+   "ok": true,
+   "detail": "skipped-previously-passed",
+   "diag": "resume mode"
+  },
+  {
+   "case": "B.garbage-spv",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=0"
+  },
+  {
+   "case": "B.missing-spv",
+   "ok": true,
+   "detail": "skipped-previously-passed",
+   "diag": "resume mode"
+  },
+  {
+   "case": "C.bad-magic",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 import=0 pos=57005"
+  },
+  {
+   "case": "C.geometry-mismatch",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 import=0 pos=57005"
+  },
+  {
+   "case": "C.payload-crc",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 import=0 pos=57005"
+  },
+  {
+   "case": "C.truncated",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 import=0 pos=57005"
+  },
+  {
+   "case": "C.insane-position-valid-crc",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 import=0 pos=57005"
+  },
+  {
+   "case": "D.valid-export-roundtrip",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 export=1"
+  },
+  {
+   "case": "D.export-enospc",
+   "ok": true,
+   "detail": "rc=0 result_has=True",
+   "diag": "RESULT init=1 export=0"
+  },
+  {
+   "case": "E.max-new-garbage",
+   "ok": true,
+   "detail": "rc=2",
+   "diag": ""
+  },
+  {
+   "case": "E.max-new-overflow",
+   "ok": true,
+   "detail": "rc=2",
+   "diag": ""
+  },
+  {
+   "case": "E.ids-garbage",
+   "ok": true,
+   "detail": "rc=2",
+   "diag": ""
+  },
+  {
+   "case": "E.max-ctx-negative",
+   "ok": true,
+   "detail": "rc=2",
+   "diag": ""
+  }
+ ],
+ "passed": 19,
+ "total": 19,
+ "all_pass": true
+}

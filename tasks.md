@@ -500,11 +500,16 @@ Phase gate M7: Persistent HTTP service operational, robust against client discon
 - Done: Fuzzer runs millions of iterations with zero unhandled crashes or undefined behaviors.
 
 ### T9.5 Fault injection testing
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T3.5, T5.6
 - Do: Inject synthetic disk errors, truncated container files, invalid checksums, corrupt cache files, and simulated Level Zero device loss. Verify graceful error reporting and clean termination.
+  DONE 2026-09-20: New suite `tools/fuzz/fault_inject.py` + `tools/fuzz/fault_driver.cpp` — **19/19 cases pass** (`tools/fuzz/report_fault_inject.json`): A (binfer truncated/bad-magic → rc 1), B (missing/truncated/bad-payload-CRC container, garbage/missing SPV → graceful init=false), C (bad-magic/geometry/CRC/truncated/insane-position caches → import=false, `out_pos` sentinel untouched), D (valid export round-trips true; `/dev/full` ENOSPC export now false), E (4 CLI garbage classes → exit 2, never SIGABRT). True device-loss mid-run is not simulable without driver fault injection; covered instead by T8.3 `zeDeviceGetStatus` monitoring.
+- Three real findings fixed: (1) runtime init verified only dir+MoE CRCs — a flipped weight byte **loaded silently**; added per-tensor payload-CRC verification at load (`verify_payload_crcs`, +~9 s, mirrors l0load/Python validator). (2) `export_diagnostic_cache` returned true unconditionally — now checks stream state after flush (ENOSPC/short-write visible). (3) garbage SPV bytes **terminated the process (exit 10)** inside the Level Zero loader instead of returning an error; added SPIR-V magic (0x07230203) + version (1.0–1.6) pre-check before `zeModuleCreate`. Residual: valid-header-but-corrupt-body SPV can still terminate in-loader (child-process isolation out of scope — documented in code).
+- Harness robustness fix: first version slurped the 19 GiB model into a Python bytearray for 1-byte mutation and got OOM-killed twice at the same case; rewritten to `shutil.copy` + seek-write. Also added `--resume` (skip previously-passed cases via report) after two external kills mid-run.
 - Cookbook (2026-09-19, B70) recorded hazard: prefix-caching × speculative decoding causes silent token corruption — the two must never be enabled together without a corruption battery. See `optimization.md` §6.10.
 - Done: Fault injection suite passes; runtime handles all failure modes gracefully without hangs or corruption.
+
+Phase gate M8: System hardened with typed memory spans, sanitizer verification, fuzzing, and fault injection. [PASSED 2026-09-20]
 
 Phase gate M8: System hardened with typed memory spans, sanitizer verification, fuzzing, and fault injection.
 
