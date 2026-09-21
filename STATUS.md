@@ -137,6 +137,8 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 
 **KV8 Trunk + 128K Update (2026-09-21):** Standalone KV8 primitives qualified (B=1 worst 7.9e-4, B=2 worst 7.15e-7, deterministic) and trunk-only KV8 behind `AINFER_KV8=1` is short-context parity-qualified: 8-token prompt identical output, 64-token/8-gen identical output (sample ids `[151644, 8948, 198, 2610, 525, 264, 10925, 151645]`). Quality: corpus 186/200 (93.0%) both BF16 and KV8, 4K needle 6/6 both. 128K arenas allocate and decode identically in BF16 (2565.0 MiB) and KV8 (1282.5 MiB): `report_kv8_128k_alloc.json` and `report_kv8_128k_positioned.json` (8-token prefill + 5 decodes at `max_ctx=131328`). Full 128K prefill remains unmeasured (16K already 11.3 min). Tier 5 (128K) added to `memory_budget.json` as `PASS_ALLOC_AND_POSITIONED_DECODE`.
 
+**KV8 16K Scale (2026-09-21):** 16K real prefill: BF16 678,505 ms (24.15 tok/s) vs KV8 550,544 ms (29.76 tok/s, 1.23×). 16K needle: KV8 4/4 (100%) vs BF16 3/4 (one `OUT_OF_DEVICE_MEMORY` during init on the distract case). At 16K+ KV8 is the stable path; production default stays BF16 for <16K.
+
 
 
 

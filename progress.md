@@ -504,3 +504,5 @@
   - Extended trunk KV8 to MTP draft and B=2 verification behind `AINFER_KV8=1`. MTP parity: **160/160 bit-exact** vs KV8 greedy baseline, 35.43→43.77 tok/s (1.235x) vs BF16 MTP 35.66→44.96 tok/s (1.261x). Committed as `f1bcb80` with `report_mtp_kv8.json`.
 - **2026-09-21 (128K positioned decode — DONE):**
   - Ran `max_ctx=131328` init + 8-token prefill + 5 decodes: both BF16 (2565.0 MiB) and KV8 (1282.5 MiB) produce identical token stream `[62497, 148287, 198, 220, 16]`. Reports: `report_kv8_128k_alloc.json`, `report_kv8_128k_positioned.json`. Full 128K prefill remains unmeasured (16K already 11.3 min).
+- **2026-09-21 (KV8 16K scale — DONE):**
+  - Real 16K prefill: BF16 678,505 ms (24.15 tok/s) vs KV8 **550,544 ms (29.76 tok/s, 1.23×)**. 16K needle 16000 tokens: KV8 **4/4 (100%)** vs BF16 3/4 (one `OUT_OF_DEVICE_MEMORY` at init on the distract case). At 16K+ KV8 is the stable/faster path; production default stays BF16 for short context. Reports: `report_prefill_16k_258v.json` (BF16), `report_prefill_16k_kv8.json`, `report_long_context_16k_kv8.json` vs `report_long_context_16k_bf16.json`, `report_kv8_16k_scale.json`.

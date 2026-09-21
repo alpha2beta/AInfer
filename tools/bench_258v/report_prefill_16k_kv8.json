@@ -1,0 +1,14 @@
+{
+  "task": "T7.2-16K-real",
+  "device": "Intel(R) Arc(TM) Graphics",
+  "model": "models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer",
+  "prompt_tokens": 16384,
+  "max_context": 16640,
+  "init_ms": 45251,
+  "warmup_prefill_ms": 550527,
+  "measured_prefill_ms": 550544,
+  "measured_prefill_tok_per_s": 29.7597,
+  "first_token": 151644,
+  "method": "real_wall_clock_single_process_bf16_kv_no_mtp",
+  "status": "PASSED"
+}

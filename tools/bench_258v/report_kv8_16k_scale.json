@@ -1,0 +1,18 @@
+{
+  "task": "T7.2-16K-KV8-scale",
+  "status": "PASSED",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "method": "real_wall_clock_single_process_no_mtp",
+  "bf16": {
+    "prefill_ms": 678505,
+    "tok_per_s": 24.15,
+    "needle_16k": "3/4 (one OUT_OF_DEVICE_MEMORY on distract case)"
+  },
+  "kv8": {
+    "prefill_ms": 550544,
+    "tok_per_s": 29.76,
+    "speedup_vs_bf16": 1.23,
+    "needle_16k": "4/4 (100%)"
+  },
+  "verdict": "KV8 is 23% faster at 16K prefill and passed the one 16K needle case that OOM'd in BF16; both modes remain functionally correct. Production default stays BF16 for <64K; KV8 is now qualified optional at 16K+."
+}
