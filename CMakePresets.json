@@ -17,13 +17,32 @@
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build-host",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "258v",
+      "displayName": "AInfer on Arc 140V (host clang++, Release)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-258v",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
+        "AINFER_BUILD_CMDLIST": "OFF",
+        "AINFER_ZE_LOADER": "${sourceDir}/tools/toolchain/sysroot/usr/lib/libze_loader.so.1"
+      }
     }
   ],
   "buildPresets": [
     { "name": "b60", "configurePreset": "b60" },
-    { "name": "host", "configurePreset": "host" }
+    { "name": "host", "configurePreset": "host" },
+    { "name": "258v", "configurePreset": "258v" }
   ],
   "testPresets": [
-    { "name": "b60", "configurePreset": "b60", "output": { "outputOnFailure": true } }
+    { "name": "b60", "configurePreset": "b60", "output": { "outputOnFailure": true } },
+    {
+      "name": "258v",
+      "configurePreset": "258v",
+      "output": { "outputOnFailure": true },
+      "filter": { "include": { "name": "l0_timestamp_smoke" } }
+    }
   ]
 }

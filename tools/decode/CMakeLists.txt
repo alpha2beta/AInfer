@@ -19,4 +19,6 @@ target_include_directories(decode_l0 PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/../l0probe/include)
 target_link_libraries(decode_l0 PRIVATE
   /usr/lib/x86_64-linux-gnu/libze_loader.so.1)
-add_dependencies(decode_l0 spv_mods)
+if(TARGET spv_mods)
+  add_dependencies(decode_l0 spv_mods)
+endif()

@@ -1,0 +1,38 @@
+{
+  "task": "T10.1-followup",
+  "title": "MTP per-submit timing profile",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "date": "2026-09-21",
+  "source": "AINFER_SPEC_PROFILE=1 tools/mtp/bench_speculative_258v.cpp",
+  "samples": 96,
+  "accepted": 66,
+  "acceptance_rate": 0.6875,
+  "units": "milliseconds",
+  "means": {
+    "host_setup": 0.000,
+    "dual_verify": 45.989,
+    "decision": 0.001,
+    "rollback": 0.392,
+    "state_copy": 0.048,
+    "draft": 3.282,
+    "round_total": 49.713,
+    "unattributed": 0.001
+  },
+  "medians": {
+    "dual_verify": 45.989,
+    "rollback": 0.000,
+    "state_copy": 0.045,
+    "draft": 3.279,
+    "round_total": 49.587
+  },
+  "accepted_rounds": {
+    "count": 66,
+    "round_total_mean": 49.399
+  },
+  "rejected_rounds": {
+    "count": 30,
+    "round_total_mean": 50.405,
+    "rollback_mean": 1.307
+  },
+  "verdict": "The prior 5-9 ms integration-overhead estimate was an artifact of subtracting medians from a different harness run. In this timestamped run, round time is accounted for by dual verification, draft, rollback, and the 2 KiB state copy; the remaining host/queue gap is approximately 0.001 ms. Optimization target is dual-token verification (45.99 ms), not host gating or rollback."
+}

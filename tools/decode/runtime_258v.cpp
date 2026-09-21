@@ -3198,6 +3198,8 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
   d_tokens_chunk_[0] = cur_tok;
   d_tokens_chunk_[1] = draft_tok;
 
+  auto t_setup1 = std::chrono::high_resolution_clock::now();
+
   // 3. Execute dual-token verification forward pass (B = 2)
   auto t_v0 = std::chrono::high_resolution_clock::now();
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_verify_m2_, fence_));
@@ -3209,8 +3211,9 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
   int true_t1 = d_verify_tokens_[0];
   int true_t2 = d_verify_tokens_[1];
   bool accepted = (draft_tok == true_t1);
+  auto t_decision1 = std::chrono::high_resolution_clock::now();
 
-  double rb_ms = 0.0, dr_ms = 0.0;
+  double rb_ms = 0.0, dr_ms = 0.0, copy_ms = 0.0;
 
   if (accepted) {
     // ACCEPTED: Both Token 1 (draft) and Token 2 are correct!
@@ -3226,8 +3229,11 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
     std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
     // Update d_x_ to point to Token 1 hidden state for subsequent drafting
+    auto t_copy0 = std::chrono::high_resolution_clock::now();
     CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_x_, d_x_chunk_ + HIDDEN_DIM, HIDDEN_DIM * sizeof(float), nullptr, 0, nullptr));
     CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+    auto t_copy1 = std::chrono::high_resolution_clock::now();
+    copy_ms = std::chrono::duration<double, std::milli>(t_copy1 - t_copy0).count();
 
     // Draft next candidate from true_t2
     pending_draft_token_ = -1;
@@ -3252,8 +3258,11 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
     std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
     // Update d_x_ to point to Token 0 hidden state for subsequent drafting
+    auto t_copy0 = std::chrono::high_resolution_clock::now();
     CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_x_, d_x_chunk_, HIDDEN_DIM * sizeof(float), nullptr, 0, nullptr));
     CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+    auto t_copy1 = std::chrono::high_resolution_clock::now();
+    copy_ms = std::chrono::duration<double, std::milli>(t_copy1 - t_copy0).count();
 
     // Draft next candidate from true_t1
     pending_draft_token_ = -1;
@@ -3268,8 +3277,12 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
 
   static const char *prof_env = std::getenv("AINFER_SPEC_PROFILE");
   if (prof_env && prof_env[0] == '1') {
-    std::printf("    [SPEC_PROF] Verify: %.2f ms | Draft: %.2f ms | Rollback: %.2f ms | Accepted: %s\n",
-                v_ms, dr_ms, rb_ms, accepted ? "YES" : "NO");
+    double setup_ms = std::chrono::duration<double, std::milli>(t_setup1 - t0).count();
+    double decision_ms = std::chrono::duration<double, std::milli>(t_decision1 - t_v1).count();
+    double total_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    std::printf("    [SPEC_PROF] setup=%.3f verify=%.3f decision=%.3f rollback=%.3f copy=%.3f draft=%.3f total=%.3f accepted=%s\n",
+                setup_ms, v_ms, decision_ms, rb_ms, copy_ms, dr_ms, total_ms,
+                accepted ? "YES" : "NO");
   }
 
   return true;
