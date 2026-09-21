@@ -260,10 +260,9 @@ int main(int argc, char **argv) {
     CHECK(zeKernelSetArgumentValue(ker, 6, sizeof(int), &iW));
     CHECK(zeKernelSetArgumentValue(ker, 7, sizeof(int), &iKB));
     CHECK(zeKernelSetArgumentValue(ker, 8, (size_t)8 * 256 * 2, nullptr));
-    CHECK(zeKernelSetArgumentValue(ker, 9, (size_t)256 * 16 * 2, nullptr));
-    CHECK(zeKernelSetArgumentValue(ker, 10, (size_t)16 * 256 * 2, nullptr));
+    CHECK(zeKernelSetArgumentValue(ker, 9, (size_t)16 * 16 * 2, nullptr));
+    CHECK(zeKernelSetArgumentValue(ker, 10, (size_t)256 * 2, nullptr));
     CHECK(zeKernelSetArgumentValue(ker, 11, (size_t)8 * 16 * 4, nullptr));
-    CHECK(zeKernelSetArgumentValue(ker, 12, (size_t)8 * 256 * 4, nullptr));
     int nG = (M + 7) / 8;
     ze_command_list_handle_t ex = nullptr;
     CHECK(zeCommandListCreate(ctx, dev, &ldesc, &ex));

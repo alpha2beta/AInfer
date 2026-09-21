@@ -65,6 +65,62 @@ void launch_controladd(sycl::queue &q, float *Out, const float *In,
   }).wait();
 }
 
+// P6 fused chunk-layer: batched RMSNorm for M rows (M up to 512, H=5120).
+// Each workgroup handles one row (256 threads, 2KB SLM), M groups total.
+// Same numerics as RMSNormW (double tree), just batched to cut M launches
+// per layer from M to 1. Launch: nd_range M*256, group 256, SLM 256 doubles.
+struct RMSNormBatch {
+  float *Y;
+  const float *X;
+  const float *W;
+  int H, M;
+  sycl::local_accessor<double, 1> PS; // 256 per workgroup
+  void operator()(sycl::nd_item<1> it) const {
+    int m = (int)it.get_group(0);
+    int lid = (int)it.get_local_id(0);
+    if (m >= M) return;
+    const float *x = X + (size_t)m * H;
+    float *y = Y + (size_t)m * H;
+    if (H != 5120) {
+      if (lid == 0) {
+        double ss = 0; for (int j = 0; j < H; ++j) { float v = x[j]; ss += (double)v * v; }
+        float inv = 1.0f / sycl::sqrt((float)(ss / H) + 1e-6f);
+        for (int j = 0; j < H; ++j) y[j] = x[j] * inv * (1.0f + W[j]);
+      }
+      return;
+    }
+    double ss = 0;
+    for (int j = lid; j < 5120; j += 256) { float v = x[j]; ss += (double)v * v; }
+    PS[lid] = ss;
+    it.barrier(sycl::access::fence_space::local_space);
+    for (int st = 128; st > 0; st >>= 1) { if (lid < st) PS[lid] += PS[lid + st]; it.barrier(sycl::access::fence_space::local_space); }
+    double tot = PS[0];
+    float inv = 1.0f / sycl::sqrt((float)(tot / 5120) + 1e-6f);
+    for (int j = lid; j < 5120; j += 256) y[j] = x[j] * inv * (1.0f + W[j]);
+  }
+};
+struct ResAddBatch {
+  float *R;
+  const float *A;
+  const float *B;
+  int H, M;
+  void operator()(sycl::id<1> id) const {
+    size_t idx = id[0]; size_t total = (size_t)H * M;
+    if (idx >= total) return;
+    R[idx] = A[idx] + B[idx];
+  }
+};
+
+void launch_rmsnorm_batch(sycl::queue &q, float *Y, const float *X, const float *W, int H, int M) {
+  q.submit([&](sycl::handler &h) {
+    sycl::local_accessor<double, 1> ps(256, h);
+    h.parallel_for(sycl::nd_range<1>({(size_t)M * 256}, {256}), RMSNormBatch{Y, X, W, H, M, ps});
+  }).wait();
+}
+void launch_resadd_batch(sycl::queue &q, float *R, const float *A, const float *B, int H, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)H * M), ResAddBatch{R, A, B, H, M}); }).wait();
+}
+
 // T5.3 layer-class prototype: decode-exact RMSNorm (1+w, eps 1e-6, single row)
 // + residual-add with control-block position bias. Together with SiluMul they
 // form a 3-kernel recorded list: norm -> silu-mul -> residual, the same
@@ -1549,6 +1605,91 @@ struct ChunkFlashAttn {
   }
 };
 
+// P8 v2: 4-batched KV positions + private Q (SLM Q removed in DPAS path).
+// Reduces barriers from ~10 per 16 keys to ~2.5 per 16 keys (0.25/pos) plus
+// one SLM exchange per 64 keys. Private Q loaded via global joint_matrix
+// (stride 256) instead of SLM staging. Requires SG16 (hardcoded shuffle).
+struct ChunkFlashAttnV2 {
+  const sycl::half *Q;
+  const uint16_t *Kc;
+  const uint16_t *Vc;
+  float *O;
+  int P, M, W, KB;
+  sycl::local_accessor<sycl::half, 1> sQ;
+  sycl::local_accessor<sycl::half, 1> sKs4;
+  sycl::local_accessor<sycl::half, 1> sVs;
+  sycl::local_accessor<float, 1> sC4;
+  void operator()(sycl::nd_item<1> it) const __attribute__((intel_reqd_sub_group_size(16))) {
+    auto sg = it.get_sub_group();
+    int gid = (int)it.get_group(0);
+    int m8 = gid / 24, hh = gid % 24;
+    int k2 = hh / 6;
+    int m0 = m8 * 8;
+    if (m0 >= M) return;
+    int lid = (int)sg.get_local_id()[0];
+    for (int u = 0; u < 128; ++u) { int idx = lid*128+u, r=idx/256, c=idx%256; sycl::half v=sycl::half(0); if(r<8 && m0+r<M) v=Q[((size_t)(m0+r)*24+hh)*256+c]; sQ[(size_t)r*256+c]=v; }
+    sg.barrier();
+    float mx[8], ls[8], resc[8], myO[128];
+    for(int r=0;r<8;++r){mx[r]=-1e30f; ls[r]=0; resc[r]=0;}
+    for(int k=0;k<128;++k) myO[k]=0.0f;
+    for(int kb=0; kb<W; kb+=KB){
+      int row_valid=0; for(int r=0;r<8;++r) if(m0+r<M && kb < P+m0+r+1) row_valid=1;
+      if(!row_valid) continue;
+      for(int c0=0; c0<KB && kb+c0<W; c0+=64){
+        int tiles=0; for(int t=0;t<4;++t) if(kb+c0+t*16 < W) tiles++;
+        if(tiles==0) continue;
+        mx::joint_matrix<sycl::sub_group, float, mx::use::accumulator, 8,16,mx::layout::dynamic> acc[4];
+        for(int t=0;t<tiles;++t) mx::joint_matrix_fill(sg, acc[t], 0.0f);
+        for(int kt=0; kt<256; kt+=16){
+          for(int t=0;t<tiles;++t){
+            for(int u=0; u<16; ++u){ int idx=lid*16+u, i=idx/16, n2=idx%16; int tt=kb+c0+t*16+n2; sycl::half vk=sycl::half(0); if(tt<W){ uint32_t uk=(uint32_t)Kc[((size_t)tt*4+k2)*256+kt+i]<<16; float fk; __builtin_memcpy(&fk,&uk,4); vk=sycl::half(fk);} sKs4[(size_t)t*256+i*16+n2]=vk; }
+          }
+          sg.barrier();
+          for(int t=0;t<tiles;++t){
+            mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::a, 8,16,mx::layout::row_major> ta;
+            mx::joint_matrix<sycl::sub_group, sycl::half, mx::use::b, 16,16,mx::layout::row_major> tb;
+            sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space> mpQ(&sQ[(size_t)kt]);
+            mx::joint_matrix_load(sg, ta, mpQ, 256);
+            sycl::multi_ptr<sycl::half, sycl::access::address_space::local_space> mpK(&sKs4[(size_t)t*256]);
+            mx::joint_matrix_load(sg, tb, mpK, 16);
+            mx::joint_matrix_mad(sg, acc[t], ta, tb, acc[t]);
+          }
+          sg.barrier();
+        }
+        for(int t=0;t<tiles;++t) mx::joint_matrix_store(sg, acc[t], sycl::multi_ptr<float, sycl::access::address_space::local_space>(&sC4[(size_t)t*128]), 16, mx::layout::row_major);
+        sg.barrier();
+        for(int r=0;r<8;++r){
+          int m=m0+r; int tlim=(m<M)?(P+m+1):kb; float m_old=mx[r], l_old=ls[r]; float m_new=m_old; float psum[64];
+          for(int c=0;c<tiles*16;++c){ int tpos=kb+c0+c; float s=(tpos<tlim)? sC4[(size_t)(c/16)*128 + r*16 + (c%16)]*(1.0f/16.0f) : -1e30f; if(s>m_new) m_new=s; psum[c]=s; }
+          float R=(m_old<=-1e29f)?0.0f:sycl::exp(m_old-m_new); float l_new=l_old*R;
+          for(int c=0;c<tiles*16;++c){ int tpos=kb+c0+c; float pw=(tpos<tlim)? sycl::exp(psum[c]-m_new):0.0f; l_new+=pw; sC4[(size_t)(c/16)*128 + r*16 + (c%16)]=pw; }
+          resc[r]=R; mx[r]=m_new; ls[r]=l_new;
+        }
+        sg.barrier();
+        for(int k=0;k<128;++k){ int dd=lid+16*k, rr=dd/256; myO[k]*=resc[rr]; }
+        for(int t=0;t<tiles;++t){
+          for(int c=0;c<16;++c){
+            int tt=kb+c0+t*16+c;
+            for(int u=0;u<16;++u){ int d=lid*16+u; sycl::half vv=sycl::half(0); if(d<256 && tt<W){ uint32_t uv=(uint32_t)Vc[((size_t)tt*4+k2)*256+d]<<16; float fv; __builtin_memcpy(&fv,&uv,4); vv=sycl::half(fv);} sVs[d]=vv; } sg.barrier();
+            for(int k=0;k<128;++k){ int dd=lid+16*k, rr=dd/256, d=dd%256; myO[k]+=sC4[(size_t)t*128+rr*16+c]*(float)sVs[d]; } sg.barrier();
+          }
+        }
+      }
+    }
+    for(int k=0;k<128;++k){ int dd=lid+16*k, r=dd/256, d=dd%256; int m=m0+r; float inv=(r<8&&m<M&&ls[r]>0)?1.0f/ls[r]:0.0f; float v=(r<8&&m<M)?myO[k]*inv:0.0f; if(r<8&&m<M) O[((size_t)m*24+hh)*256+d]=v; }
+  }
+};
+void launch_chunkflashattn_v2(sycl::queue &q, const sycl::half *Q, const uint16_t *Kc, const uint16_t *Vc, float *O, int P,int M,int W,int KB){
+  q.submit([&](sycl::handler &h){
+    sycl::local_accessor<sycl::half,1> sQ(8*256,h);
+    sycl::local_accessor<sycl::half,1> sKs4(64*16,h);
+    sycl::local_accessor<sycl::half,1> sVs(256,h);
+    sycl::local_accessor<float,1> sC4(8*64,h);
+    int nG=(M+7)/8; h.parallel_for(sycl::nd_range<1>({(size_t)nG*24*16},{16}), ChunkFlashAttnV2{Q,Kc,Vc,O,P,M,W,KB,sQ,sKs4,sVs,sC4});
+  }).wait();
+}
+
+
 // Dead-strip guard (Concat2 lesson): raw-L0 never calls this, but the
 // reference retains the entry point in the bundle for extract_spv.
 void launch_chunkflashattn(sycl::queue &q, const sycl::half *Q,
@@ -1840,6 +1981,39 @@ struct L2NormQK {
       X[d] *= inv * (i < 48 ? 0.0883883476f : 1.0f);
   }
 };
+struct SplitRepeatBatch {
+  const float *Mx; // M*C
+  float *Q48, *K48, *V48; // M*V6 each
+  void operator()(sycl::id<1> id) const {
+    size_t idx = id[0]; int m = idx / 6144; int i = idx % 6144;
+    int hh = i / 128, d = i % 128, kh = hh / 3;
+    Q48[(size_t)m * 6144 + i] = Mx[(size_t)m * 10240 + kh * 128 + d];
+    K48[(size_t)m * 6144 + i] = Mx[(size_t)m * 10240 + 2048 + kh * 128 + d];
+    V48[(size_t)m * 6144 + i] = Mx[(size_t)m * 10240 + 4096 + hh * 128 + d];
+  }
+};
+struct L2NormQKBatch {
+  float *Q48, *K48; // M*V6 each
+  void operator()(sycl::id<1> id) const {
+    int i = id[0]; int m = i / 96; int hh = i % 96;
+    float *X = hh < 48 ? Q48 + (size_t)m * 6144 + (size_t)hh * 128 : K48 + (size_t)m * 6144 + (size_t)(hh - 48) * 128;
+    float ss = 0; for (int d = 0; d < 128; ++d) ss += X[d] * X[d];
+    float inv = 1.0f / sycl::sqrt(ss + 1e-6f);
+    for (int d = 0; d < 128; ++d) X[d] *= inv * (hh < 48 ? 0.0883883476f : 1.0f);
+  }
+};
+struct BetaGBatch {
+  float *Bt, *G48; // M*48 each
+  const float *B48, *A48; // M*48 each
+  const float *AL, *DT; // 48 each (broadcast)
+  void operator()(sycl::id<1> id) const {
+    size_t idx = id[0]; int m = idx / 48; int hh = idx % 48;
+    Bt[(size_t)m * 48 + hh] = 1.0f / (1.0f + sycl::exp(-B48[(size_t)m * 48 + hh]));
+    float sa = A48[(size_t)m * 48 + hh] + DT[hh];
+    float soft = sa > 20 ? sa : sycl::log(1.0f + sycl::exp(sa));
+    G48[(size_t)m * 48 + hh] = -sycl::exp(AL[hh]) * soft;
+  }
+};
 
 struct BetaG {
   float *Bt, *G48; // 48 each, out
@@ -1853,6 +2027,16 @@ struct BetaG {
     G48[hh] = -sycl::exp(AL[hh]) * soft;
   }
 };
+
+void launch_splitrepeat_batch(sycl::queue &q, const float *Mx, float *Q48, float *K48, float *V48, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)M * 6144), SplitRepeatBatch{Mx, Q48, K48, V48}); }).wait();
+}
+void launch_l2normqk_batch(sycl::queue &q, float *Q48, float *K48, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)M * 96), L2NormQKBatch{Q48, K48}); }).wait();
+}
+void launch_betag_batch(sycl::queue &q, float *Bt, float *G48, const float *B48, const float *A48, const float *AL, const float *DT, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)M * 48), BetaGBatch{Bt, G48, B48, A48, AL, DT}); }).wait();
+}
 
 struct NormGated {
   float *Att; // 6144 out
@@ -1880,6 +2064,34 @@ struct RmsInv {
     Inv[hh] = 1.0f / sycl::sqrt(ss / 128 + 1e-6f);
   }
 };
+struct RmsInvBatch {
+  float *Inv; // M*48
+  const float *Mx; // M*6144
+  void operator()(sycl::id<1> id) const {
+    size_t idx = id[0]; int m = idx / 48; int hh = idx % 48;
+    const float *x = Mx + (size_t)m * 6144 + (size_t)hh * 128;
+    float ss = 0; for (int d = 0; d < 128; ++d) ss += x[d] * x[d];
+    Inv[(size_t)m * 48 + hh] = 1.0f / sycl::sqrt(ss / 128 + 1e-6f);
+  }
+};
+struct NormGatedBatch {
+  float *Att; // M*6144
+  const float *Mx, *Z;
+  const float *NG;
+  const float *Bt; // M*48
+  void operator()(sycl::id<1> id) const {
+    size_t idx = id[0]; int m = idx / 6144; int i = idx % 6144;
+    int hh = i / 128, d = i % 128;
+    float zv = Z[(size_t)m * 6144 + (size_t)hh * 128 + d];
+    Att[idx] = NG[d] * Mx[idx] * Bt[(size_t)m * 48 + hh] * (zv / (1.0f + sycl::exp(-zv)));
+  }
+};
+void launch_rmsinv_batch(sycl::queue &q, float *Inv, const float *Mx, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)M * 48), RmsInvBatch{Inv, Mx}); }).wait();
+}
+void launch_normgated_batch(sycl::queue &q, float *Att, const float *Mx, const float *Z, const float *NG, const float *Bt, int M) {
+  q.submit([&](sycl::handler &h) { h.parallel_for(sycl::range<1>((size_t)M * 6144), NormGatedBatch{Att, Mx, Z, NG, Bt}); }).wait();
+}
 
 struct ResAddF {
   float *Y;

@@ -1304,19 +1304,30 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   this box; schema-normalized llama rerun still open.)
 
 ### B60-R5 DPAS projection feasibility (P1)
-- Status: `[~]` (2026-09-20: ChunkGemmPP prototype DONE — planar nibble-
-  plane pack (K-group, K-index, N N-fastest) + f16 scales + SLM sext LUT,
-  no runtime repack, same B size. At 256x5120x17408: 2.27 TFLOPS =
-  1.45x vs ChunkGemm 1.57 (both CHUNK-OK, PP worst-rel 2.2e-4 within
-  1e-3 tol, bitwise deterministic). Dual-col PP2 = negative (0.80).
-  Kernel bar 1.8x NOT met; est. E2E ~ +22% (linear 71% x 1/1.45) but
-  unmeasured (decode_l0 not rewired); go criteria partially met — keep
-  iterating (barrier/slice amortization with planes+LUT, double-buffer)
-  or accept no-go. Reports `tools/cmdlist/report_gemmpp{,2}.json` +
-  bench evidence `r5_*`. R7 slim-Flash stash merged onto worktree.)
+- Status: `[x]` (2026-09-21: ChunkGemmPP DONE — planar nibble-plane
+  pack (K-group, K-index, N N-fastest) + f16 scales + SLM sext LUT,
+  2.27 TFLOPS =1.45x vs 1.57 (worst-rel 2.2e-4, CHUNK-OK); PP2/DB
+  negative. Wired into decode_l0 via AINFER_PP=1 (130 gate/up,
+  6.0 GiB compact repack). Measured M256 e2e 11% (P256 7.70/35.7 vs
+  8.54/32.1 etc) short of 15% go bar. Stacked with chunk-budget
+  sweep P6/6.4 (CHUNK_M 256→512, `tools/decode/decode_l0.cpp:2341`):
+  M512 alone +4% (P4096 139.23 vs 144.96), M512+PP **+15–16%**
+  (P4096 125.84/32.70 vs 144.96/28.39, P2048 60.78 vs 70.38, P1024
+  29.82 vs 34.57, P512 14.79 vs 17.19) — clears 15% go bar.
+  Quality parity held. Evidence `tools/bench/evidence/r5_pp_p*.json`,
+  `r6_m512*` + normalized `report_pp/m512/m512pp`; gate 145/145.
+  Harness `tools/cmdlist/report_gemmpp{,2}.json`, R7 slim-Flash merged.)
 
 ### B60-R6 DeltaNet recurrence study (P1)
-- Status: `[ ]` (open: recurrence roofline + sequential floor)
+- Status: `[x]` (2026-09-21: batched chunk-layer `P6` fused 7/18 kernels
+  `RMSNormBatch`/`ResAddBatch`/`SplitRepeatBatch`/`L2NormQKBatch`/
+  `BetaGBatch`/`RmsInvBatch`/`NormGatedBatch` (`tools/cmdlist/kernels.cpp:72`
+  `r.*batch.spv`, `tools/decode/decode_l0.cpp:2545` `AINFER_BATCH=1`) —
+  per-row loops `M→1` launch, `P256` 8.56→8.10s (+5.7%), stacked
+  `BATCH+PP` 7.24s (+18.3%), `BATCH+PP+M512` 116.33s vs 144.96s
+  (+24.6% faster at P4096). New prefill baseline locked as
+  `CHUNK_M=512` + `AINFER_PP=1` + `AINFER_BATCH=1` (19–24% e2e vs
+  old M256). Remaining P6 kernels (`cvt` fusion etc.) deferred.)
 
 ### B60-R7 Long-context attention investigation (P1)
 - Status: `[~]` (partial: `ChunkFlashAttn` + `AINFER_FLASH=1` gated;

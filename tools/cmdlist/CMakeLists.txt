@@ -26,7 +26,7 @@ find_program(SYCL_POST_LINK sycl-post-link
 if(NOT LLVM_SPIRV OR NOT SYCL_POST_LINK)
   message(FATAL_ERROR "llvm-spirv/sycl-post-link not found (needed for T5.3 SPIR-V)")
 endif()
-set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkgemmdb chunkgemmpp chunkgemmpp2 chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow)
+set(SPV_MODS silumul control norm res gemv attn ssmconv ssmrecur rope kvappend argmax1 argmax2 scalesmax quantize splitrepeat l2normqk betag rmsinv normgated resaddf splitqk batchnorm embed chunkgemm chunkgemmdb chunkgemmpp chunkgemmpp2 chunkattn chunkssmconv chunkssmrecur cvtf32f16 concat gemvm2 gemvm3 chunkkvappend chunkrope kvappendi8 attni8 tiledattn qkgemm wvgemm softmaxrow gatemul chunkqkgemm chunkwvgemm chunksoftmaxrow chunkflashattnv2 rmsnormbatch resaddbatch splitrepeatbatch l2normqkbatch betagbatch rmsinvbatch normgatedbatch)
 set(SPV_FILES "")
 foreach(m IN LISTS SPV_MODS)
   list(APPEND SPV_FILES ${CMAKE_CURRENT_BINARY_DIR}/${m}.spv)

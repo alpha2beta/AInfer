@@ -19,6 +19,7 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "../sample/sampler.h" // T7.1 host sampler (temp/top-k/top-p/penalty)
@@ -53,6 +54,25 @@ static uint32_t rd32(std::ifstream &f) {
 }
 static float bf16_to_f32(uint16_t b) {
   uint32_t u = (uint32_t)b << 16;
+  float x;
+  std::memcpy(&x, &u, 4);
+  return x;
+}
+static uint16_t f32_to_f16(float x) {
+  uint32_t u;
+  std::memcpy(&u, &x, 4);
+  uint32_t sign = (u >> 16) & 0x8000u;
+  int exp = (int)((u >> 23) & 0xFF) - 112;
+  uint32_t mant = u & 0x7FFFFFu;
+  if (exp <= 0) return (uint16_t)sign;
+  if (exp >= 31) return (uint16_t)(sign | 0x7BFFu);
+  return (uint16_t)(sign | ((uint32_t)exp << 10) | (mant >> 13));
+}
+static float f16_to_f32(uint16_t h) {
+  uint32_t sign = ((uint32_t)h & 0x8000u) << 16;
+  int exp = ((h >> 10) & 0x1F);
+  uint32_t mant = (uint32_t)(h & 0x3FFu) << 13;
+  uint32_t u = exp == 0 ? sign : sign | ((uint32_t)(exp + 112) << 23) | mant;
   float x;
   std::memcpy(&x, &u, 4);
   return x;
@@ -303,6 +323,87 @@ int main(int argc, char **argv) {
     };
     upspan(pay_lo, payArena, pay_lo, pay_hi - pay_lo);
     upspan(sc_lo, scArena, sc_lo, sc_hi - sc_lo);
+  }
+  // ---- B60-R5 planar PP arenas (offline repack, gated by AINFER_PP=1) ----
+  void *dPLArena = nullptr, *dSSArena = nullptr;
+  std::unordered_map<uint64_t, void*> ppPayMap, ppScMap;
+  uint64_t ppEligibleBytes = 0, ppEligibleCount = 0;
+  bool usePP = (std::getenv("AINFER_PP") && std::getenv("AINFER_PP")[0] == '1');
+  if (usePP) {
+    struct Elig { const Entry *e; size_t N; };
+    std::vector<Elig> elig;
+    uint64_t totP = 0, totS = 0;
+    for (auto &e : ents) {
+      if (e.d_bytes == 0 || e.sc_bytes == 0) continue;
+      size_t N = 0, K = 0;
+      if (e.sc_bytes % (40 * 2) == 0) {
+        size_t n_try = e.sc_bytes / 2 / 40;
+        if (n_try * 5120 / 2 == e.d_bytes) { N = n_try; K = 5120; }
+      }
+      // Gate/up only: down_proj has same byte sizes but K=17408, not 5120
+      bool isGateUp = (std::strstr(e.name, "gate_proj") || std::strstr(e.name, "up_proj"));
+      if (isGateUp && K == 5120 && (N == 17408 || N == 34816)) {
+        elig.push_back({&e, N});
+        totP += e.d_bytes;
+        totS += e.sc_bytes;
+      }
+    }
+    ppEligibleCount = elig.size();
+    ppEligibleBytes = totP + totS;
+    if (ppEligibleCount == 0) {
+      std::fprintf(stderr, "[l0] AINFER_PP=1: no eligible tensors\n");
+      usePP = false;
+    } else {
+      dPLArena = alloc(totP);
+      dSSArena = alloc(totS);
+      std::vector<uint8_t> hostP, hostPL;
+      std::vector<uint16_t> hostS, hostSS;
+      uint64_t offP = 0, offS = 0;
+      for (auto &pr : elig) {
+        const Entry *e = pr.e;
+        size_t N = pr.N;
+        size_t GG = 40;
+        hostP.assign(e->d_bytes, 0);
+        hostPL.assign(e->d_bytes, 0);
+        hostS.assign(e->sc_bytes / 2, 0);
+        hostSS.assign(e->sc_bytes / 2, 0);
+        f.clear();
+        f.seekg((std::streamoff)e->d_off);
+        f.read((char *)hostP.data(), e->d_bytes);
+        f.clear();
+        f.seekg((std::streamoff)e->sc_off);
+        f.read((char *)hostS.data(), e->sc_bytes);
+        for (size_t g = 0; g < GG; ++g) {
+          for (size_t j = 0; j < 128; ++j) {
+            size_t row = g * 128 + j;
+            for (size_t n = 0; n < N; ++n) {
+              size_t srcIdx = n * 5120 + g * 128 + j;
+              uint8_t b = hostP[srcIdx / 2];
+              int nib = (srcIdx & 1) ? (b >> 4) & 0xF : b & 0xF;
+              size_t dstIdx = row * N + n;
+              if (dstIdx & 1) hostPL[dstIdx / 2] |= (uint8_t)(nib << 4);
+              else hostPL[dstIdx / 2] |= (uint8_t)nib;
+            }
+          }
+          for (size_t n = 0; n < N; ++n) {
+            hostSS[g * N + n] = f32_to_f16(bf16_to_f32(hostS[g * N + n]));
+          }
+        }
+        void *dstP = (char *)dPLArena + offP;
+        void *dstS = (char *)dSSArena + offS;
+        CHECK(zeCommandListAppendMemoryCopy(up, dstP, hostPL.data(),
+                                            e->d_bytes, nullptr, 0, nullptr));
+        CHECK(zeCommandListAppendMemoryCopy(up, dstS, hostSS.data(),
+                                            e->sc_bytes, nullptr, 0, nullptr));
+        ppPayMap[e->d_off] = dstP;
+        ppScMap[e->sc_off] = dstS;
+        offP += e->d_bytes;
+        offS += e->sc_bytes;
+      }
+      std::fprintf(stderr, "[l0] AINFER_PP=1 planar PP arenas ready: %zu tensors %llu bytes (P %llu S %llu)\n",
+                   ppEligibleCount, (unsigned long long)ppEligibleBytes,
+                   (unsigned long long)totP, (unsigned long long)totS);
+    }
   }
 
   // ---- L0-context scratch / caches / small mirrors / rope / control ----
@@ -797,7 +898,16 @@ int main(int argc, char **argv) {
       {"gemvm2.spv", "_ZTS10Int4GemvM2"},
       {"gemvm3.spv", "_ZTS10Int4GemvM3"},
       {"chunkgemmdb.spv", "_ZTS11ChunkGemmDB"},
+      {"chunkgemmpp.spv", "_ZTS11ChunkGemmPP"},
       {"chunkflashattn.spv", "_ZTS14ChunkFlashAttn"},
+      {"chunkflashattnv2.spv", "_ZTS16ChunkFlashAttnV2"},
+      {"rmsnormbatch.spv", "_ZTS12RMSNormBatch"},
+      {"resaddbatch.spv", "_ZTS11ResAddBatch"},
+      {"splitrepeatbatch.spv", "_ZTS16SplitRepeatBatch"},
+      {"l2normqkbatch.spv", "_ZTS13L2NormQKBatch"},
+      {"betagbatch.spv", "_ZTS10BetaGBatch"},
+      {"rmsinvbatch.spv", "_ZTS11RmsInvBatch"},
+      {"normgatedbatch.spv", "_ZTS14NormGatedBatch"},
   };
   enum K {
     NORM,
@@ -840,7 +950,16 @@ int main(int argc, char **argv) {
     GEMVM2,
     GEMVM3,
     CGEMMDB,
+    CGEMMPP,
     CFA,
+    CFA2,
+    RNORMB,
+    RADD_B,
+    SPLITB,
+    L2B,
+    BETAB,
+    RINV_B,
+    NGATE_B,
     NK
   };
   ze_kernel_handle_t kh[NK] = {nullptr};
@@ -885,7 +1004,16 @@ int main(int argc, char **argv) {
   CHECK(zeKernelSetGroupSize(kh[WVG], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CGEMM], 16, 1, 1)); // chunk prefill: same
   CHECK(zeKernelSetGroupSize(kh[CGEMMDB], 16, 1, 1)); // paired-slice GEMM: same
+  CHECK(zeKernelSetGroupSize(kh[CGEMMPP], 16, 1, 1)); // B60-R5 planar PP: SG16
   CHECK(zeKernelSetGroupSize(kh[CFA], 16, 1, 1)); // fused flash attn: SG16 groups
+  CHECK(zeKernelSetGroupSize(kh[CFA2], 16, 1, 1)); // P8 v2: SG16 reqd (IGC SIMD32 fix)
+  CHECK(zeKernelSetGroupSize(kh[RNORMB], 256, 1, 1)); // P6 batch norm: 256
+  CHECK(zeKernelSetGroupSize(kh[RADD_B], 1, 1, 1)); // batch resadd: 1D range
+  CHECK(zeKernelSetGroupSize(kh[SPLITB], 1, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[L2B], 1, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[BETAB], 1, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[RINV_B], 1, 1, 1));
+  CHECK(zeKernelSetGroupSize(kh[NGATE_B], 1, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CQK], 16, 1, 1));
   CHECK(zeKernelSetGroupSize(kh[CWV], 16, 1, 1));
 
@@ -2430,6 +2558,17 @@ int main(int argc, char **argv) {
                                               nullptr, 0, nullptr));
         }
         auto normYa = [&](void *Y, void *X, void *Wn) {
+          if (std::getenv("AINFER_BATCH") && std::getenv("AINFER_BATCH")[0] == '1') {
+            int hh = H, mm = M;
+            setarg(kh[RNORMB], 0, sizeof(void *), &Y);
+            setarg(kh[RNORMB], 1, sizeof(void *), &X);
+            setarg(kh[RNORMB], 2, sizeof(void *), &Wn);
+            setarg(kh[RNORMB], 3, sizeof(int), &hh);
+            setarg(kh[RNORMB], 4, sizeof(int), &mm);
+            setarg(kh[RNORMB], 5, (size_t)256 * 8, nullptr);
+            launch(R, kh[RNORMB], (uint32_t)M);
+            return;
+          }
           int nn = H;
           for (int m = 0; m < M; ++m) {
             void *yy = (char *)Y + (size_t)m * H * 4;
@@ -2459,6 +2598,9 @@ int main(int argc, char **argv) {
         const bool flashAttn =
             (std::getenv("AINFER_FLASH") != nullptr &&
              std::getenv("AINFER_FLASH")[0] == '1');
+        const bool flashAttnV2 =
+            (std::getenv("AINFER_FLASH_V2") != nullptr &&
+             std::getenv("AINFER_FLASH_V2")[0] == '1');
         auto cgemmW = [&](void *Wp, void *Ws, int nn, int kk, void *Ah,
                           void *Y) {
           int mm = M;
@@ -2478,6 +2620,30 @@ int main(int argc, char **argv) {
             launch(R, kh[CGEMMDB], ((mm + 31) / 32) * (nn / 16));
             return;
           }
+          // B60-R5 planar PP: AINFER_PP=1 + K==5120 + N in {17408,34816}
+          if (usePP && kk == 5120 && (nn == 17408 || nn == 34816)) {
+            uint64_t payOff = (uint64_t)((char *)Wp - (char *)payArena) + pay_lo;
+            uint64_t scOff = (uint64_t)((char *)Ws - (char *)scArena) + sc_lo;
+            auto itP = ppPayMap.find(payOff);
+            auto itS = ppScMap.find(scOff);
+            if (itP != ppPayMap.end() && itS != ppScMap.end()) {
+              void *WpPP = itP->second;
+              void *WsPP = itS->second;
+              setarg(kh[CGEMMPP], 0, sizeof(void *), &Ah);
+              setarg(kh[CGEMMPP], 1, sizeof(void *), &WpPP);
+              setarg(kh[CGEMMPP], 2, sizeof(void *), &WsPP);
+              setarg(kh[CGEMMPP], 3, sizeof(void *), &Y);
+              setarg(kh[CGEMMPP], 4, sizeof(int), &mm);
+              setarg(kh[CGEMMPP], 5, sizeof(int), &kk);
+              setarg(kh[CGEMMPP], 6, sizeof(int), &nn);
+              setarg(kh[CGEMMPP], 7, (size_t)512 * 2, nullptr);
+              setarg(kh[CGEMMPP], 8, (size_t)256 * 2, nullptr);
+              setarg(kh[CGEMMPP], 9, (size_t)512 * 4, nullptr);
+              setarg(kh[CGEMMPP], 10, 32, nullptr);
+              launch(R, kh[CGEMMPP], ((mm + 31) / 32) * (nn / 16));
+              return;
+            }
+          }
           setarg(kh[CGEMM], 0, sizeof(void *), &Ah);
           setarg(kh[CGEMM], 1, sizeof(void *), &Wp);
           setarg(kh[CGEMM], 2, sizeof(void *), &Ws);
@@ -2491,6 +2657,18 @@ int main(int argc, char **argv) {
           launch(R, kh[CGEMM], ((mm + 31) / 32) * (nn / 16));
         };
         auto resYa = [&](void *Y, void *A, void *B) {
+          if (std::getenv("AINFER_BATCH") && std::getenv("AINFER_BATCH")[0] == '1') {
+            int hh = H, mm = M;
+            // ResAddBatch: R = A + B (B is H broadcast, A/Y are M*H)
+            // Our batch kernel does R = A + B[H % H] per element, no Ctrl
+            setarg(kh[RADD_B], 0, sizeof(void *), &Y);
+            setarg(kh[RADD_B], 1, sizeof(void *), &A);
+            setarg(kh[RADD_B], 2, sizeof(void *), &B);
+            setarg(kh[RADD_B], 3, sizeof(int), &hh);
+            setarg(kh[RADD_B], 4, sizeof(int), &mm);
+            launch(R, kh[RADD_B], (uint32_t)((size_t)H * M));
+            return;
+          }
           for (int m = 0; m < M; ++m) {
             void *yy = (char *)Y + (size_t)m * H * 4;
             void *aa = (char *)A + (size_t)m * H * 4;
@@ -2541,32 +2719,52 @@ int main(int argc, char **argv) {
           setarg(kh[CCONV], 4, sizeof(int), &C);
           setarg(kh[CCONV], 5, sizeof(int), &pfMmA);
           launch(R, kh[CCONV], C);
-          for (int m = 0; m < M; ++m) {
-            void *mx = (char *)dMxC_ + (size_t)m * C * 4;
-            void *q4 = (char *)dQ48_ + (size_t)m * V6 * 4;
-            void *k4 = (char *)dK48_ + (size_t)m * V6 * 4;
-            void *v4 = (char *)dV48_ + (size_t)m * V6 * 4;
-            setarg(kh[SPLIT2], 0, sizeof(void *), &mx);
-            setarg(kh[SPLIT2], 1, sizeof(void *), &q4);
-            setarg(kh[SPLIT2], 2, sizeof(void *), &k4);
-            setarg(kh[SPLIT2], 3, sizeof(void *), &v4);
-            launch(R, kh[SPLIT2], V6);
-            setarg(kh[L2], 0, sizeof(void *), &q4);
-            setarg(kh[L2], 1, sizeof(void *), &k4);
-            launch(R, kh[L2], 96);
-            void *b1 = (char *)dB_ + (size_t)m * NH * 4;
-            void *a1 = (char *)dA_ + (size_t)m * NH * 4;
-            void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
-            void *g1 = (char *)dG48_ + (size_t)m * NH * 4;
+          if (std::getenv("AINFER_BATCH") && std::getenv("AINFER_BATCH")[0] == '1') {
+            setarg(kh[SPLITB], 0, sizeof(void *), &dMxC_);
+            setarg(kh[SPLITB], 1, sizeof(void *), &dQ48_);
+            setarg(kh[SPLITB], 2, sizeof(void *), &dK48_);
+            setarg(kh[SPLITB], 3, sizeof(void *), &dV48_);
+            launch(R, kh[SPLITB], (uint32_t)((size_t)M * V6));
+            setarg(kh[L2B], 0, sizeof(void *), &dQ48_);
+            setarg(kh[L2B], 1, sizeof(void *), &dK48_);
+            launch(R, kh[L2B], (uint32_t)((size_t)M * 96));
             void *alS = (char *)dAL + (size_t)sl * 48 * 4;
             void *dtS = (char *)dDT + (size_t)sl * 48 * 4;
-            setarg(kh[BETA], 0, sizeof(void *), &bt1);
-            setarg(kh[BETA], 1, sizeof(void *), &g1);
-            setarg(kh[BETA], 2, sizeof(void *), &b1);
-            setarg(kh[BETA], 3, sizeof(void *), &a1);
-            setarg(kh[BETA], 4, sizeof(void *), &alS);
-            setarg(kh[BETA], 5, sizeof(void *), &dtS);
-            launch(R, kh[BETA], NH);
+            setarg(kh[BETAB], 0, sizeof(void *), &dBt_);
+            setarg(kh[BETAB], 1, sizeof(void *), &dG48_);
+            setarg(kh[BETAB], 2, sizeof(void *), &dB_);
+            setarg(kh[BETAB], 3, sizeof(void *), &dA_);
+            setarg(kh[BETAB], 4, sizeof(void *), &alS);
+            setarg(kh[BETAB], 5, sizeof(void *), &dtS);
+            launch(R, kh[BETAB], (uint32_t)((size_t)M * NH));
+          } else {
+            for (int m = 0; m < M; ++m) {
+              void *mx = (char *)dMxC_ + (size_t)m * C * 4;
+              void *q4 = (char *)dQ48_ + (size_t)m * V6 * 4;
+              void *k4 = (char *)dK48_ + (size_t)m * V6 * 4;
+              void *v4 = (char *)dV48_ + (size_t)m * V6 * 4;
+              setarg(kh[SPLIT2], 0, sizeof(void *), &mx);
+              setarg(kh[SPLIT2], 1, sizeof(void *), &q4);
+              setarg(kh[SPLIT2], 2, sizeof(void *), &k4);
+              setarg(kh[SPLIT2], 3, sizeof(void *), &v4);
+              launch(R, kh[SPLIT2], V6);
+              setarg(kh[L2], 0, sizeof(void *), &q4);
+              setarg(kh[L2], 1, sizeof(void *), &k4);
+              launch(R, kh[L2], 96);
+              void *b1 = (char *)dB_ + (size_t)m * NH * 4;
+              void *a1 = (char *)dA_ + (size_t)m * NH * 4;
+              void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
+              void *g1 = (char *)dG48_ + (size_t)m * NH * 4;
+              void *alS = (char *)dAL + (size_t)sl * 48 * 4;
+              void *dtS = (char *)dDT + (size_t)sl * 48 * 4;
+              setarg(kh[BETA], 0, sizeof(void *), &bt1);
+              setarg(kh[BETA], 1, sizeof(void *), &g1);
+              setarg(kh[BETA], 2, sizeof(void *), &b1);
+              setarg(kh[BETA], 3, sizeof(void *), &a1);
+              setarg(kh[BETA], 4, sizeof(void *), &alS);
+              setarg(kh[BETA], 5, sizeof(void *), &dtS);
+              launch(R, kh[BETA], NH);
+            }
           }
           void *sS = (char *)dS + (size_t)sl * NH * D * D * 4;
           setarg(kh[CRECUR], 0, sizeof(void *), &dMxR_);
@@ -2578,21 +2776,34 @@ int main(int argc, char **argv) {
           setarg(kh[CRECUR], 6, sizeof(void *), &dG48_);
           setarg(kh[CRECUR], 7, sizeof(int), &pfMmA);
           launch(R, kh[CRECUR], NH);
-          for (int m = 0; m < M; ++m) {
-            void *mx = (char *)dMxR_ + (size_t)m * V6 * 4;
-            void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
-            void *at = (char *)dAttL_ + (size_t)m * V6 * 4;
-            void *zz = (char *)dZ_ + (size_t)m * V6 * 4;
-            setarg(kh[RMSI], 0, sizeof(void *), &bt1);
-            setarg(kh[RMSI], 1, sizeof(void *), &mx);
-            launch(R, kh[RMSI], NH);
-            setarg(kh[GATE], 0, sizeof(void *), &at);
-            setarg(kh[GATE], 1, sizeof(void *), &mx);
-            setarg(kh[GATE], 2, sizeof(void *), &zz);
+          if (std::getenv("AINFER_BATCH") && std::getenv("AINFER_BATCH")[0] == '1') {
+            setarg(kh[RINV_B], 0, sizeof(void *), &dBt_);
+            setarg(kh[RINV_B], 1, sizeof(void *), &dMxR_);
+            launch(R, kh[RINV_B], (uint32_t)((size_t)M * NH));
             void *ngS = (char *)dLinN + (size_t)sl * 128 * 4;
-            setarg(kh[GATE], 3, sizeof(void *), &ngS);
-            setarg(kh[GATE], 4, sizeof(void *), &bt1);
-            launch(R, kh[GATE], V6);
+            setarg(kh[NGATE_B], 0, sizeof(void *), &dAttL_);
+            setarg(kh[NGATE_B], 1, sizeof(void *), &dMxR_);
+            setarg(kh[NGATE_B], 2, sizeof(void *), &dZ_);
+            setarg(kh[NGATE_B], 3, sizeof(void *), &ngS);
+            setarg(kh[NGATE_B], 4, sizeof(void *), &dBt_);
+            launch(R, kh[NGATE_B], (uint32_t)((size_t)M * V6));
+          } else {
+            for (int m = 0; m < M; ++m) {
+              void *mx = (char *)dMxR_ + (size_t)m * V6 * 4;
+              void *bt1 = (char *)dBt_ + (size_t)m * NH * 4;
+              void *at = (char *)dAttL_ + (size_t)m * V6 * 4;
+              void *zz = (char *)dZ_ + (size_t)m * V6 * 4;
+              setarg(kh[RMSI], 0, sizeof(void *), &bt1);
+              setarg(kh[RMSI], 1, sizeof(void *), &mx);
+              launch(R, kh[RMSI], NH);
+              setarg(kh[GATE], 0, sizeof(void *), &at);
+              setarg(kh[GATE], 1, sizeof(void *), &mx);
+              setarg(kh[GATE], 2, sizeof(void *), &zz);
+              void *ngS = (char *)dLinN + (size_t)sl * 128 * 4;
+              setarg(kh[GATE], 3, sizeof(void *), &ngS);
+              setarg(kh[GATE], 4, sizeof(void *), &bt1);
+              launch(R, kh[GATE], V6);
+            }
           }
           cvtYa(dAtthL_, dAttL_, M * V6);
           cgemmW(pWo, pWoS, H, V6, dAtthL_, dMix_);
@@ -2651,7 +2862,22 @@ int main(int argc, char **argv) {
           setarg(kh[CKV], 6, sizeof(int), &pfMmA);
           launch(R, kh[CKV], M * 1024);
           cvtYa(dQnh_, dQn_, M * QN);
-          if (flashAttn) {
+          if (flashAttnV2) {
+            int pp = base, ww = W, kb = 512;
+            setarg(kh[CFA2], 0, sizeof(void *), &dQnh_);
+            setarg(kh[CFA2], 1, sizeof(void *), &kcS);
+            setarg(kh[CFA2], 2, sizeof(void *), &vcS);
+            setarg(kh[CFA2], 3, sizeof(void *), &dCore_);
+            setarg(kh[CFA2], 4, sizeof(int), &pp);
+            setarg(kh[CFA2], 5, sizeof(int), &pfMmA);
+            setarg(kh[CFA2], 6, sizeof(int), &ww);
+            setarg(kh[CFA2], 7, sizeof(int), &kb);
+            setarg(kh[CFA2], 8, (size_t)8 * 256 * 2, nullptr);
+            setarg(kh[CFA2], 9, (size_t)64 * 16 * 2, nullptr);
+            setarg(kh[CFA2], 10, (size_t)256 * 2, nullptr);
+            setarg(kh[CFA2], 11, (size_t)8 * 64 * 4, nullptr);
+            launch(R, kh[CFA2], (uint32_t)(((M + 7) / 8) * 24));
+          } else if (flashAttn) {
             int pp = base, ww = W, kb = 512;
             setarg(kh[CFA], 0, sizeof(void *), &dQnh_);
             setarg(kh[CFA], 1, sizeof(void *), &kcS);
@@ -2662,10 +2888,9 @@ int main(int argc, char **argv) {
             setarg(kh[CFA], 6, sizeof(int), &ww);
             setarg(kh[CFA], 7, sizeof(int), &kb);
             setarg(kh[CFA], 8, (size_t)8 * 256 * 2, nullptr);
-            setarg(kh[CFA], 9, (size_t)256 * 16 * 2, nullptr);
-            setarg(kh[CFA], 10, (size_t)16 * 256 * 2, nullptr);
+            setarg(kh[CFA], 9, (size_t)16 * 16 * 2, nullptr);
+            setarg(kh[CFA], 10, (size_t)256 * 2, nullptr);
             setarg(kh[CFA], 11, (size_t)8 * 16 * 4, nullptr);
-            setarg(kh[CFA], 12, (size_t)8 * 256 * 4, nullptr);
             launch(R, kh[CFA], (uint32_t)(((M + 7) / 8) * 24));
           } else {
           {

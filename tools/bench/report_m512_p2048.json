@@ -1,0 +1,36 @@
+{
+ "schema": "b60-bench-v1",
+ "manifest_commit": "aad157a",
+ "prompt_tokens": 2067,
+ "context_occupancy": 2048,
+ "generated_tokens": 2,
+ "warm_state": "warm",
+ "model_load_seconds": null,
+ "tokenization_seconds": null,
+ "cache_initialization_seconds": null,
+ "prefill_seconds": 67.4335,
+ "prefill_tokens_per_second": 30.652420532821225,
+ "first_decode_seconds": null,
+ "cold_ttft_seconds": null,
+ "warm_ttft_seconds": null,
+ "decode_tokens_per_second": 17.14,
+ "accepted_tokens_per_second": null,
+ "mtp_acceptance_rate": null,
+ "peak_vram_bytes": null,
+ "metadata": {
+  "command": "CHUNK_M=512 decode_l0 --prefill-chunks=4 (M512 sweep, no PP)",
+  "run_type": "prefill_decode",
+  "kv_precision": "bf16",
+  "mtp_mode": "off",
+  "chunk_size": 512,
+  "warm_state": "warm",
+  "comparison_class": "local_reproduced",
+  "evidence": "/tmp/m512_2048.json",
+  "boundaries": {
+   "model_load_included": false,
+   "tokenization_included": false,
+   "prefill_start": "first chunk-list exec (chunk path) or first loop step (decode path)",
+   "prefill_end": "last chunk-list fence (chunk path)"
+  }
+ }
+}
