@@ -88,10 +88,10 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Done: Microbenchmark report identifies supported execution paths; matrix design decisions grounded in measurement.
 
 ### T1.5 Characterize unified memory allocation policies
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.3
 - Do: Benchmark memory allocation modes on Lunar Lake: `zeMemAllocDevice`, `zeMemAllocShared`, and host-visible buffers. Profile first-touch latency, page migration overhead, and CPU-iGPU synchronization cost.
-- Note (2026-09-18 waiver): T2.4/T3.5/T5.1 were signed off with this still open — the working policy (device arenas for weights/scales/states) is proven by `report_l0load.json` (712/712 CRCs) and `report_phase5.json` (17.99 GiB committed), but the formal isolated-vs-shared comparison report is still owed before M1 can close.
+  DONE 2026-09-21: New `tools/membench/alloc_policy.cpp` (1 GiB per type, stream kernel warm median-of-7 + cold first-touch, 64 MiB round-trip, D2H 4-byte token probe). `tools/membench/report_alloc_258v.json`: warm streaming identical once resident (device 105.79 / shared 104.59 / host 104.68 GB/s — unified memory, no migration penalty); device first-touch slower (73.48 vs 96.97 GB/s shared — one-time init cost); H2D copy 27.00 GB/s; D2H token readback 22.91 µs (per-token host overhead proxy for T5.4). Recommendation recorded: device arenas for weights/scales/states (confirms the T5.1 working policy with measurement), shared/host-visible for control + token paths.
 - Done: Memory allocation report published; optimal allocation policy selected for model weights, states, and control buffers.
 
 ### T1.6 Dedicated concurrent CPU/GPU memory contention benchmark
@@ -102,11 +102,10 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Done: Contention benchmark report published, documenting DRAM bandwidth degradation under concurrent CPU load.
 
 ### T1.7 Sustainable memory bandwidth and dispatch profiling
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.3, T1.5
 - Do: Measure sequential and strided read bandwidth, Level Zero command list launch/replay latency, and barrier cost across cold, warm, and thermally steady states on Arc 140V.
-- Note (2026-09-18 waiver): T4.2's shootout used inline per-strategy latencies (`report_shootout.json`) rather than this standalone bandwidth/dispatch profile. The profile is still owed before M1/M6 can close.
-- Cookbook (2026-09-19, B70): A/B `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` and immediate vs regular command lists in this profile; graph-capture precedent validates the recorded-list approach. See `optimization.md` §6.7.
+  DONE 2026-09-21: New `tools/membench/stream_strided.cl` + `dispatch_profile.cpp`. `tools/membench/report_dispatch_258v.json`: sequential 105.82 GB/s (cold first-exec 19.49 ms, ~2x penalty) vs stride-64 collapse to 6.64 GB/s (16x — prefetch-hostile as designed); empty-list launch 5.2 µs; barrier cost below resolution (<25 µs upper bound — measured deltas −4/−15 µs are noise, caught honestly, not reported as negative cost); 60 s sustained drift −0.03% (no throttling). `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE` A/B: no meaningful difference on any metric. Immediate lists (`AINFER_IMM=1`): functional for ~36 submissions then hangs deterministically on sustained resubmission (reproduced 3x incl. with host pacing — not a zero-gap race; minimal probe proves barrier+event sync works in isolation) — recorded as a finding, production stays on regular recorded lists (T5.3, no change needed). Cookbook §6.7 closed.
 - Done: Bandwidth and dispatch profile stored; roofline ceiling parameters established from empirical data.
 
 ### T1.8 Build system and smoke test integration

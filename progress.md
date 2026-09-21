@@ -14,7 +14,7 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) and T10.2/vision (deferred); Phase 9 complete
+- **Current Focus:** Phase 1 remainder (T1.2, T1.8, T2.5) and T10.2/vision (deferred); Phase 9 complete
 - **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
@@ -107,7 +107,7 @@
 | Phase | Milestone | Scope | Status | Done / Total |
 |---|---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ **Done** | 6 / 6 |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 4 / 8 |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 6 / 8 |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[~]` In Progress | 4 / 5 |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ validation, rejection | ✅ **Done** | 6 / 6 |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet, Attn | ✅ **Done** | 7 / 7 |
@@ -118,7 +118,7 @@
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | ✅ **Done** | 5 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done; dual-token extension uncommitted) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **53 / 62** |
+| **Total** | | | | **56 / 62** |
 
 ---
 
@@ -143,9 +143,9 @@
 | **T1.2** | Reproducible container/chroot & rollback | `[ ]` | Requires package cache snapshot |
 | **T1.3** | Level Zero device probe on Arc 140V | `[x]` | Ported `probe.cpp` to Arc 140V (`8086:64a0`), emitted `tools/l0probe/report_258v.json` |
 | **T1.4** | ESIMD, DP4A, and DPAS / XMX audit | `[x]` | Audited DPAS/XMX on Arc 140V (Xe2); discovered native INT4 DPAS (`dpas.8x1 ...:s4 :s4`) and `dpas.8x8` SIMD16; prototype achieved 1.90x speedup on M=8192; emitted `tools/esimd_check/report_esimd_258v.json` & `tools/bench_gemv/report_dpas_evaluation.json` (status: GO) |
-| **T1.5** | Unified memory allocation benchmarking | `[ ]` | `zeMemAllocDevice` vs `Shared` comparison |
+| **T1.5** | Unified memory allocation benchmarking | `[x]` | Warm streaming identical (~105 GB/s all types); device first-touch slower (one-time); D2H token 22.9 µs (`report_alloc_258v.json`) |
 | **T1.6** | Dedicated CPU/GPU memory contention benchmark | `[x]` | Isolated 103.03 GB/s; tokenizer -5.1%; triad -40.5%; combined -41.5% (`tools/membench/report_contention_258v.json`). Single completed run; repeat owed for release confidence after forced-reboot interruption. |
-| **T1.7** | Sustainable bandwidth and dispatch profiling | `[ ]` | Profile steady-state vs cold launch |
+| **T1.7** | Sustainable bandwidth and dispatch profiling | `[x]` | Seq 105.8 vs strided 6.6 GB/s; launch 5.2 µs; barrier <25 µs; drift ~0%; COMPOSITE no-op; immediate-lists hang finding (`report_dispatch_258v.json`) |
 | **T1.8** | Build system and smoke test integration | `[ ]` | Add `CMakePresets.json` preset `258v` |
 
 ### Phase 2: Verified Model Manifest and Memory Plan (M2a)
@@ -476,3 +476,7 @@
   - Rebuilt `bench_258v` from committed source, ran `run_benchmark_t71.py` + `run_llama_comparison_t75.py` on current HEAD: **35.06 tok/s** decode (−1.4% vs committed 35.54, within ±7% variance), prefill 116.49 tok/s, jitter p50=28.51/p95=29.18 ms; comparison 1.20x vs Vulkan (29.33), 3.51x vs CPU (9.98). The 30.48 outlier did not reproduce — retired as a bad run under load. Fresh reports committed.
   - Verified dual-token MTP code and `report_speculative_258v.json` committed in-tree (Stamp-3 "uncommitted" claims now stale — corrected in `tasks.md` T10.1, `STATUS.md` Gate M6/MTP rows).
   - Observed (non-gating): model load 48.4 s vs 9.88 s committed — T9.5 CRC pass re-reads 19 GiB plus slow disk reads this session (~0.3–0.4 GB/s); recorded for awareness, not a gate criterion.
+- **2026-09-21 (T1.5 allocation policy + T1.7 dispatch profile — DONE, M1 at 6/8):**
+  - New `tools/membench/alloc_policy.cpp`: 1 GiB allocs per type — warm streaming identical once resident (device 105.79 / shared 104.59 / host 104.68 GB/s, unified memory, no migration penalty); device first-touch slower (73.48 vs 96.97 GB/s, one-time init cost); H2D copy 27.00 GB/s; D2H 4-byte token readback 22.91 µs. Policy confirmed: device arenas for weights/states (T5.1 waiver now measured), shared/host-visible for control + token paths. `tools/membench/report_alloc_258v.json`.
+  - New `tools/membench/stream_strided.cl` + `dispatch_profile.cpp`: sequential 105.82 GB/s (cold 19.49 ms, ~2x) vs stride-64 collapse 6.64 GB/s (16x); empty-list launch 5.2 µs; barrier cost below resolution (<25 µs upper bound — negative deltas reported honestly as noise); 60 s sustained drift −0.03% (no throttling). `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`: no measurable difference. Immediate lists (`AINFER_IMM=1`): work for ~36 submissions then hang deterministically on sustained resubmission (3x repro incl. pacing control; minimal probe proves barrier+event sync works in isolation) — recorded as finding, production stays on regular lists. `tools/membench/report_dispatch_258v.json`.
+  - Dashboard **56/62**. M1 remainder is now T1.2, T1.8, T2.5 only.

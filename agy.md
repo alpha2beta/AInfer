@@ -1,4 +1,4 @@
-# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-20, 54/62 done, Phase 9 complete; T1.6 contention measured)
+# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-21, 56/62 done, Phase 9 complete; M1 at 6/8)
 
 ## What it is
 
@@ -8,12 +8,12 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ---
 
-## Overall Health: Green (54/62 done; Phases 0/3/4/5/6/7/8/9 passed, Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
+## Overall Health: Green (56/62 done; Phases 0/3/4/5/6/7/8/9 passed, Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off; M1 at 6/8)
 
 | Phase | Milestone | Scope | Status |
 |---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ Done (6/6) |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress (4/8; T1.1, T1.3, T1.4, T1.6 done) |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress (6/8; T1.1, T1.3–T1.7 done) |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, budget | `[~]` In Progress (4/5; T2.5 open with T5.1 waiver) |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ loader, rejection | ✅ Done (6/6) |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet | ✅ Done (7/7) |
@@ -37,6 +37,5 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ## Immediate Next Actions
 
-1. **Phase 1 remainder (M1 still open):** T1.2 container/rollback, T1.5 allocation-policy report, T1.6 contention benchmark, T1.7 bandwidth profile, T1.8 `258v` CTest preset — plus standalone T2.5 allocation utility (currently waived via T5.1 proof). [Stamp-3 dual-token/regression leftover resolved 2026-09-20 by clean re-run; item retired.]
-2. **Phase 1 remainder (M1 still open):** T1.2 container/rollback, T1.5 allocation-policy report, T1.6 contention benchmark, T1.7 bandwidth profile, T1.8 `258v` CTest preset — plus standalone T2.5 allocation utility (currently waived via T5.1 proof).
+1. **Phase 1 remainder (M1 still open):** T1.2 container/rollback, T1.8 `258v` CTest preset — plus standalone T2.5 allocation utility (currently waived via T5.1 proof).
 3. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.

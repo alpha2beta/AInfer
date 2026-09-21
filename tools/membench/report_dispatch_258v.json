@@ -1,0 +1,38 @@
+{
+ "task": "T1.7",
+ "device": "Intel Arc 140V (Xe2, Lunar Lake 258V)",
+ "method": "1 GiB sequential vs stride-64 read kernels, empty-list launch, kernel+barrier delta, cold first-exec vs warm median-of-7, 60 s sustained first-10s vs last-10s; host fence timing",
+ "default": {
+  "seq_gbs": 105.82,
+  "seq_ms": 10.147,
+  "cold_seq_ms": 19.487,
+  "strided_gbs": 6.64,
+  "strided_ms": 161.698,
+  "cold_strided_ms": 161.675,
+  "empty_launch_ms": 0.0052,
+  "barrier_delta_us": -4.44,
+  "sustained_early_ms": 10.154,
+  "sustained_late_ms": 10.151,
+  "sustained_drift_pct": -0.03
+ },
+ "composite": {
+  "seq_gbs": 105.52,
+  "cold_seq_ms": 19.108,
+  "strided_gbs": 6.6,
+  "empty_launch_ms": 0.0066,
+  "barrier_delta_us": -15.08,
+  "sustained_drift_pct": -0.32,
+  "verdict": "no meaningful difference vs default on any metric"
+ },
+ "immediate_lists": {
+  "verdict": "NOT VIABLE on compute-runtime 26.31",
+  "detail": "functional for short bursts (~36 submissions) then hangs deterministically on sustained resubmission; reproduced 3x incl. with 1 ms host pacing (not a zero-gap race). Production stays on regular recorded lists (T5.3 architecture, no change needed)."
+ },
+ "readout": {
+  "barrier_cost": "below measurement resolution (<25 us upper bound; deltas -4/-15 us are noise)",
+  "cold_penalty": "~2x first-exec (19.5 vs 10.1 ms)",
+  "thermal_drift_60s": "~0% (no throttling in window)",
+  "strided_collapse": "16x (6.6 vs 105.8 GB/s at stride 64)"
+ },
+ "all_pass": true
+}

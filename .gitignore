@@ -70,4 +70,6 @@ tools/mtp/bench_speculative_258v
 tools/mtp/profile_spec
 tools/mtp/profile_verify_layers
 tools/membench/contention
+tools/membench/alloc_policy
+tools/membench/dispatch_profile
 tools/bench_258v/profile_prefill

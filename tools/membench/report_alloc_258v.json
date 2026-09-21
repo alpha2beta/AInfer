@@ -1,0 +1,23 @@
+{
+ "task": "T1.5",
+ "device": "Intel Arc 140V (Xe2, Lunar Lake 258V)",
+ "method": "1 GiB zeMemAllocDevice/Shared/Host; stream_read kernel warm median-of-7 + cold first-touch; 64 MiB host-write vs H2D copy; D2H 4B token readback median-of-7",
+ "result": {
+  "label": "final",
+  "alloc_device_ms": 34.44,
+  "alloc_shared_ms": 54.18,
+  "alloc_host_ms": 52.92,
+  "have_host_alloc": true,
+  "warm_device_gbs": 105.79,
+  "warm_shared_gbs": 104.59,
+  "warm_host_gbs": 104.68,
+  "cold_device_gbs": 73.48,
+  "cold_shared_gbs": 96.97,
+  "host_write_64mib_ms": 2.86,
+  "h2d_64mib_ms": 2.49,
+  "h2d_gbs": 27.0,
+  "d2h_token_us": 22.91
+ },
+ "recommendation": "Device arenas for weights/scales/states (production policy since T5.1, confirmed: warm streaming identical across types once resident, device avoids any migration path); shared/host-visible for the control block and token readback (22.9 us D2H). First-touch cost is paid once at init.",
+ "all_pass": true
+}
