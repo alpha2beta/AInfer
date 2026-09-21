@@ -1,0 +1,20 @@
+{
+  "task": "T10.1-followup-KV8-128K-positioned",
+  "status": "PASSED",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "max_ctx": 131328,
+  "prompt_tokens": 8,
+  "decode_steps": 5,
+  "bf16": {
+    "kv_mib": 2565.0,
+    "prefill_first": 148431,
+    "decode_tokens": [62497, 148287, 198, 220, 16]
+  },
+  "kv8": {
+    "kv_mib": 1282.5,
+    "prefill_first": 148431,
+    "decode_tokens": [62497, 148287, 198, 220, 16],
+    "parity": true
+  },
+  "verdict": "128K-capacity runtime initializes and decodes identically in BF16 and KV8; no 128K prefill execution claim"
+}

@@ -14,7 +14,7 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** MTP verification-path optimization and T10.2/vision (deferred); Phases 1/2/9 complete; 16K real prefill measured
+- **Current Focus:** T10.2/vision (deferred); Phases 1/2/9 complete; KV8 trunk + 128K positioned decode qualified
 - **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
@@ -498,3 +498,9 @@
 - **2026-09-21 (Baseline Stamp 4 — post-Stamp-3/current-HEAD audit):**
   - Reviewed commits `c75c5fa` through `bb1e2c7`, the current release evidence, and the attempted KV8×MTP port. Current release state is **59/62**: M1 is 8/8, M2a is 5/5, Phase 9 is 5/5, and MTP dual-token evidence is committed (`155265c`) and reconciled by the clean 35.06 tok/s re-run. Corrected stale dashboard (56→59), Phase 10/T10.1 wording, and provisional MTP-overhead text.
   - KV8×MTP/128K is **not qualified**: the experimental port first caused a Level Zero device loss, then avoided the reset with standalone packaging but failed its bit-exact MTP parity gate (examples 1/32 and 3/32 matches; 1.035x mean). Experiment discarded; production remains BF16 KV, and no 128K runtime claim is made. Historical Stamp-3 warnings remain as history only; their later resolutions are reflected in live dashboard rows and `STATUS.md`.
+- **2026-09-21 (KV8 trunk parity + 128K alloc — DONE):**
+  - Standalone KV8 primitives passed (B=1 worst 7.9e-4, B=2 worst 7.15e-7, deterministic). Trunk-only KV8 behind `AINFER_KV8=1` is short-context parity-qualified: 8-token prompt identical output `[148431, 62497]`, 64-token 8-gen identical output. Quality corpus 186/200 (93.0%) both BF16 and KV8, 4K needle 6/6 both. 128K arenas allocate and decode identically in BF16 (2565.0 MiB) and KV8 (1282.5 MiB) at `max_ctx=131328`.
+- **2026-09-21 (KV8 MTP draft + B=2 verification — DONE):**
+  - Extended trunk KV8 to MTP draft and B=2 verification behind `AINFER_KV8=1`. MTP parity: **160/160 bit-exact** vs KV8 greedy baseline, 35.43→43.77 tok/s (1.235x) vs BF16 MTP 35.66→44.96 tok/s (1.261x). Committed as `f1bcb80` with `report_mtp_kv8.json`.
+- **2026-09-21 (128K positioned decode — DONE):**
+  - Ran `max_ctx=131328` init + 8-token prefill + 5 decodes: both BF16 (2565.0 MiB) and KV8 (1282.5 MiB) produce identical token stream `[62497, 148287, 198, 220, 16]`. Reports: `report_kv8_128k_alloc.json`, `report_kv8_128k_positioned.json`. Full 128K prefill remains unmeasured (16K already 11.3 min).

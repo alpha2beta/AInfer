@@ -16,7 +16,7 @@
 | Target Model | `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, dequantized from `LuffyTheFox/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF`; sparse MoE hybrid: 40 text layers = 30 DeltaNet-style linear-attention + 10 full-attention) |
 | Model Scale | ~35 Billion total parameters; ~3 Billion active parameters per token |
 | Quantization Target | INT4 symmetric group-128, BF16 scales, high-precision router gates and RMSNorm |
-| Context Tiers | Tier 1 (4K correctness) $\to$ Tier 2 (16K integration) $\to$ Tier 3 (32K performance) $\to$ Tier 4 (64K stretch) |
+| Context Tiers | Tier 1 (4K) $\to$ Tier 2 (16K) $\to$ Tier 3 (32K) $\to$ Tier 4 (64K) $\to$ Tier 5 (128K, INT8 KV required) |
 | Initial Scope | Batch size 1, text-only; greedy and top-k/top-p sampling. Vision encoder and MTP explicitly deferred |
 | Baseline Reference | Inherited from B60 production commit `06f267e` (discrete Arc Pro B60, Qwen3.8-27B dense hybrid) |
 
@@ -134,6 +134,8 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 **T7.1/T7.5 clean re-run (2026-09-20):** rebuilt `bench_258v` from committed source and re-ran both harnesses on current HEAD — **35.06 tok/s** decode (vs committed 35.54, −1.4%, within variance), 1.20x vs llama.cpp Vulkan, 3.51x vs CPU. The Stamp-3 30.48 tok/s outlier did not reproduce (bad run, not a regression); fresh reports committed. Dual-token MTP code + `report_speculative_258v.json` verified committed in-tree, closing the remaining Stamp-3 staleness. Observed (non-gating): model load 48.4 s vs 9.88 s, attributed to the T9.5 CRC re-read plus slow disk this session.
 
 **Baseline Stamp 4 (2026-09-21):** Reviewed commits `c75c5fa` through `bb1e2c7` and current reports. **59/62 tasks done**: M1 is 8/8, M2a 5/5, Phase 9 5/5. The real 16K BF16-KV prefill completed in 678,505 ms (24.15 tok/s). The attempted KV8×MTP port was rejected: it failed MTP bit-exact parity after an initial device-loss packaging fault, so production remains BF16 KV and no 128K runtime support is claimed.
+
+**KV8 Trunk + 128K Update (2026-09-21):** Standalone KV8 primitives qualified (B=1 worst 7.9e-4, B=2 worst 7.15e-7, deterministic) and trunk-only KV8 behind `AINFER_KV8=1` is short-context parity-qualified: 8-token prompt identical output, 64-token/8-gen identical output (sample ids `[151644, 8948, 198, 2610, 525, 264, 10925, 151645]`). Quality: corpus 186/200 (93.0%) both BF16 and KV8, 4K needle 6/6 both. 128K arenas allocate and decode identically in BF16 (2565.0 MiB) and KV8 (1282.5 MiB): `report_kv8_128k_alloc.json` and `report_kv8_128k_positioned.json` (8-token prefill + 5 decodes at `max_ctx=131328`). Full 128K prefill remains unmeasured (16K already 11.3 min). Tier 5 (128K) added to `memory_budget.json` as `PASS_ALLOC_AND_POSITIONED_DECODE`.
 
 
 

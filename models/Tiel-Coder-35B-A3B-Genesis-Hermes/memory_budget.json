@@ -54,6 +54,17 @@
       "available_headroom_gb": 7.51,
       "headroom_percent": 23.5,
       "status": "PASS"
+    },
+    "tier5_128k": {
+      "context_length": 131328,
+      "kv_cache_fp16_mb": 2565.0,
+      "kv_cache_int8_mb": 1282.5,
+      "workspace_mb": 350.0,
+      "total_committed_gb": 25.78,
+      "available_headroom_gb": 6.22,
+      "headroom_percent": 19.4,
+      "status": "PASS_ALLOC_AND_POSITIONED_DECODE",
+      "note": "KV8 halves 128K cache; full 128K prefill not measured (16K already 11.3 min)"
     }
   }
 }
