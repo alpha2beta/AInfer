@@ -1330,9 +1330,15 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   old M256). Remaining P6 kernels (`cvt` fusion etc.) deferred.)
 
 ### B60-R7 Long-context attention investigation (P1)
-- Status: `[~]` (partial: `ChunkFlashAttn` + `AINFER_FLASH=1` gated;
-  synthetic gate passes at M=256/W=4096; 16-chunk trajectory gate
-  inconclusive; BF16/INT8-KV + 4K→64K scaling pending)
+- Status: `[x]` (2026-09-21: R7 re-profile complete on locked baseline
+  `AINFER_PP=1 AINFER_BATCH=1`, M256@P256/M512@P4K/P16K, BF16 KV. Normal
+  attention: P256 7.179s (full 1.824s), P4096 116.323s (full 36.168s,
+  31.1%), P16384 578.584s (full 257.432s, 44.5%). `AINFER_FLASH=1`
+  is negative on B60: P256 7.404s (+3.1%), P4096 139.262s (+19.8%),
+  P16384 903.617s (+56.2%). Keep FlashAttention experimental/off;
+  full attention is the long-context bottleneck, but this v1 path is
+  not viable on B60. Raw `tools/bench/evidence/r7_{normal,flash}_p*.json`,
+  normalized `tools/bench/report_r7_{normal,flash}_p*.json`; gate 151/151.)
 
 ### B60-R8 Continuation decision (P0)
 - Status: `[ ]` (open: needs R4, R5, R6, R7; deliverable `B60_decision.md`)
