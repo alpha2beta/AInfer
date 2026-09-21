@@ -95,9 +95,10 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Done: Memory allocation report published; optimal allocation policy selected for model weights, states, and control buffers.
 
 ### T1.6 Dedicated concurrent CPU/GPU memory contention benchmark
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.5
 - Do: Measure iGPU weight-streaming bandwidth in isolation, then measure simultaneously under concurrent CPU memory stress (tokenization loops, host orchestration, synthetic cache-thrashing). Report the isolated vs concurrent bandwidth delta.
+  DONE 2026-09-20: Added `tools/membench/stream_read.cl`, `contention.cpp`, `stress_cpu.py`, and `run_contention.py`. Physical Arc 140V results (`tools/membench/report_contention_258v.json`, 2 GiB sequential read + D2D copy, median of 7 after 2 warmups, GPU pinned CPU0): isolated stream **103.03 GB/s** / D2D **99.23 GB/s**; tokenizer stress (2 workers) **97.73 GB/s** / 102.65 GB/s (**-5.1%** stream); 7-worker NumPy triad **61.33 GB/s** / 72.05 GB/s (**-40.5%** stream); combined triad+tokenizer **60.24 GB/s** / 66.74 GB/s (**-41.5%** stream). Stress workers were pinned to CPUs 1–7; footprint reduced to 0.25 GiB/array after an initial 1 GiB/worker design risked OOM (7 workers × 4 arrays). One forced-reboot interrupted a planned repeat; this report is a single completed run and should be repeated for release confidence.
 - Done: Contention benchmark report published, documenting DRAM bandwidth degradation under concurrent CPU load.
 
 ### T1.7 Sustainable memory bandwidth and dispatch profiling

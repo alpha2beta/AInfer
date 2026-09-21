@@ -137,3 +137,5 @@ Next: resolve the remaining critical finding (root-cause and commit the dual-tok
 
 
 
+
+**T1.6 contention (2026-09-20):** `tools/membench/report_contention_258v.json` measured isolated Arc 140V sequential read bandwidth at **103.03 GB/s**. Tokenizer stress reduced stream bandwidth 5.1%; 7-worker NumPy triad reduced it 40.5%; combined load reduced it 41.5% (60.24 GB/s). One completed run is recorded; repeat is recommended after a forced-reboot interruption.

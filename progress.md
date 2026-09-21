@@ -107,7 +107,7 @@
 | Phase | Milestone | Scope | Status | Done / Total |
 |---|---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ **Done** | 6 / 6 |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 3 / 8 |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 4 / 8 |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[~]` In Progress | 4 / 5 |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ validation, rejection | ✅ **Done** | 6 / 6 |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet, Attn | ✅ **Done** | 7 / 7 |
@@ -144,7 +144,7 @@
 | **T1.3** | Level Zero device probe on Arc 140V | `[x]` | Ported `probe.cpp` to Arc 140V (`8086:64a0`), emitted `tools/l0probe/report_258v.json` |
 | **T1.4** | ESIMD, DP4A, and DPAS / XMX audit | `[x]` | Audited DPAS/XMX on Arc 140V (Xe2); discovered native INT4 DPAS (`dpas.8x1 ...:s4 :s4`) and `dpas.8x8` SIMD16; prototype achieved 1.90x speedup on M=8192; emitted `tools/esimd_check/report_esimd_258v.json` & `tools/bench_gemv/report_dpas_evaluation.json` (status: GO) |
 | **T1.5** | Unified memory allocation benchmarking | `[ ]` | `zeMemAllocDevice` vs `Shared` comparison |
-| **T1.6** | Dedicated CPU/GPU memory contention benchmark | `[ ]` | Critical gated benchmark for MoE on shared RAM |
+| **T1.6** | Dedicated CPU/GPU memory contention benchmark | `[x]` | Isolated 103.03 GB/s; tokenizer -5.1%; triad -40.5%; combined -41.5% (`tools/membench/report_contention_258v.json`). Single completed run; repeat owed for release confidence after forced-reboot interruption. |
 | **T1.7** | Sustainable bandwidth and dispatch profiling | `[ ]` | Profile steady-state vs cold launch |
 | **T1.8** | Build system and smoke test integration | `[ ]` | Add `CMakePresets.json` preset `258v` |
 
@@ -465,11 +465,13 @@
   - `tools/fuzz/fuzz_cache_import.cpp` (ASan+UBSan, in-process `import_diagnostic_cache`, valid exported cache as seed): **2000 iters, 0 findings, worst 0.30 s** — header/geometry/payload mutants all rejected cleanly.
   - `tools/fuzz/fuzz_cli_parse.cpp` (differential vs independent oracle): **2,000,000 iters + 38 fixed edge cases, 0 findings**; one grammar mismatch fixed (explicit digit-scan replaced `stol` whitespace/`+` quirks).
   - Dashboard **52/62**. Only T9.5 remains in Phase 9.
-- **2026-09-20 (T9.5 fault injection — DONE, Phase 9 at 5/5, Gate M8 PASSED):**
+- **2026-09-20 (T1.6 contention benchmark — DONE, M1 at 4/8):**
+  - Physical Arc 140V measurement: isolated 103.03 GB/s; tokenizer stress -5.1%; NumPy triad -40.5%; combined -41.5%. Report: `tools/membench/report_contention_258v.json`. A planned repeat was interrupted by a forced reboot; retain one completed run and repeat for release confidence.
+- **2026-09-20 (T9.5 fault injection — DONE, Phase 9 at 5/5, Gate M8 PASSED):
   - New `tools/fuzz/fault_inject.py` + `fault_driver.cpp`: **19/19 cases pass** (`tools/fuzz/report_fault_inject.json`) — container faults (rc 1 / init=false), cache faults incl. CRC-valid-but-insane position (import=false, sentinel untouched), ENOSPC export (now false), CLI garbage (exit 2, never SIGABRT).
   - Three real findings fixed: per-tensor payload-CRC verification at load (was silent-load; +~9 s, mirrors l0load), export short-write detection (was silent-true), SPIR-V magic+version pre-check (loader exited 10 on garbage; residual valid-header corruption documented as driver limitation).
   - Harness lessons: 19 GiB `bytearray(f.read())` mutation got OOM-killed twice — rewritten to copy + seek-write; added `--resume` after two external kills mid-run. True mid-run device loss not simulable (T8.3 health monitoring covers it instead).
-  - Dashboard **53/62**. Phase 9 complete; remaining open work is Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) plus deferred T10.2/vision.
+  - Dashboard **54/62**. Phase 9 complete; remaining open work is Phase 1 remainder (T1.2, T1.5–T1.8, T2.5) plus deferred T10.2/vision.
 - **2026-09-20 (T7.1/T7.5 clean re-run — Stamp-3 regression resolved):**
   - Rebuilt `bench_258v` from committed source, ran `run_benchmark_t71.py` + `run_llama_comparison_t75.py` on current HEAD: **35.06 tok/s** decode (−1.4% vs committed 35.54, within ±7% variance), prefill 116.49 tok/s, jitter p50=28.51/p95=29.18 ms; comparison 1.20x vs Vulkan (29.33), 3.51x vs CPU (9.98). The 30.48 outlier did not reproduce — retired as a bad run under load. Fresh reports committed.
   - Verified dual-token MTP code and `report_speculative_258v.json` committed in-tree (Stamp-3 "uncommitted" claims now stale — corrected in `tasks.md` T10.1, `STATUS.md` Gate M6/MTP rows).

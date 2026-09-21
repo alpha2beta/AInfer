@@ -1,0 +1,69 @@
+{
+ "task": "T1.6",
+ "device": "Intel Arc 140V (Xe2, Lunar Lake 258V)",
+ "timestamp": "2026-09-20T08:54:19Z",
+ "method": {
+  "gpu_work": "2 GiB sequential float4 stream-read kernel + D2D copy, host fence timing, median of 7 after 2 warmup, GPU bench pinned to CPU 0",
+  "cpu_stress": "numpy triad workers (1 GiB each, spawn ctx) and/or tok.py encode loops pinned to CPUs 1-7",
+  "host_loadavg_during_run": [
+   "7.14",
+   "14.93",
+   "22.32"
+  ]
+ },
+ "phases": {
+  "isolated": {
+   "label": "isolated",
+   "buffer_gib": 2.0,
+   "stream_read_ms": 20.842,
+   "stream_read_gbs": 103.03,
+   "d2d_copy_ms": 43.281,
+   "d2d_copy_gbs": 99.23
+  },
+  "tokenize": {
+   "label": "tokenize",
+   "buffer_gib": 2.0,
+   "stream_read_ms": 21.973,
+   "stream_read_gbs": 97.73,
+   "d2d_copy_ms": 41.839,
+   "d2d_copy_gbs": 102.65
+  },
+  "triad": {
+   "label": "triad",
+   "buffer_gib": 2.0,
+   "stream_read_ms": 35.015,
+   "stream_read_gbs": 61.33,
+   "d2d_copy_ms": 59.615,
+   "d2d_copy_gbs": 72.05
+  },
+  "combined": {
+   "label": "combined",
+   "buffer_gib": 2.0,
+   "stream_read_ms": 35.647,
+   "stream_read_gbs": 60.24,
+   "d2d_copy_ms": 64.358,
+   "d2d_copy_gbs": 66.74
+  }
+ },
+ "contention_delta_vs_isolated": {
+  "tokenize": {
+   "stream_read_gbs": 97.73,
+   "delta_gbs": -5.3,
+   "delta_pct": -5.1,
+   "d2d_copy_gbs": 102.65
+  },
+  "triad": {
+   "stream_read_gbs": 61.33,
+   "delta_gbs": -41.7,
+   "delta_pct": -40.5,
+   "d2d_copy_gbs": 72.05
+  },
+  "combined": {
+   "stream_read_gbs": 60.24,
+   "delta_gbs": -42.79,
+   "delta_pct": -41.5,
+   "d2d_copy_gbs": 66.74
+  }
+ },
+ "all_pass": true
+}
