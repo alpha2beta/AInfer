@@ -14,7 +14,7 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 1 remainder (T1.2, T1.8, T2.5) and T10.2/vision (deferred); Phase 9 complete
+- **Current Focus:** Phase 1 remainder (T1.2, T1.8) and T10.2/vision (deferred); Phase 2 closed; Phase 9 complete
 - **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
@@ -43,7 +43,7 @@
 > High-Risk #1 numbers updated to verified 19.37 GB / 35.95B params; tasks.md X1 `[ ]`→`[~]`.
 >
 > **Known waivers (work signed off with deps still open):** Gate M2 passed with T2.5 open (superseded by T5.1
-> on-device allocation proof; standalone T2.5 utility still owed); T4.2/T4.3 signed off with T1.4 open
+> on-device allocation proof; standalone T2.5 utility DONE 2026-09-21, waiver retired); T4.2/T4.3 signed off with T1.4 open
 > (GEMV choice rests on T4.3 inline measurements); T2.4/T3.5/T5.1 signed off with T1.5 open (device-arena policy
 > proven by `report_l0load.json`/`report_phase5.json`, formal comparison still owed); T4.2 shootout used inline
 > latencies with T1.7 profile still owed. M1 stays open until T1.2, T1.4–T1.8, T2.5 close.
@@ -79,7 +79,7 @@
 > 16K/32K/64K verified via static arena allocation and command list recording (smoke init) only.
 > Full needle retrieval at higher tiers owed to Phase 7 performance sweep or standalone follow-up.
 > *Prior waivers from Stamp 1 still open:* M1 stays open until T1.2, T1.4–T1.8, T2.5 close;
-> T2.5 standalone allocation utility still owed (superseded by T5.1 on-device proof).
+> T2.5 standalone allocation utility DONE 2026-09-21 (waiver retired).
 > Next: Phase 7 performance characterization (T7.1–T7.5), then Phase 8.
 
 ### Baseline Stamp 3 (2026-09-20)
@@ -108,7 +108,7 @@
 |---|---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ **Done** | 6 / 6 |
 | **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 6 / 8 |
-| **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[~]` In Progress | 4 / 5 |
+| **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[x]` Done | 5 / 5 |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ validation, rejection | ✅ **Done** | 6 / 6 |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet, Attn | ✅ **Done** | 7 / 7 |
 | **Phase 5** | M4: Unified Runtime | Single-process arena manager, in-memory prefill→decode, recorded loop | ✅ **Done** | 6 / 6 |
@@ -156,7 +156,7 @@
 | **T2.2** | Architecture manifest generation | `[x]` | Emitted `models/Tiel-Coder-35B-A3B-Genesis-Hermes/manifest.json` (35.95B params, 1045 tensors) |
 | **T2.3** | MoE routing topology & expert inventory | `[x]` | Mapped 3D tensor layout: `gate_up_proj` [256, 1024, 2048], `down_proj` [256, 2048, 512], active traffic ~1.45B params/tok (~0.95 GB) |
 | **T2.4** | Measured memory budget across context tiers | `[x]` | Emitted `models/Tiel-Coder-35B-A3B-Genesis-Hermes/memory_budget.json` (Headroom: 4K=8.68 GB, 16K=8.44 GB, 32K=8.13 GB, 64K=7.51 GB) |
-| **T2.5** | Empirical memory allocation validation | `[ ]` | Test full static arena allocation under OS load |
+| **T2.5** | Empirical memory allocation validation | `[x]` | 19.42 GiB arenas under load, `oom_kill` 0→0 (`report_alloc_validate_258v.json`) |
 
 ### Phase 3: `.binfer` MoE Extension and Model Exporter (M2b) — PASSED ✅
 
@@ -340,7 +340,7 @@
 - **2026-09-18 (Baseline Stamp 1):**
   - Reviewed all work since Stamp 0 against on-device evidence; signed off Phases 0/3/4/5 (Gates M0/M2b/M3/M4).
   - Doc-sync corrections: dashboard total 32→**31/62**, Phase X 1/2→0/2, P0-4/P0-5→Published, Meta focus→Phase 6, High-Risk #1→verified numbers, tasks.md X1→`[~]`.
-  - Recorded waivers: M2 passed with T2.5 open (superseded by T5.1); T4.2/T4.3 with T1.4 open; T2.4/T3.5/T5.1 with T1.5 open; shootout with T1.7 open. M1 stays open until T1.2, T1.4–T1.8, T2.5 close.
+  - Recorded waivers: M2 passed with T2.5 open (superseded by T5.1; retired 2026-09-21 with standalone utility DONE); T4.2/T4.3 with T1.4 open; T2.4/T3.5/T5.1 with T1.5 open; shootout with T1.7 open. M1 stays open until T1.2, T1.8 close.
 - **2026-09-18 (Baseline Stamp 2):**
   - Reviewed Phase 6 completion against on-device evidence; signed off Phase 6 (Gate M5). All 7 report artifacts verified on disk.
   - Doc-sync corrections: `agy.md` Phase 6→`✅ Done (6/6)`, header→"Baseline Stamp 2"/"37/62", focus→Phase 7; restored Stamp 1 changelog entry.
@@ -480,6 +480,9 @@
   - New `tools/membench/alloc_policy.cpp`: 1 GiB allocs per type — warm streaming identical once resident (device 105.79 / shared 104.59 / host 104.68 GB/s, unified memory, no migration penalty); device first-touch slower (73.48 vs 96.97 GB/s, one-time init cost); H2D copy 27.00 GB/s; D2H 4-byte token readback 22.91 µs. Policy confirmed: device arenas for weights/states (T5.1 waiver now measured), shared/host-visible for control + token paths. `tools/membench/report_alloc_258v.json`.
   - New `tools/membench/stream_strided.cl` + `dispatch_profile.cpp`: sequential 105.82 GB/s (cold 19.49 ms, ~2x) vs stride-64 collapse 6.64 GB/s (16x); empty-list launch 5.2 µs; barrier cost below resolution (<25 µs upper bound — negative deltas reported honestly as noise); 60 s sustained drift −0.03% (no throttling). `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`: no measurable difference. Immediate lists (`AINFER_IMM=1`): work for ~36 submissions then hang deterministically on sustained resubmission (3x repro incl. pacing control; minimal probe proves barrier+event sync works in isolation) — recorded as finding, production stays on regular lists. `tools/membench/report_dispatch_258v.json`.
   - Dashboard **56/62**. M1 remainder is now T1.2, T1.8, T2.5 only.
+- **2026-09-21 (T2.5 allocation validation — DONE, Phase 2 at 5/5, M2 waiver retired):**
+  - New `tools/membench/alloc_validate.cpp`: full 64K-tier budget (19.42 GiB: payload 17.32 GiB + scales 521 MiB + KV 1.28 GiB + SSM 62.8 MiB + workspace 256 MiB) via `zeMemAllocDevice` under load (2 CPU triad workers + ambient), first-touch via MemoryFill + sampled readback. Cold run: alloc 3.8 s, first-touch 9.3 s (true commitment cost), `oom_kill` 0→0, swap −109 MB, zram +8.4 MB (0.5% — paging, not thrashing), 5.2 GB MemAvailable remaining. Warm re-run re-touches in 68 ms (pages still resident) — both numbers recorded, cold is the honest one. `tools/membench/report_alloc_validate_258v.json`.
+  - Dashboard **57/62**. M1 remainder is now T1.2, T1.8 only.
 - **2026-09-21 (T10.1 follow-up — MTP acceptance analysis):**
   - Trace analysis of `report_mtp_258v.json` (80 samples) + overhead accounting vs `report_speculative_258v.json`: position effect real (early-step α=0.43 → late-step α=0.82, rejects cluster at generation start) but warmup gating NOT recommended — trace sim (rollback swept 0–10 ms) lands within ±2% of always-speculate because the 3.26 ms draft is only 11% of the 29.8 ms trunk (breakeven α≈0.28). Main gap is 5–9 ms/round integration overhead (extra submits + host loop + rollback; 20–30% tax, explains projected-1.44x vs realized-1.198x). Next: profile per-submit timestamps, then attack round overhead. Report: `tools/mtp/report_mtp_acceptance_analysis.json`; noted in `tasks.md` T10.1. No count change (analysis, not a new task).
   - Corrections recorded: `report_accept.json` is B60/Qwen3.8-27B-era (64-layer trunk, `/mnt/usb` paths) and excluded from 258V conclusions; 258V runtime is BF16-KV only — KV8×MTP needs an INT8-KV port into `runtime_258v`, not a flag flip.

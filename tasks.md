@@ -149,11 +149,12 @@ Phase gate M1: Target hardware verified, software stack pinned, unified memory c
 - Done: Memory budget verified with explicit safety headroom calculation against 32 GB system RAM.
 
 ### T2.5 Empirical memory allocation validation
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T2.4, T1.5
 - Do: Build a test utility that allocates the full budget arenas on Arc 140V via Level Zero under realistic system load. Verify that allocation succeeds without invoking Linux OOM-killer, zram thrashing, or swap degradation.
 - Note (2026-09-18 waiver): Gate M2/M2b + M4 were signed off with T2.5 still open because T5.1 superseded it in practice — `tools/decode/report_phase5.json` proves 17.99 GiB static arenas allocate cleanly on the 32 GB machine with 14.01 GiB headroom and 0 KB RSS growth over 10 runs (T5.6). A standalone T2.5 allocation utility is still owed before M2a can be called fully closed.
 - Done: Physical allocation test passes with documented safety margin on the 258V platform.
+- DONE 2026-09-21: `tools/membench/alloc_validate.cpp` allocates the full 64K-tier budget (payload 17.32 GiB + scales 521 MiB + KV 1.28 GiB + SSM 62.8 MiB + workspace 256 MiB = 19.42 GiB) via `zeMemAllocDevice` under load (2 CPU triad workers + ambient box load), first-touches every page (MemoryFill + sampled readback verify). Cold run: alloc 3.8 s, first-touch 9.3 s, `oom_kill` 0→0, swap −109 MB, zram +8.4 MB (0.5% — paging, not thrashing), 5.2 GB MemAvailable remaining. Warm re-run: re-touch 68 ms (pages still resident). Report: `tools/membench/report_alloc_validate_258v.json`. M2 waiver retired — M2a fully closed.
 
 Phase gate M2a: Checkpoint topology verified, machine-readable manifest generated, physical memory fit proven.
 

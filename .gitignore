@@ -72,4 +72,5 @@ tools/mtp/profile_verify_layers
 tools/membench/contention
 tools/membench/alloc_policy
 tools/membench/dispatch_profile
+tools/membench/alloc_validate
 tools/bench_258v/profile_prefill
