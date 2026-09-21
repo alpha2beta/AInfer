@@ -1,4 +1,4 @@
-# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-21, 58/62 done, Phase 9 complete; M1 at 7/8, Phase 2 closed)
+# AInfer — Project Status: Intel Core Ultra 7 258V (as of 2026-09-21, 59/62 done, Phase 9 complete; M1 at 8/8, Phase 2 closed)
 
 ## What it is
 
@@ -8,12 +8,12 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ---
 
-## Overall Health: Green (58/62 done; Phases 0/2/3/4/5/6/7/8/9 passed, Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off; M1 at 7/8)
+## Overall Health: Green (59/62 done; Phases 0/1/2/3/4/5/6/7/8/9 passed, Gates M0/M1/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 | Phase | Milestone | Scope | Status |
 |---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ Done (6/6) |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress (7/8; T1.1, T1.3–T1.8 done) |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[x]` Done (8/8; T1.1–T1.8 done) |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, budget | `[x]` Done (5/5; T2.5 measured 2026-09-21) |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ loader, rejection | ✅ Done (6/6) |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet | ✅ Done (7/7) |
@@ -37,5 +37,5 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ## Immediate Next Actions
 
-1. **Phase 1 remainder (M1 still open):** T1.2 container/rollback.
+1. **Phase 1 is complete:** T1.1–T1.8 are closed; remaining work is optional long-context measurement and deferred vision scope.
 3. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.

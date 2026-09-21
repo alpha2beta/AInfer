@@ -1,0 +1,61 @@
+{
+  "task": "T1.2",
+  "status": "PASSED",
+  "scope": "offline pinned CachyOS Intel runtime/sysroot; rootless user+mount namespace",
+  "rollback_unit": "tools/toolchain/cache/*.pkg.tar.zst + tools/toolchain/sysroot",
+  "snapshot": {
+    "packages": [
+      {
+        "name": "intel-compute-runtime-26.31.39395.13-1.1-x86_64_v3.pkg.tar.zst",
+        "sha256": "c83335828993ff36c080191dabaeb50f8ebb712f186ae97f46136b37dc06e75b",
+        "bytes": 7425097
+      },
+      {
+        "name": "intel-graphics-compiler-1:2.40.13-1.1-x86_64_v3.pkg.tar.zst",
+        "sha256": "76c77bcdc87740906ad2d0713713215f835551f744336815d8b1a41d9b560676",
+        "bytes": 74779877
+      },
+      {
+        "name": "level-zero-loader-1.32.0-1-x86_64.pkg.tar.zst",
+        "sha256": "9cf5518c86b41f4bfb0a389eeaf3d968c6bd0787a54cddfc8962ddd1436f6c5a",
+        "bytes": 609739
+      }
+    ],
+    "sysroot_buildinfo_sha256": "5b68cc7e9079152aeac76eb3ab2cb74d5d2a31ae9c318469df6eab2784444a33",
+    "sysroot_pkginfo_sha256": "3aef69f088acd483ec0eefcb0fad432dddf23e21400e93df96a66d70289d369c",
+    "loader_sha256": "023c7017ce1dd924919444fb27a020ec963fd41fb7447b22aab8efed748ad78b",
+    "loader_bytes": 760000
+  },
+  "baseline": {
+    "returncode": 0,
+    "seconds": 0.054,
+    "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
+  },
+  "private_baseline": {
+    "returncode": 0,
+    "seconds": 0.046,
+    "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
+  },
+  "rollback_failure": {
+    "returncode": 127,
+    "seconds": 0.001,
+    "output": "/home/yanchun/Projects/AInfer/build-258v/tools/l0probe/l0_timestamp_smoke: error while loading shared libraries: <private-sysroot>/usr/lib/libze_loader.so.1: file too short"
+  },
+  "restored": {
+    "returncode": 0,
+    "seconds": 0.057,
+    "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
+  },
+  "checks": {
+    "baseline_pass": true,
+    "private_baseline_pass": true,
+    "bad_runtime_rejected": true,
+    "restored_pass": true,
+    "snapshot_unchanged": true
+  },
+  "notes": [
+    "No host package database or system files were modified.",
+    "The negative phase substitutes an invalid loader in a private copied sysroot.",
+    "This validates the pinned runtime rollback unit, not a full distro upgrade rollback."
+  ]
+}

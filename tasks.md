@@ -68,10 +68,11 @@ Phase gate M0: Scope bounded, target machine and model identities pinned, feasib
 - Done: Written toolchain documentation exists; environment can be reproduced exactly from the local package cache.
 
 ### T1.2 Reproducible container/chroot and rollback procedure
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: T1.1
 - Do: Build a reproducible container or chroot from the pinned CachyOS package snapshot. Test and verify a step-by-step downgrade/rollback procedure to guard against rolling-release driver breakage.
 - Done: Container/chroot build verified and rollback procedure tested successfully.
+- DONE 2026-09-21: `tools/toolchain/t12_rollback.py` performs an offline, rootless pinned-runtime rollback test. It hashes all three cached CachyOS Intel packages plus sysroot metadata and loader, runs `l0_timestamp_smoke` in an unprivileged user+mount namespace, runs a private copied-sysroot baseline, substitutes a deterministic invalid loader and verifies rejection, restores the pinned loader, verifies recovery, and confirms the host sysroot hash is unchanged. `tools/toolchain/report_t12_rollback.json`: all 5 checks passed. Scope is the pinned Intel runtime/sysroot rollback unit, not a full distro upgrade rollback, because the repository carries a package cache and extracted sysroot rather than a complete CachyOS root filesystem.
 
 ### T1.3 Level Zero device capability probe on Arc 140V
 - Status: `[x]`

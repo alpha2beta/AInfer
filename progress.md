@@ -14,7 +14,7 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Phase 1 remainder (T1.2) and T10.2/vision (deferred); Phase 2 closed; Phase 9 complete
+- **Current Focus:** Optional 16K long-context wall-clock validation and T10.2/vision (deferred); Phases 1/2/9 complete
 - **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
@@ -107,7 +107,7 @@
 | Phase | Milestone | Scope | Status | Done / Total |
 |---|---|---|---|---|
 | **Phase 0** | M0: Migration Contract | Scope, identifiers, feasibility, acceptance gates | ✅ **Done** | 6 / 6 |
-| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[~]` In Progress | 7 / 8 |
+| **Phase 1** | M1: Platform Ready | CachyOS toolchain, L0 probe, unified memory, contention | `[x]` Done | 8 / 8 |
 | **Phase 2** | M2a: Model Manifest | SafeTensors headers, manifest, MoE inventory, memory budget | `[x]` Done | 5 / 5 |
 | **Phase 3** | M2b: MoE Container | MoE `.binfer` spec, quantizer, Python/C++ validation, rejection | ✅ **Done** | 6 / 6 |
 | **Phase 4** | M3: Kernels Correct | Deterministic router, expert shootout, INT4 GEMV, DeltaNet, Attn | ✅ **Done** | 7 / 7 |
@@ -140,7 +140,7 @@
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
 | **T1.1** | Toolchain pinning and package snapshotting | `[x]` | Pinned packages cached in `tools/toolchain/cache/`, extracted to sysroot |
-| **T1.2** | Reproducible container/chroot & rollback | `[ ]` | Requires package cache snapshot |
+| **T1.2** | Reproducible container/chroot & rollback | `[x]` | Rootless pinned-runtime snapshot/rollback, 5/5 checks pass |
 | **T1.3** | Level Zero device probe on Arc 140V | `[x]` | Ported `probe.cpp` to Arc 140V (`8086:64a0`), emitted `tools/l0probe/report_258v.json` |
 | **T1.4** | ESIMD, DP4A, and DPAS / XMX audit | `[x]` | Audited DPAS/XMX on Arc 140V (Xe2); discovered native INT4 DPAS (`dpas.8x1 ...:s4 :s4`) and `dpas.8x8` SIMD16; prototype achieved 1.90x speedup on M=8192; emitted `tools/esimd_check/report_esimd_258v.json` & `tools/bench_gemv/report_dpas_evaluation.json` (status: GO) |
 | **T1.5** | Unified memory allocation benchmarking | `[x]` | Warm streaming identical (~105 GB/s all types); device first-touch slower (one-time); D2H token 22.9 µs (`report_alloc_258v.json`) |
@@ -492,3 +492,6 @@
 - **2026-09-21 (T10.1 per-submit profiling):**
   - Instrumented `runtime_258v.cpp` behind `AINFER_SPEC_PROFILE=1` to split host setup, dual verification, decision, rollback, state-copy, draft, and total round time. 96 rounds: dual verify **45.989 ms**, draft **3.282 ms**, rollback **0.392 ms average** (1.307 ms on rejected rounds), state copy **0.048 ms**, unattributed gap **0.001 ms**; acceptance 66/96 (68.75%).
   - Correction: the earlier 5–9 ms/round integration-overhead estimate came from subtracting medians across different harness runs and is not supported by this timestamped run. The optimization target is dual-token verification; host gating and rollback are not the dominant cost. Report: `tools/mtp/report_mtp_submit_profile_258v.json`.
+- **2026-09-21 (T1.2 pinned-runtime rollback — DONE, M1 PASSED 8/8):**
+  - Added `tools/toolchain/t12_rollback.py` and `report_t12_rollback.json`. The harness hashes all three cached Intel packages and sysroot metadata, runs the Level Zero timestamp smoke in a rootless user+mount namespace, mutates only a private copied sysroot with an invalid loader, verifies failure, restores the pinned loader, verifies recovery, and confirms the host loader hash is unchanged.
+  - **5/5 checks passed:** baseline, private baseline, bad-runtime rejection, restored runtime, and snapshot unchanged. Dashboard **59/62**. Scope is explicitly the pinned Intel runtime/sysroot rollback unit, not a full distro rollback because no complete CachyOS root filesystem is stored in the repository.
