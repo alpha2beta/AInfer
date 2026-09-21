@@ -1,0 +1,22 @@
+{
+  "task": "T10.1-followup-KV8-trunk-quality",
+  "status": "PASSED",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "mode": "AINFER_KV8=1",
+  "scope": "trunk-only KV8 vs BF16 baseline on full quality gates; identical runtime path, no MTP",
+  "quality_corpus": {
+    "bf16_pass": 186,
+    "kv8_pass": 186,
+    "total": 200,
+    "bf16_pct": 93.0,
+    "kv8_pct": 93.0,
+    "differing_cases": 2,
+    "differing_ids": ["arit-019", "retr-002"]
+  },
+  "needle_4k": {
+    "bf16_pass": 6,
+    "kv8_pass": 6,
+    "total": 6
+  },
+  "verdict": "Trunk-only KV8 preserves BF16 quality on the 200-case corpus and 4K needle retrieval for the current path. MTP-integrated KV8 quality still requires a separate gate."
+}

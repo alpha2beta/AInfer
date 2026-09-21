@@ -1,0 +1,17 @@
+{
+  "task": "T10.1-followup-KV8-128K-alloc",
+  "status": "PASSED_ALLOC_ONLY",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "target_ctx": 131328,
+  "arena_bytes": {
+    "bf16": 2689609728,
+    "kv8_int8": 1344804864,
+    "kv8_saving_bytes": 1344804864,
+    "kv8_saving_mib": 1282.5
+  },
+  "runtime_smokes": {
+    "bf16_init": true,
+    "kv8_init": true
+  },
+  "verdict": "128K KV arena allocation fits in both precisions; KV8 halves cache (2.51 GiB -> 1.25 GiB). No 128K prefill or long-context execution claim is made."
+}
