@@ -247,6 +247,10 @@ struct LayerBinding {
   void *k_norm_w;
   void *k_cache; // [2, max_ctx, 256] BF16
   void *v_cache; // [2, max_ctx, 256] BF16
+  void *k_cache_i8 = nullptr;
+  void *v_cache_i8 = nullptr;
+  void *k_scale_i8 = nullptr;
+  void *v_scale_i8 = nullptr;
 
   // MoE weights
   void *router_w;
@@ -484,6 +488,7 @@ private:
   uint64_t pay_lo_ = UINT64_MAX, pay_hi_ = 0;
   uint64_t sc_lo_ = UINT64_MAX, sc_hi_ = 0;
   uint32_t max_ctx_ = 2048;
+  bool kv8_enabled_ = false;
 
   // Level Zero Handles
   ze_driver_handle_t drv_ = nullptr;
@@ -493,12 +498,14 @@ private:
   ze_command_list_handle_t cmd_copy_ = nullptr;
   ze_fence_handle_t fence_ = nullptr;
   ze_module_handle_t mod_ = nullptr;
+  ze_module_handle_t mod_kv8_ = nullptr;
   char dev_name_[256] = "Intel Arc 140V";
 
   // Static Arenas (T5.1)
   void *pay_arena_ = nullptr;
   void *sc_arena_ = nullptr;
   void *kv_cache_arena_ = nullptr;
+  void *kv_scale_arena_ = nullptr;
   void *ssm_recr_arena_ = nullptr;
   void *ssm_conv_arena_ = nullptr;
   void *workspace_arena_ = nullptr;
@@ -506,6 +513,7 @@ private:
   RuntimeControl h_ctrl_{};          // Host shadow control block
 
   uint64_t kv_cache_bytes_ = 0;
+  uint64_t kv_scale_bytes_ = 0;
   uint64_t ssm_state_bytes_ = 0;
   uint64_t workspace_bytes_ = 0;
   CheckedArena workspace_bump_; // T9.1: checked bump ledger for workspace_arena_
@@ -587,6 +595,8 @@ private:
   ze_kernel_handle_t k_add_shared_ctrl_ = nullptr;
   ze_kernel_handle_t k_rope_ctrl_ = nullptr;
   ze_kernel_handle_t k_attn_ctrl_ = nullptr;
+  ze_kernel_handle_t k_rope_ctrl_i8_ = nullptr;
+  ze_kernel_handle_t k_attn_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_deinterleave_qg_ = nullptr;
   ze_kernel_handle_t k_argmax2_ctrl_ = nullptr;
 
@@ -662,6 +672,8 @@ private:
   ze_kernel_handle_t k_deinterleave_qg_batch_ = nullptr;
   ze_kernel_handle_t k_rope_batch_ = nullptr;
   ze_kernel_handle_t k_attn_batch_ = nullptr;
+  ze_kernel_handle_t k_rope_batch_i8_ = nullptr;
+  ze_kernel_handle_t k_attn_batch_i8_ = nullptr;
   ze_kernel_handle_t k_router_batch_ = nullptr;
   ze_kernel_handle_t k_moe_build_expert_bins_ = nullptr;
   ze_kernel_handle_t k_moe_gateup_grouped_batch_ = nullptr;

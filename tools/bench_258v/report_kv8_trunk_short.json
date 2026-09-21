@@ -1,0 +1,31 @@
+{
+  "task": "T10.1-followup-KV8-trunk",
+  "status": "PASSED_SHORT_CONTEXT",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "mode": "AINFER_KV8=1",
+  "scope": "trunk-only KV8 prefill/decode; MTP disabled",
+  "companion_module": "tools/kernels_258v/all_kernels.spv.kv8",
+  "short_smoke": {
+    "prompt_tokens": 8,
+    "max_new": 2,
+    "max_ctx": 64,
+    "bf16_generated_ids": [148431, 62497],
+    "kv8_generated_ids": [148431, 62497],
+    "bf16_prefill_ms": 120.126,
+    "kv8_prefill_ms": 139.06,
+    "bf16_decode_tok_per_s": 35.8012,
+    "kv8_decode_tok_per_s": 34.3857
+  },
+  "longer_smoke": {
+    "prompt_tokens": 64,
+    "max_new": 8,
+    "max_ctx": 128,
+    "bf16_generated_ids": [151644, 8948, 198, 2610, 525, 264, 10925, 151645],
+    "kv8_generated_ids": [151644, 8948, 198, 2610, 525, 264, 10925, 151645],
+    "bf16_prefill_ms": 295.238,
+    "kv8_prefill_ms": 308.113,
+    "bf16_decode_tok_per_s": 34.8941,
+    "kv8_decode_tok_per_s": 34.7467
+  },
+  "verdict": "Trunk-only KV8 is short-context parity-qualified for these smoke prompts. MTP is not integrated with this path; no quality-suite qualification or 128K runtime claim is made."
+}

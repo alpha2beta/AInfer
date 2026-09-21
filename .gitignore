@@ -41,6 +41,7 @@ tools/l0probe/build/
 
 # Compiled test/bench binaries, shared libs & SPIR-V (rebuilt from committed .cpp/.cl)
 *.spv
+*.spv.kv8
 *.so
 *.bin
 tools/bench_gemv/bench_dpas_prototype

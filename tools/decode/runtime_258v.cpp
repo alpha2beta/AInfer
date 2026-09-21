@@ -216,11 +216,18 @@ bool AInferRuntime258V::allocate_static_arenas() {
     CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, sc_size, 4096, dev_, &sc_arena_));
   }
 
-  // 3. Static KV Cache Arena (10 layers, 2 heads, max_ctx, 256 dim, BF16)
-  // Cache per layer: K [2, max_ctx, 256] + V [2, max_ctx, 256]
-  size_t layer_kv_bytes = (size_t)NUM_KV_HEADS * max_ctx_ * HEAD_DIM * sizeof(uint16_t);
+  // 3. Static KV Cache Arena. KV8 is opt-in; BF16 remains the default.
+  const char *kv8_env = std::getenv("AINFER_KV8");
+  kv8_enabled_ = kv8_env && kv8_env[0] == '1';
+  size_t kv_elem_bytes = kv8_enabled_ ? sizeof(int8_t) : sizeof(uint16_t);
+  size_t layer_kv_bytes = (size_t)NUM_KV_HEADS * max_ctx_ * HEAD_DIM * kv_elem_bytes;
   kv_cache_bytes_ = (size_t)NUM_FULL_ATTN_LAYERS * 2 * layer_kv_bytes;
   CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, kv_cache_bytes_, 4096, dev_, &kv_cache_arena_));
+  kv_scale_bytes_ = kv8_enabled_
+      ? (size_t)NUM_FULL_ATTN_LAYERS * 2 * max_ctx_ * NUM_KV_HEADS * sizeof(float)
+      : 0;
+  if (kv_scale_bytes_)
+    CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, kv_scale_bytes_, 4096, dev_, &kv_scale_arena_));
 
   // 4. Static SSM Recurrent State Arena (30 layers, 32 heads, 128 x 128, FP32)
   size_t layer_ssm_recr_bytes = (size_t)H_V * S_V * S_V * sizeof(float);
@@ -397,8 +404,17 @@ bool AInferRuntime258V::allocate_static_arenas() {
         return false;
       }
       size_t slot_offset = (size_t)lb.full_slot * (2 * layer_kv_bytes);
-      lb.k_cache = (char *)kv_cache_arena_ + slot_offset;
-      lb.v_cache = (char *)kv_cache_arena_ + slot_offset + layer_kv_bytes;
+      if (kv8_enabled_) {
+        lb.k_cache_i8 = (char *)kv_cache_arena_ + slot_offset;
+        lb.v_cache_i8 = (char *)kv_cache_arena_ + slot_offset + layer_kv_bytes;
+        size_t scale_layer = (size_t)max_ctx_ * NUM_KV_HEADS * sizeof(float);
+        size_t scale_offset = (size_t)lb.full_slot * 2 * scale_layer;
+        lb.k_scale_i8 = (char *)kv_scale_arena_ + scale_offset;
+        lb.v_scale_i8 = (char *)kv_scale_arena_ + scale_offset + scale_layer;
+      } else {
+        lb.k_cache = (char *)kv_cache_arena_ + slot_offset;
+        lb.v_cache = (char *)kv_cache_arena_ + slot_offset + layer_kv_bytes;
+      }
     } else {
       lb.linear_slot = linear_slot_cnt++;
       lb.full_slot = -1;
@@ -503,8 +519,15 @@ bool AInferRuntime258V::verify_bindings() const {
         std::fprintf(stderr, "[verify_bindings] %s: bad full_slot %d\n", ctx, lb.full_slot);
         return false;
       }
-      VB_PTR(lb.k_cache, kv_cache_arena_, kv_cache_bytes_, "k_cache");
-      VB_PTR(lb.v_cache, kv_cache_arena_, kv_cache_bytes_, "v_cache");
+      if (kv8_enabled_) {
+        VB_PTR(lb.k_cache_i8, kv_cache_arena_, kv_cache_bytes_, "k_cache_i8");
+        VB_PTR(lb.v_cache_i8, kv_cache_arena_, kv_cache_bytes_, "v_cache_i8");
+        VB_PTR(lb.k_scale_i8, kv_scale_arena_, kv_scale_bytes_, "k_scale_i8");
+        VB_PTR(lb.v_scale_i8, kv_scale_arena_, kv_scale_bytes_, "v_scale_i8");
+      } else {
+        VB_PTR(lb.k_cache, kv_cache_arena_, kv_cache_bytes_, "k_cache");
+        VB_PTR(lb.v_cache, kv_cache_arena_, kv_cache_bytes_, "v_cache");
+      }
       VB_PTR(lb.q_proj_w, pay_arena_, pay_size, "q_proj_w");
       VB_PTR(lb.o_proj_w, pay_arena_, pay_size, "o_proj_w");
     } else {
@@ -687,6 +710,39 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   ze_module_desc_t mdesc = {ZE_STRUCTURE_TYPE_MODULE_DESC, nullptr, ZE_MODULE_FORMAT_IL_SPIRV,
                             spv_size, spv.data(), nullptr, nullptr};
   CHECK_L0(zeModuleCreate(ctx_, dev_, &mdesc, &mod_, nullptr));
+
+  auto load_kv8_module = [&]() -> bool {
+    std::string path = spv_path + ".kv8";
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+      std::fprintf(stderr, "AINFER_KV8 requires companion SPIR-V module %s\n", path.c_str());
+      return false;
+    }
+    f.seekg(0, std::ios::end);
+    size_t n = (size_t)f.tellg();
+    f.seekg(0, std::ios::beg);
+    std::vector<uint8_t> b(n);
+    f.read((char *)b.data(), n);
+    ze_module_desc_t d{ZE_STRUCTURE_TYPE_MODULE_DESC, nullptr, ZE_MODULE_FORMAT_IL_SPIRV,
+                       n, b.data(), nullptr, nullptr};
+    if (zeModuleCreate(ctx_, dev_, &d, &mod_kv8_, nullptr) != ZE_RESULT_SUCCESS)
+      return false;
+    auto get8 = [&](const char *name) -> ze_kernel_handle_t {
+      ze_kernel_desc_t kd{ZE_STRUCTURE_TYPE_KERNEL_DESC, nullptr, 0, name};
+      ze_kernel_handle_t k = nullptr;
+      if (zeKernelCreate(mod_kv8_, &kd, &k) != ZE_RESULT_SUCCESS) return nullptr;
+      return k;
+    };
+    k_rope_ctrl_i8_ = get8("kv8_append_ctrl");
+    k_attn_ctrl_i8_ = get8("kv8_attn_ctrl");
+    k_rope_batch_i8_ = get8("kv8_append_batch");
+    k_attn_batch_i8_ = get8("kv8_attn_batch");
+    return k_rope_ctrl_i8_ && k_attn_ctrl_i8_ && k_rope_batch_i8_ && k_attn_batch_i8_;
+  };
+  if (kv8_enabled_ && !load_kv8_module()) {
+    std::fprintf(stderr, "Failed to load required KV8 companion kernels\n");
+    return false;
+  }
 
   auto get_k = [&](const char *name) -> ze_kernel_handle_t {
     ze_kernel_desc_t kd{ZE_STRUCTURE_TYPE_KERNEL_DESC, nullptr, 0, name};
@@ -910,29 +966,57 @@ bool AInferRuntime258V::record_command_lists() {
 
       // RoPE and KV Cache Append (Device control block drives position) (T5.4)
       uint32_t max_c = max_ctx_;
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 0, sizeof(void *), &d_q_full_));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 1, sizeof(void *), &d_k_full_));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 2, sizeof(void *), &d_v_full_));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 3, sizeof(void *), &lb.k_cache));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 4, sizeof(void *), &lb.v_cache));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 5, sizeof(void *), &d_ctrl_));
-      CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 6, sizeof(uint32_t), &max_c));
-      CHECK_L0(zeKernelSetGroupSize(k_rope_ctrl_, 256, 1, 1));
       ze_group_count_t gcnt_rope{1, 1, 1};
-      APPEND_L0_K(list, k_rope_ctrl_, &gcnt_rope);
+      if (kv8_enabled_) {
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 0, sizeof(void *), &d_q_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 1, sizeof(void *), &d_k_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 2, sizeof(void *), &d_v_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 3, sizeof(void *), &lb.k_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 4, sizeof(void *), &lb.v_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 5, sizeof(void *), &lb.k_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 6, sizeof(void *), &lb.v_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 7, sizeof(void *), &d_ctrl_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_i8_, 8, sizeof(uint32_t), &max_c));
+        CHECK_L0(zeKernelSetGroupSize(k_rope_ctrl_i8_, 256, 1, 1));
+        APPEND_L0_K(list, k_rope_ctrl_i8_, &gcnt_rope);
+      } else {
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 0, sizeof(void *), &d_q_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 1, sizeof(void *), &d_k_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 2, sizeof(void *), &d_v_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 3, sizeof(void *), &lb.k_cache));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 4, sizeof(void *), &lb.v_cache));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 5, sizeof(void *), &d_ctrl_));
+        CHECK_L0(zeKernelSetArgumentValue(k_rope_ctrl_, 6, sizeof(uint32_t), &max_c));
+        CHECK_L0(zeKernelSetGroupSize(k_rope_ctrl_, 256, 1, 1));
+        APPEND_L0_K(list, k_rope_ctrl_, &gcnt_rope);
+      }
       APPEND_L0_B(list);
 
       // GQA Attention Decode (Device control block drives position) (T5.4)
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 0, sizeof(void *), &d_attn_out_));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 1, sizeof(void *), &d_q_full_));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 2, sizeof(void *), &d_gate_full_));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 3, sizeof(void *), &lb.k_cache));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 4, sizeof(void *), &lb.v_cache));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 5, sizeof(void *), &d_ctrl_));
-      CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 6, sizeof(uint32_t), &max_c));
-      CHECK_L0(zeKernelSetGroupSize(k_attn_ctrl_, 256, 1, 1));
       ze_group_count_t gcnt_attn{(uint32_t)NUM_Q_HEADS, 1, 1};
-      APPEND_L0_K(list, k_attn_ctrl_, &gcnt_attn);
+      if (kv8_enabled_) {
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 0, sizeof(void *), &d_attn_out_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 1, sizeof(void *), &d_q_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 2, sizeof(void *), &d_gate_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 3, sizeof(void *), &lb.k_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 4, sizeof(void *), &lb.v_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 5, sizeof(void *), &lb.k_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 6, sizeof(void *), &lb.v_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 7, sizeof(void *), &d_ctrl_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 8, sizeof(uint32_t), &max_c));
+        CHECK_L0(zeKernelSetGroupSize(k_attn_ctrl_i8_, 256, 1, 1));
+        APPEND_L0_K(list, k_attn_ctrl_i8_, &gcnt_attn);
+      } else {
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 0, sizeof(void *), &d_attn_out_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 1, sizeof(void *), &d_q_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 2, sizeof(void *), &d_gate_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 3, sizeof(void *), &lb.k_cache));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 4, sizeof(void *), &lb.v_cache));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 5, sizeof(void *), &d_ctrl_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_, 6, sizeof(uint32_t), &max_c));
+        CHECK_L0(zeKernelSetGroupSize(k_attn_ctrl_, 256, 1, 1));
+        APPEND_L0_K(list, k_attn_ctrl_, &gcnt_attn);
+      }
       APPEND_L0_B(list);
 
       // O Proj GEMV
@@ -1314,31 +1398,61 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_chunk_list(int
 
       // RoPE & KV Cache Append
       uint32_t max_c = max_ctx_;
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 0, sizeof(void *), &d_q_full_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 1, sizeof(void *), &d_k_full_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 2, sizeof(void *), &d_v_full_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 3, sizeof(void *), &lb.k_cache));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 4, sizeof(void *), &lb.v_cache));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 5, sizeof(void *), &d_ctrl_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 6, sizeof(uint32_t), &max_c));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 7, sizeof(int), &B));
-      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_rope_batch_, 256, 1, 1));
       ze_group_count_t gcnt_rope{(uint32_t)B, 1, 1};
-      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_rope_batch_, &gcnt_rope, nullptr, 0, nullptr));
+      if (kv8_enabled_) {
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 0, sizeof(void *), &d_q_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 1, sizeof(void *), &d_k_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 2, sizeof(void *), &d_v_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 3, sizeof(void *), &lb.k_cache_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 4, sizeof(void *), &lb.v_cache_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 5, sizeof(void *), &lb.k_scale_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 6, sizeof(void *), &lb.v_scale_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 7, sizeof(void *), &d_ctrl_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 8, sizeof(uint32_t), &max_c));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 9, sizeof(int), &B));
+        CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_rope_batch_i8_, 256, 1, 1));
+        CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_rope_batch_i8_, &gcnt_rope, nullptr, 0, nullptr));
+      } else {
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 0, sizeof(void *), &d_q_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 1, sizeof(void *), &d_k_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 2, sizeof(void *), &d_v_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 3, sizeof(void *), &lb.k_cache));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 4, sizeof(void *), &lb.v_cache));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 5, sizeof(void *), &d_ctrl_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 6, sizeof(uint32_t), &max_c));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 7, sizeof(int), &B));
+        CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_rope_batch_, 256, 1, 1));
+        CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_rope_batch_, &gcnt_rope, nullptr, 0, nullptr));
+      }
       CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
       // GQA Attention Prefill
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 0, sizeof(void *), &d_attn_out_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 1, sizeof(void *), &d_q_full_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 2, sizeof(void *), &d_gate_full_chunk_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 3, sizeof(void *), &lb.k_cache));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 4, sizeof(void *), &lb.v_cache));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 5, sizeof(void *), &d_ctrl_));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 6, sizeof(uint32_t), &max_c));
-      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 7, sizeof(int), &B));
-      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_attn_batch_, 256, 1, 1));
       ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
-      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_attn_batch_, &gcnt_attn, nullptr, 0, nullptr));
+      if (kv8_enabled_) {
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 0, sizeof(void *), &d_attn_out_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 1, sizeof(void *), &d_q_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 2, sizeof(void *), &d_gate_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 3, sizeof(void *), &lb.k_cache_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 4, sizeof(void *), &lb.v_cache_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 5, sizeof(void *), &lb.k_scale_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 6, sizeof(void *), &lb.v_scale_i8));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 7, sizeof(void *), &d_ctrl_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 8, sizeof(uint32_t), &max_c));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 9, sizeof(int), &B));
+        CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_attn_batch_i8_, 256, 1, 1));
+        CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_attn_batch_i8_, &gcnt_attn, nullptr, 0, nullptr));
+      } else {
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 0, sizeof(void *), &d_attn_out_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 1, sizeof(void *), &d_q_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 2, sizeof(void *), &d_gate_full_chunk_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 3, sizeof(void *), &lb.k_cache));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 4, sizeof(void *), &lb.v_cache));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 5, sizeof(void *), &d_ctrl_));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 6, sizeof(uint32_t), &max_c));
+        CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 7, sizeof(int), &B));
+        CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_attn_batch_, 256, 1, 1));
+        CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_attn_batch_, &gcnt_attn, nullptr, 0, nullptr));
+      }
       CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
       // Output Proj GEMM
@@ -2307,6 +2421,9 @@ bool AInferRuntime258V::reset_state() {
   uint32_t zero = 0;
   if (kv_cache_arena_ && kv_cache_bytes_ > 0) {
     CHECK_L0(zeCommandListAppendMemoryFill(cmd_copy_, kv_cache_arena_, &zero, sizeof(zero), kv_cache_bytes_, nullptr, 0, nullptr));
+  }
+  if (kv_scale_arena_ && kv_scale_bytes_ > 0) {
+    CHECK_L0(zeCommandListAppendMemoryFill(cmd_copy_, kv_scale_arena_, &zero, sizeof(zero), kv_scale_bytes_, nullptr, 0, nullptr));
   }
 
   // Zero out SSM state arenas (T5.6)
@@ -3426,6 +3543,10 @@ void AInferRuntime258V::cleanup() {
   if (k_recr_m2_spec_) zeKernelDestroy(k_recr_m2_spec_);
   if (k_lm_head_m2_argmax1_) zeKernelDestroy(k_lm_head_m2_argmax1_);
   if (k_gemv_m2_) zeKernelDestroy(k_gemv_m2_);
+  if (k_rope_ctrl_i8_) zeKernelDestroy(k_rope_ctrl_i8_);
+  if (k_attn_ctrl_i8_) zeKernelDestroy(k_attn_ctrl_i8_);
+  if (k_rope_batch_i8_) zeKernelDestroy(k_rope_batch_i8_);
+  if (k_attn_batch_i8_) zeKernelDestroy(k_attn_batch_i8_);
 
   // Destroy speculative verification command lists & buffers
   if (cmd_verify_m2_) { zeCommandListDestroy(cmd_verify_m2_); cmd_verify_m2_ = nullptr; }
@@ -3444,11 +3565,13 @@ void AInferRuntime258V::cleanup() {
   }
 
   if (mod_) { zeModuleDestroy(mod_); mod_ = nullptr; }
+  if (mod_kv8_) { zeModuleDestroy(mod_kv8_); mod_kv8_ = nullptr; }
 
   // Free static device arenas
   if (pay_arena_) { zeMemFree(ctx_, pay_arena_); pay_arena_ = nullptr; }
   if (sc_arena_) { zeMemFree(ctx_, sc_arena_); sc_arena_ = nullptr; }
   if (kv_cache_arena_) { zeMemFree(ctx_, kv_cache_arena_); kv_cache_arena_ = nullptr; }
+  if (kv_scale_arena_) { zeMemFree(ctx_, kv_scale_arena_); kv_scale_arena_ = nullptr; }
   if (ssm_recr_arena_) { zeMemFree(ctx_, ssm_recr_arena_); ssm_recr_arena_ = nullptr; }
   if (ssm_conv_arena_) { zeMemFree(ctx_, ssm_conv_arena_); ssm_conv_arena_ = nullptr; }
   if (workspace_arena_) { zeMemFree(ctx_, workspace_arena_); workspace_arena_ = nullptr; }
