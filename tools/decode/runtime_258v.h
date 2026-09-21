@@ -304,6 +304,10 @@ struct MtpBinding {
 
   void *k_cache = nullptr; // [2, max_ctx, 256] BF16
   void *v_cache = nullptr; // [2, max_ctx, 256] BF16
+  void *k_cache_i8 = nullptr;
+  void *v_cache_i8 = nullptr;
+  void *k_scale_i8 = nullptr;
+  void *v_scale_i8 = nullptr;
 
   float *d_e_raw = nullptr;    // [2048]
   float *d_e_norm = nullptr;   // [2048]

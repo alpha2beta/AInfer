@@ -1,0 +1,66 @@
+{
+  "hardware": {
+    "device": "Intel(R) Arc(TM) Graphics",
+    "target": "Intel Core Ultra 7 258V (Xe2, Lunar Lake)",
+    "os": "CachyOS (Linux 6.x rolling)"
+  },
+  "speculative_verification": {
+    "status": "PASSED",
+    "bit_exact_parity": true,
+    "mean_baseline_tok_s": 35.428,
+    "mean_speculative_tok_s": 43.7707,
+    "realized_speedup": 1.23548
+  },
+  "prompts": [
+    {
+      "prompt_idx": 0,
+      "name": "Python reverse string",
+      "bit_exact": true,
+      "tokens_compared": 32,
+      "baseline_tok_s": 35.4327,
+      "speculative_tok_s": 38.4004,
+      "speedup": 1.08376,
+      "acceptance_rate": 0.52381
+    },
+    {
+      "prompt_idx": 1,
+      "name": "Arithmetic reasoning",
+      "bit_exact": true,
+      "tokens_compared": 32,
+      "baseline_tok_s": 35.3281,
+      "speculative_tok_s": 38.5015,
+      "speedup": 1.08983,
+      "acceptance_rate": 0.47619
+    },
+    {
+      "prompt_idx": 2,
+      "name": "Factual knowledge",
+      "bit_exact": true,
+      "tokens_compared": 32,
+      "baseline_tok_s": 35.6547,
+      "speculative_tok_s": 46.0375,
+      "speedup": 1.29121,
+      "acceptance_rate": 0.777778
+    },
+    {
+      "prompt_idx": 3,
+      "name": "Code loop range",
+      "bit_exact": true,
+      "tokens_compared": 32,
+      "baseline_tok_s": 35.5841,
+      "speculative_tok_s": 45.1505,
+      "speedup": 1.26884,
+      "acceptance_rate": 0.777778
+    },
+    {
+      "prompt_idx": 4,
+      "name": "Logic puzzle",
+      "bit_exact": true,
+      "tokens_compared": 32,
+      "baseline_tok_s": 35.1406,
+      "speculative_tok_s": 50.7634,
+      "speedup": 1.44458,
+      "acceptance_rate": 0.9375
+    }
+  ]
+}
