@@ -37,5 +37,5 @@ Baseline inherited from Intel Arc Pro B60 production implementation (`06f267e`).
 
 ## Immediate Next Actions
 
-1. **Phase 1 is complete:** T1.1–T1.8 are closed; remaining work is optional long-context measurement and deferred vision scope.
-3. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.
+1. **Phase 1 is complete:** T1.1–T1.8 are closed. Next engineering priority is reducing the ~46 ms MTP dual-token verification path; KV8×MTP and 128K remain unqualified.
+2. **Harness follow-up (non-blocking):** make the T8.4 warmup stabilization explicit (~10 warmup requests or slope-based leak assertion) so future cold-server runs pass first time.

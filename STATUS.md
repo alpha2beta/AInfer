@@ -109,11 +109,11 @@
 
 *Critical finding 1 (corrected):* T8.4/Gate M7 — the committed `tools/http/report_http_stress.json` reads `"status": "FAILED"`, `"total_requests": 20` (not 100), `"zero_leak_verified": false` (+6.5 MB RSS over 20 requests). This directly contradicts the "100/100 passed, 0 KB leak" claim previously carried in `tasks.md`/`progress.md`/this file. T8.4 reverted `[x]`→`[~]`; Gate M7 downgraded to re-verification-needed (see §4 row above). All 20 individual HTTP requests did succeed — the failure is the harness's own leak-growth criterion, not request-level errors.
 
-*Critical finding 2 (flagged, not yet correctable):* the dual-token MTP speculative-verification feature described in the "MTP Speculative Decoding" stamp immediately above this one is **not present in any git commit** — it exists only in the uncommitted working tree. Its own benchmark (`report_speculative_258v.json`) is internally consistent, but the same working tree's regenerated `report_bench_t71.json`/`report_llama_comparison.json` show an unexplained regression (35.54→30.48 tok/s decode, −14%; model load 9.88s→21.94s, +122%) not present in any committed state. Do not commit or cite these three regenerated files until root-caused.
+*Critical finding 2 (historical, resolved 2026-09-20):* the dual-token MTP feature was then uncommitted and accompanied by a 30.48 tok/s outlier. Commit `155265c` subsequently landed the dual-token code and report; a clean current-HEAD re-run measured 35.06 tok/s, so the outlier was retired as background-load variance rather than a release regression.
 
 *Doc hygiene:* reworded 4 references to a phantom "T5.7" task ID (2 here, 2 in `progress.md`) (never defined in `tasks.md`) to cite T5.2/T5.3 instead. Noted, uncorrected: `14014e5` re-added large tokenizer assets (~23 MB) to git despite an earlier explicit exclusion decision — confirm intentional.
 
-Next: resolve the remaining critical finding (root-cause and commit the dual-token MTP regression) before Phase 9 hardening work is considered gate-eligible. T8.4 resolved 2026-09-19 (see T8.4 re-verification note below).
+Historical next-step note: the dual-token and T8.4 findings were resolved in subsequent commits (`155265c`, `c75c5fa`); Phase 9 and M1 are now complete. See the current gate table above for release truth.
 
 **T8.4 re-verification (2026-09-19):** fresh 100-request runs against `server_258v.py` (:8088). Run 1 (cold): 100/100 OK but FAILED on +5,432 KB RSS warmup transient. Run 2 (warm): **100/100, +20 KB RSS, `"status": "PASSED"`** — committed report is the Run-2 artifact. Gate M7 re-signed; dashboard 48/62.
 
@@ -132,6 +132,8 @@ Next: resolve the remaining critical finding (root-cause and commit the dual-tok
 **T9.5 fault injection (2026-09-20, Phase 9 at 5/5, Gate M8 PASSED):** `fault_inject.py` + `fault_driver.cpp` **19/19 pass** (`tools/fuzz/report_fault_inject.json`). Three runtime fixes from findings: per-tensor payload-CRC at load (was silent-load), export short-write detection (was silent-true), SPV magic+version pre-check (loader exited 10). Dashboard 53/62. Phase 9 complete.
 
 **T7.1/T7.5 clean re-run (2026-09-20):** rebuilt `bench_258v` from committed source and re-ran both harnesses on current HEAD — **35.06 tok/s** decode (vs committed 35.54, −1.4%, within variance), 1.20x vs llama.cpp Vulkan, 3.51x vs CPU. The Stamp-3 30.48 tok/s outlier did not reproduce (bad run, not a regression); fresh reports committed. Dual-token MTP code + `report_speculative_258v.json` verified committed in-tree, closing the remaining Stamp-3 staleness. Observed (non-gating): model load 48.4 s vs 9.88 s, attributed to the T9.5 CRC re-read plus slow disk this session.
+
+**Baseline Stamp 4 (2026-09-21):** Reviewed commits `c75c5fa` through `bb1e2c7` and current reports. **59/62 tasks done**: M1 is 8/8, M2a 5/5, Phase 9 5/5. The real 16K BF16-KV prefill completed in 678,505 ms (24.15 tok/s). The attempted KV8×MTP port was rejected: it failed MTP bit-exact parity after an initial device-loss packaging fault, so production remains BF16 KV and no 128K runtime support is claimed.
 
 
 

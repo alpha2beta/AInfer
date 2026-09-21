@@ -14,7 +14,7 @@
 - **Target OS:** CachyOS (Arch-based rolling Linux, optimized kernel)
 - **Target Model:** `symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized` (Qwen3.5-MoE architecture fine-tune, verified 40 layers: 30 DeltaNet-style linear-attention + 10 full-attention, ~36B total / ~3B active per token, 256 routed experts / 8 active)
 - **Baseline Inherited:** Intel Arc Pro B60 branch commit `06f267e` (discrete Xe2, dense Qwen3.8-27B)
-- **Current Focus:** Optional 16K long-context wall-clock validation and T10.2/vision (deferred); Phases 1/2/9 complete
+- **Current Focus:** MTP verification-path optimization and T10.2/vision (deferred); Phases 1/2/9 complete; 16K real prefill measured
 - **Overall Health:** Green (Phases 0, 3, 4, 5, 6, 7, 8, 9 passed with on-device evidence; Gates M0/M2b/M3/M4/M5/M6/M7/M8 signed off)
 
 ### Baseline Stamp 0 (2026-09-17)
@@ -90,15 +90,15 @@
 >
 > **Confirmed passing (evidence matches docs):** Phase 6 unchanged since Stamp 2. T1.4 DPAS/XMX audit (`report_esimd_258v.json`, `report_dpas_evaluation.json`, GO verdict, 1.90x speedup) — committed `14014e5`, verified. T7.2/T7.3/T7.4 (`report_context_sweep.json`, `report_roofline.json`, `report_thermal_steady_state.json`) — committed `de6cb2c`, untouched since, verified. T7.1/T7.5's **committed** (HEAD) evidence is real and matches `STATUS.md`: `report_bench_t71.json` shows model load 9.88s, prefill 88.49 tok/s, sustained decode 35.54 tok/s; `report_llama_comparison.json` shows 1.21x vs llama.cpp Vulkan (29.33 tok/s), 3.56x vs CPU (9.98 tok/s). T8.1–T8.3 (resident server, queue/cancellation, health endpoints) code is committed and inspected as described. T10.1 single-token MTP draft (`report_mtp_258v.json`, α=67.5%, 1.44x projected) is committed (`eb7d06c`) and verified.
 >
-> **Critical finding 1 — T8.4 / Gate M7 evidence contradicts documented PASS.** The committed `tools/http/report_http_stress.json` (commit `14014e5`) reads `"status": "FAILED"`, `"total_requests": 20` (not the 100 the harness defaults to and docs claimed), and `"zero_leak_verified": false` (RSS 205,544→212,044 KB, +6.5 MB over just 20 requests). `tasks.md`, this file, and `STATUS.md` all previously stated "100/100 requests succeeded... 0 KB device memory leak" — that claim is not backed by any artifact in the repository. **Corrected:** T8.4 reverted `[x]`→`[~]` in `tasks.md`; Gate M7 downgraded from PASSED to re-verification-needed in both `tasks.md` and `STATUS.md`; dashboard Phase 8 row and total adjusted.
+> **Critical finding 1 (historical; resolved by `c75c5fa`) — T8.4 / Gate M7 evidence contradicted the then-documented PASS.** The committed report at that audit point was a 20-request, +6.5 MB RSS failure. T8.4 was correctly reverted and then re-verified in a warm 100-request run (100/100, +20 KB, PASSED); Gate M7 was re-signed and the current dashboard reflects that resolution.
 >
-> **Critical finding 2 — uncommitted dual-token MTP extension + unresolved benchmark regression.** The dual-token speculative-verification code described under "T10.1 Dual-Token..." (`cmd_verify_m2_`, `cmd_rollback_`, `int4_gemv_m2`, `ainfer_init_speculative`/`ainfer_speculative_step`, server `--speculative` flag) exists **only in the uncommitted working tree** — never committed past `eb7d06c`. Its own report (`tools/mtp/report_speculative_258v.json`, untracked) is internally consistent (PASSED, 160/160 bit-exact, ~35.7 tok/s baseline). However, the working tree's regenerated `report_bench_t71.json` / `report_llama_comparison.json` / `report_prefill_scaling.json` (uncommitted modifications) now show a regression versus the last committed numbers: sustained decode 35.54→30.48 tok/s (−14%), model load 9.88s→21.94s (+122%), while prefill rose 88.49→104.44 tok/s. Root cause not identified. **Action:** do not commit or cite these three regenerated report files until the regression is root-caused; the dual-token feature must be committed and re-benchmarked cleanly before T10.1's dual-token claims are treated as closed evidence.
+> **Critical finding 2 (historical; resolved by `155265c`) — dual-token MTP was then uncommitted and accompanied by a 30.48 tok/s outlier.** The code and report were subsequently committed, and a clean current-HEAD re-run measured 35.06 tok/s (within variance of 35.54), retiring the outlier as background-load variance. Current T10.1 evidence is closed; the live rows and Stamp 4 carry the release truth.
 >
 > **Doc-hygiene correction — phantom task ID "T5.7".** `progress.md` and `STATUS.md` referenced "T5.7 Multi-Chunk Long-Prompt Verification" as if it were a formal task, but no such ID exists in `tasks.md` (which is the sole source of scope per `AGENTS.md`). Reworded all 4 references (2 in this file, 2 in `STATUS.md`) to attribute the P=128/P=256 chunk-boundary verification to the existing T5.2/T5.3 scope instead of inventing an ungoverned ID.
 >
 > **Also noted (not corrected, informational):** commit `14014e5` added `tokenizer.json` (12.8 MB), `vocab.json` (6.7 MB), and `merges.txt` (3.3 MB) to git despite these being explicitly excluded at the prior commit (`de6cb2c`) as large-and-reproducible-via-`tools/download_model.py`. Not wrong, just a reversed decision worth confirming is intentional.
 >
-> Next: resolve the two critical findings above (re-run T8.4 to a genuine PASSED/zero-leak result; root-cause the decode regression and commit the dual-token MTP feature), then proceed to Phase 9 hardening.
+> Historical next-step note: both findings were resolved in subsequent commits; see Stamp 4 and the dashboard for current state.
 
 ---
 
@@ -116,9 +116,9 @@
 | **Phase 7** | M6: Performance Ready | Independent timing, thermal steady state, roofline, llama.cpp comp | ✅ **Done** | 5 / 5 |
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | ✅ **Done** | 5 / 5 |
-| **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 Done; dual-token extension uncommitted) | 1 / 2 |
+| **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 done; T10.2 deferred) | 1 / 2 |
 | **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **56 / 62** |
+| **Total** | | | | **59 / 62** |
 
 ---
 
@@ -236,7 +236,7 @@
 
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
-| **T10.1** | MTP speculative decoding verification | `[x]`* | Single-token draft committed & verified (`report_mtp_258v.json`, α=67.5%, 1.44x projected). *Dual-token verification (int4_gemv_m2, 51.36 tok/s peak, `report_speculative_258v.json`) is uncommitted — see Stamp 3 waiver. |
+| **T10.1** | MTP speculative decoding verification | `[x]` | Single- and dual-token paths committed and verified (`report_mtp_258v.json`, `report_speculative_258v.json`; 160/160 bit-exact, 1.198x mean realized speedup). |
 | **T10.2** | Vision encoder integration evaluation | `[-]` | Deferred for v1 text-only scope |
 
 ### Phase X: Cross-Cutting Engineering
@@ -411,7 +411,7 @@
     - Arithmetic reasoning ($\alpha = 39.13\%$): **34.82 tok/s** vs 35.21 tok/s (0.989x, break-even even at low acceptance).
     - Mean across all domains: **42.79 tok/s** (vs 35.72 tok/s baseline decode, **1.198x mean speedup**).
   - **Serving & C-API Integration:** Added `ainfer_init_speculative` and `ainfer_speculative_step` to `tools/decode/c_api_258v.cpp` (`libainfer_258v.so`); updated `tools/http/server_258v.py` with `--speculative` CLI flag supporting both full JSON and streaming SSE chunks.
-- **2026-09-20 (Baseline Stamp 3):**
+- **2026-09-20 (Baseline Stamp 3, historical; both critical findings resolved in later commits):**
   - Reviewed all self-reported work since Stamp 2 (commits `14014e5`, `eb7d06c`, plus uncommitted working tree) against on-device evidence. **47/62 tasks done.**
   - Confirmed passing: Phase 6 (unchanged), T1.4 DPAS audit, T7.2/T7.3/T7.4, T7.1/T7.5 committed figures (35.54 tok/s decode, 88.49 tok/s prefill, 1.21x vs llama.cpp Vulkan), T8.1–T8.3, T10.1 single-token MTP draft.
   - **Critical finding 1:** T8.4/Gate M7 committed evidence (`report_http_stress.json`) reads `status: FAILED`, 20/100 requests, `zero_leak_verified: false` — contradicts previously documented "100/100 passed, 0 KB leak." Reverted T8.4 `[x]`→`[~]`; Gate M7 downgraded to re-verification-needed.
@@ -487,7 +487,7 @@
   - Added `258v` configure/build/test presets: host `clang++`, cached Level Zero loader, command-list generation disabled explicitly when `llvm-spirv`/`sycl-post-link` are unavailable. Added `tools/l0probe/timestamp_smoke.cpp`, which discovers Arc 140V, submits a Level Zero MemoryFill, verifies data, and validates a non-empty kernel timestamp interval.
   - Verified `cmake --preset 258v`, `cmake --build --preset 258v --target l0_timestamp_smoke`, and `ctest --preset 258v`: **1/1 passed**. Dashboard **58/62**. M1 remainder is now T1.2 only.
 - **2026-09-21 (T10.1 follow-up — MTP acceptance analysis):**
-  - Trace analysis of `report_mtp_258v.json` (80 samples) + overhead accounting vs `report_speculative_258v.json`: position effect real (early-step α=0.43 → late-step α=0.82, rejects cluster at generation start) but warmup gating NOT recommended — trace sim (rollback swept 0–10 ms) lands within ±2% of always-speculate because the 3.26 ms draft is only 11% of the 29.8 ms trunk (breakeven α≈0.28). Main gap is 5–9 ms/round integration overhead (extra submits + host loop + rollback; 20–30% tax, explains projected-1.44x vs realized-1.198x). Next: profile per-submit timestamps, then attack round overhead. Report: `tools/mtp/report_mtp_acceptance_analysis.json`; noted in `tasks.md` T10.1. No count change (analysis, not a new task).
+  - Trace analysis of `report_mtp_258v.json` (80 samples) + overhead accounting vs `report_speculative_258v.json`: position effect real (early-step α=0.43 → late-step α=0.82, rejects cluster at generation start) but warmup gating NOT recommended — trace sim (rollback swept 0–10 ms) lands within ±2% of always-speculate because the 3.26 ms draft is only 11% of the 29.8 ms trunk (breakeven α≈0.28). The subsequent timestamped profile corrected the provisional 5–9 ms cross-harness overhead estimate; report: `tools/mtp/report_mtp_acceptance_analysis.json`; no count change.
   - Corrections recorded: `report_accept.json` is B60/Qwen3.8-27B-era (64-layer trunk, `/mnt/usb` paths) and excluded from 258V conclusions; 258V runtime is BF16-KV only — KV8×MTP needs an INT8-KV port into `runtime_258v`, not a flag flip.
 - **2026-09-21 (T10.1 per-submit profiling):**
   - Instrumented `runtime_258v.cpp` behind `AINFER_SPEC_PROFILE=1` to split host setup, dual verification, decision, rollback, state-copy, draft, and total round time. 96 rounds: dual verify **45.989 ms**, draft **3.282 ms**, rollback **0.392 ms average** (1.307 ms on rejected rounds), state copy **0.048 ms**, unattributed gap **0.001 ms**; acceptance 66/96 (68.75%).
@@ -495,3 +495,6 @@
 - **2026-09-21 (T1.2 pinned-runtime rollback — DONE, M1 PASSED 8/8):**
   - Added `tools/toolchain/t12_rollback.py` and `report_t12_rollback.json`. The harness hashes all three cached Intel packages and sysroot metadata, runs the Level Zero timestamp smoke in a rootless user+mount namespace, mutates only a private copied sysroot with an invalid loader, verifies failure, restores the pinned loader, verifies recovery, and confirms the host loader hash is unchanged.
   - **5/5 checks passed:** baseline, private baseline, bad-runtime rejection, restored runtime, and snapshot unchanged. Dashboard **59/62**. Scope is explicitly the pinned Intel runtime/sysroot rollback unit, not a full distro rollback because no complete CachyOS root filesystem is stored in the repository.
+- **2026-09-21 (Baseline Stamp 4 — post-Stamp-3/current-HEAD audit):**
+  - Reviewed commits `c75c5fa` through `bb1e2c7`, the current release evidence, and the attempted KV8×MTP port. Current release state is **59/62**: M1 is 8/8, M2a is 5/5, Phase 9 is 5/5, and MTP dual-token evidence is committed (`155265c`) and reconciled by the clean 35.06 tok/s re-run. Corrected stale dashboard (56→59), Phase 10/T10.1 wording, and provisional MTP-overhead text.
+  - KV8×MTP/128K is **not qualified**: the experimental port first caused a Level Zero device loss, then avoided the reset with standalone packaging but failed its bit-exact MTP parity gate (examples 1/32 and 3/32 matches; 1.035x mean). Experiment discarded; production remains BF16 KV, and no 128K runtime claim is made. Historical Stamp-3 warnings remain as history only; their later resolutions are reflected in live dashboard rows and `STATUS.md`.
