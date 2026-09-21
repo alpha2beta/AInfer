@@ -1,0 +1,21 @@
+{
+  "task": "T10.1-followup-KV8-primitive",
+  "status": "PASSED",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "topology": "16 query heads / 2 KV heads / head_dim 256",
+  "single_token": {
+    "tokens_in_cache": 37,
+    "worst_attention_abs_error": 0.000790121,
+    "scale_relative_error": 0.000000414366,
+    "max_int8_quantization_delta": 1,
+    "bounded_cache_rows": true,
+    "bitwise_deterministic": true
+  },
+  "dual_token": {
+    "batch": 2,
+    "worst_attention_abs_error": 0.000000715256,
+    "bitwise_deterministic": true
+  },
+  "method": "standalone Level Zero SPIR-V replay against host RoPE, symmetric per-row INT8 dequantized reference",
+  "scope": "primitive qualification only; no runtime_258v integration or 128K claim"
+}

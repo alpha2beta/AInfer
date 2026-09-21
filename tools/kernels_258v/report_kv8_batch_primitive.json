@@ -1,0 +1,11 @@
+{
+  "task": "T10.1-followup-KV8-B2-primitive",
+  "status": "PASSED",
+  "device": "Intel Core Ultra 7 258V (Arc 140V Xe2)",
+  "batch": 2,
+  "topology": "16 query heads / 2 KV heads / head_dim 256",
+  "worst_attention_abs_error": 0.000000715256,
+  "bitwise_deterministic": true,
+  "method": "standalone Level Zero SPIR-V replay from an empty cache; token 0 causal prefix and token 1 two-token causal prefix",
+  "scope": "primitive qualification only; no runtime_258v integration or 128K claim"
+}
