@@ -117,8 +117,8 @@
 | **Phase 8** | M7: Service Candidate | In-process HTTP daemon, request queue, cancellation, leak audit | ✅ **Done** | 4 / 4 |
 | **Phase 9** | Hardening | Typed spans, execution guards, ASan/UBSan, fuzzing, fault injection | ✅ **Done** | 5 / 5 |
 | **Phase 10**| Deferred Scope | MTP speculative decoding, vision encoder | `[~]` In Progress (T10.1 done; T10.2 deferred) | 1 / 2 |
-| **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress | 0 / 2 |
-| **Total** | | | | **59 / 62** |
+| **Phase X** | Cross-Cutting | Doc synchronization, CTest suite automation | `[~]` In Progress (X2 done; X1 ongoing) | 1 / 2 |
+| **Total** | | | | **60 / 62** |
 
 ---
 
@@ -244,7 +244,7 @@
 | Task | Description | Status | Evidence / Notes |
 |---|---|---|---|
 | **X1** | Continuous documentation synchronization | `[~]` | Maintained across plan, tasks, progress, status |
-| **X2** | CTest suite automation and release stamping | `[ ]` | Will integrate `ctest --preset 258v` |
+| **X2** | CTest suite automation and release stamping | `[x]` | `ctest --preset 258v` 6/6 green in 2.48 s (2026-09-22) |
 
 ---
 
@@ -506,5 +506,7 @@
   - Ran `max_ctx=131328` init + 8-token prefill + 5 decodes: both BF16 (2565.0 MiB) and KV8 (1282.5 MiB) produce identical token stream `[62497, 148287, 198, 220, 16]`. Reports: `report_kv8_128k_alloc.json`, `report_kv8_128k_positioned.json`. Full 128K prefill remains unmeasured (16K already 11.3 min).
 - **2026-09-21 (KV8 16K scale — DONE):**
   - Real 16K prefill: BF16 678,505 ms (24.15 tok/s) vs KV8 **550,544 ms (29.76 tok/s, 1.23×)**. 16K needle 16000 tokens: KV8 **4/4 (100%)** vs BF16 3/4 (one `OUT_OF_DEVICE_MEMORY` at init on the distract case). At 16K+ KV8 is the stable/faster path; production default stays BF16 for short context. Reports: `report_prefill_16k_258v.json` (BF16), `report_prefill_16k_kv8.json`, `report_long_context_16k_kv8.json` vs `report_long_context_16k_bf16.json`, `report_kv8_16k_scale.json`.
+- **2026-09-22 (X2 CTest automation — DONE):**
+  - `ctest --preset 258v` green **6/6 in 2.48 s**: `l0probe`, `l0_timestamp_smoke`, `test_arena_spans`, `test_exec_guards`, `kv8_primitive_tests`, `t12_rollback`. Dashboard moves to **60/62** (only X1 ongoing + T10.2 deferred remain). Multi-hour GPU gates stay manual; full-preset build needs SYCL-guard follow-up.
 - **2026-09-22 (KV8 32K scale — DONE):**
   - Real 32K prefill under KV8: **2,423,229 ms (40.4 min, 13.52 tok/s)**, first token valid; 16K→32K scaling 4.4× time for 2× tokens (near-quadratic). 32K needle (32000 tokens): KV8 **4/4 (100%)** across depths 0.0/0.5/1.0 + distractor (prefill ~14.0–14.3 tok/s per case, decode ~1.75 tok/s over 32K KV). Generalized `bench_prefill_16k.cpp` to take prompt length (argv[4]) + skip-warmup flag (argv[5]). Reports: `report_prefill_32k_kv8.json`, `report_long_context_32k_kv8.json`. BF16 32K control skipped (16K already showed BF16 slower + OOM-prone).

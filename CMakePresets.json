@@ -42,7 +42,7 @@
       "name": "258v",
       "configurePreset": "258v",
       "output": { "outputOnFailure": true },
-      "filter": { "include": { "name": "l0_timestamp_smoke" } }
+      "filter": { "include": { "name": "l0_timestamp_smoke|l0probe|test_arena_spans|test_exec_guards|kv8_primitive_tests|t12_rollback" } }
     }
   ]
 }

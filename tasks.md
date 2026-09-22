@@ -564,7 +564,7 @@ Phase gate M8: System hardened with typed memory spans, sanitizer verification, 
 - Done: Documentation reflects live codebase state at all times.
 
 ### X2 CTest suite automation and release stamping
-- Status: `[ ]`
+- Status: `[x]`
 - Deps: ongoing
 - Do: Integrate all microbenchmarks, unit tests, loader checks, and quality gates into `ctest --preset 258v`. Establish reproducible verification release stamps.
-- Done: Full CTest preset runs cleanly and automates regression checking.
+- Done: Fast regression set wired into `ctest --preset 258v` and green **6/6 in 2.48 s** (2026-09-22): `l0probe`, `l0_timestamp_smoke` (device), `test_arena_spans` (T9.1), `test_exec_guards` (T9.2), `kv8_primitive_tests` (script-driven device gate), `t12_rollback` (script-driven). New CMake targets for the host unit tests (`tools/decode/CMakeLists.txt`); script gates registered in root `CMakeLists.txt`; preset filter extended in `CMakePresets.json`. Build: `cmake --build build-258v --target l0_timestamp_smoke l0probe test_arena_spans test_exec_guards` (t12_rollback consumes the prebuilt smoke). Scope note: multi-hour GPU gates (prefill/needle/MTP/quality suites) remain manual scripts with committed JSON reports; full-preset `cmake --build --preset 258v` still needs SYCL-guard follow-up (clang++ vs `-fsycl` targets).
