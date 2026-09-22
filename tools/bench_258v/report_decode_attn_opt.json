@@ -287,5 +287,17 @@
         ]
       }
     ]
+  },
+  "stacked_32k_auto": {
+    "case": "32K depth-0.50 code 910293, env AINFER_KV8 unset (auto-KV8, max_ctx 32256), rebuilt decode_258v + .attn override auto-loaded",
+    "result": "HIT 910293",
+    "prefill_tok_per_s": 14.25,
+    "decode_tok_per_s": 2.21,
+    "prior_same_case_explicitKV8_oldkernel": {
+      "prefill": 14.1,
+      "decode": 1.76
+    },
+    "stacked_decode_speedup": 1.26,
+    "note": "prefill unchanged (batch kernels untouched); decode 1.76->2.21 combines 3-barrier kernel + auto-KV8 traffic halving"
   }
 }
