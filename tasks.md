@@ -379,6 +379,7 @@ Phase gate M4: Single-process runtime completes prefill and recorded decode enti
   DONE 2026-09-18: Published comparative qualification report `tools/quality_258v/report_kv8_quality.json`. Because only 10 of 40 layers carry KV cache (30 layers are DeltaNet with fixed 62.8 MiB state), BF16 KV consumes only 640 MiB at 32K context and leaves 13.38 GB free RAM. The marginal memory savings of INT8 KV (320 MiB) does not justify softmax error amplification. BF16 KV is formally qualified and confirmed as the production default; INT8 KV retained as optional diagnostic mode.
 - Cookbook (2026-09-19, B70): corroborates — q8_0-K/q4_1-V and FP8 KV ship in production recipes, so INT8 KV remains a viable fallback; the BF16-default decision stands. See `optimization.md` §6.5.
 - Done: Comparative quality report published justifying whether INT8 KV is enabled by default.
+- UPDATE 2026-09-21: KV8 promoted to **qualified optional at ≥16K** (`AINFER_KV8=1`): trunk parity 8/64-token prompts identical, corpus 186/200 both, 4K needle 6/6 both, MTP parity 160/160 bit-exact (1.235x vs BF16 1.261x), 16K prefill 1.23× and 4/4 needle (BF16 OOM'd one case), 128K alloc + positioned decode identical. BF16 remains production default for <16K.
 
 Phase gate M5: Quality suite passes, teacher-forced agreement validated, context tiers qualified. [PASSED 2026-09-18]
 
