@@ -284,6 +284,10 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             "total_requests_served": STATE.total_requests,
             "total_tokens_generated": STATE.total_tokens_generated,
             "uptime_seconds": round(time.time() - STATE.start_time, 1),
+            # T8.4: capability marker — remote agents curl this to confirm the
+            # live daemon parses Hermes <tool_call> XML into OpenAI tool_calls.
+            "tool_calling": "hermes-native",
+            "server_build": "258v-t8.4",
         }
         self._send_json(200 if healthy else 500, data)
 
@@ -471,7 +475,11 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         if is_chat:
             # T8.4: translate native Hermes <tool_call> XML into OpenAI tool_calls.
-            prefix, tool_calls = _parse_hermes_tool_calls(output_text, req_id) if parse_tools else (output_text, [])
+            # T8.4b: parse UNCONDITIONALLY — some agents inline tool schemas as
+            # prompt text and send no `tools` array; the model still emits
+            # Hermes XML, which must come back as tool_calls for the loop to
+            # function. Plain answers contain no such blocks and pass through.
+            prefix, tool_calls = _parse_hermes_tool_calls(output_text, req_id)
             if tool_calls:
                 message = {"role": "assistant", "content": prefix or None, "tool_calls": tool_calls}
                 finish_reason = "tool_calls"
@@ -624,7 +632,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # as an OpenAI tool_calls delta before the terminal chunk. (Raw
             # XML already streamed as content chunks above; clients that
             # accumulate deltas still converge on the same calls.)
-            _, stream_tool_calls = _parse_hermes_tool_calls("".join(streamed_parts), req_id) if parse_tools else ("", [])
+            # T8.4b: unconditional (see _complete_response) — parse even when
+            # the request carried no `tools` array.
+            _, stream_tool_calls = _parse_hermes_tool_calls("".join(streamed_parts), req_id)
             if stream_tool_calls:
                 send_sse_chunk({
                     "id": req_id,
