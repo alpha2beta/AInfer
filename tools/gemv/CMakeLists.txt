@@ -1,3 +1,5 @@
+# B60-era SYCL benchmarks; skipped when AINFER_ENABLE_SYCL=OFF (e.g. 258v/clang++).
+if(AINFER_ENABLE_SYCL)
 add_executable(gemv_t32 gemv.cpp)
 target_compile_options(gemv_t32 PRIVATE -fsycl)
 target_link_options(gemv_t32 PRIVATE -fsycl)
@@ -12,3 +14,4 @@ enable_testing()
 add_test(NAME gemv_t32
   COMMAND gemv_t32 ${CMAKE_CURRENT_BINARY_DIR}/report_t32.json)
 set_tests_properties(gemv_t32 PROPERTIES TIMEOUT 1800)
+endif()

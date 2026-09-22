@@ -27,6 +27,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
         "AINFER_BUILD_CMDLIST": "OFF",
+        "AINFER_ENABLE_SYCL": "OFF",
         "AINFER_ZE_LOADER": "${sourceDir}/tools/toolchain/sysroot/usr/lib/libze_loader.so.1"
       }
     }
