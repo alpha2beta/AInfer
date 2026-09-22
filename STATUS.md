@@ -143,6 +143,8 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 
 **Decode-attention opt v2 (2026-09-22):** decode attention went 10 → 3 SLM barriers/position (8-thread 4-chain reduction + broadcast; v1 serial chain was slower and discarded). Same-harness gains: 4K BF16 11.39 → 13.62 (1.20×), 4K KV8 10.13 → 13.63 (1.35×), 16K BF16 3.92 (~1.21×), 32K BF16 1.75 → **2.13 (1.22×)** — flat ~1.2×, barriers were ~20% of attention time. Parity: short + 4K bit-identical both paths; MTP re-verified 160/160 BF16 (1.229×) + KV8 (1.243×). Ships as optional `all_kernels.spv.attn` override (upstream clang cannot rebuild the ESIMD bundle). Report: `report_decode_attn_opt.json`.
 
+**KV8 traffic halving made default ≥16K (2026-09-23):** auto-KV8 policy — `AINFER_KV8` unset enables KV8 when `max_ctx ≥ 16384` (the qualified boundary); `=0` forces BF16, `=1` forces KV8. Validated on device (arena sizes + outputs per mode). Production consequence: long-context decode KV traffic halves automatically (4 B/head-token bf16 → ~2.03 B int8+scales) exactly where attention bandwidth dominates. Long-context production default is now KV8; short-context default remains BF16.
+
 
 
 

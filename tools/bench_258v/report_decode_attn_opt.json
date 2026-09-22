@@ -233,5 +233,59 @@
     "bf16": "160/160 bit-exact, 1.229x (report_speculative_258v.json re-run under new kernel)",
     "kv8": "160/160 bit-exact, 1.243x (report_mtp_kv8.json re-run under new kernel)"
   },
-  "conclusion": "consistent ~1.2x decode gain 4K->32K; barrier share ~20% of attention time, rest is KV loads + exp/softmax ALU (scales with P in both versions)"
+  "conclusion": "consistent ~1.2x decode gain 4K->32K; barrier share ~20% of attention time, rest is KV loads + exp/softmax ALU (scales with P in both versions)",
+  "honest_correction": "Earlier in-session claim KV8-short-new == KV8-short-old was wrong: v2 KV8 @2048 yields [148431,...] vs old-code KV8 [1425,...] (8-thread dot-order rounding flips near-tie token; still equals BF16-style tokens). KV8 v2-vs-v2 parity chain intact (4K 16/16, MTP 160/160 vs KV8 greedy). No quality evidence invalidated: needle/corpus/MTP all ran end-to-end KV8.",
+  "auto_kv8_policy": {
+    "change": "runtime_258v.cpp allocate_static_arenas: AINFER_KV8 unset => KV8 auto-on when max_ctx >= 16384; =0 force BF16; =1 force KV8 (unchanged)",
+    "validated": [
+      {
+        "max_ctx": 16640,
+        "env": "unset",
+        "arena_miB": 162.5,
+        "mode": "KV8 auto-engaged",
+        "tokens8": [
+          148431,
+          62497,
+          148287,
+          198,
+          220,
+          16,
+          13,
+          198
+        ]
+      },
+      {
+        "max_ctx": 16640,
+        "env": "0",
+        "arena_miB": 325.0,
+        "mode": "BF16 forced",
+        "tokens8": [
+          148431,
+          62497,
+          148287,
+          198,
+          220,
+          16,
+          13,
+          198
+        ]
+      },
+      {
+        "max_ctx": 4352,
+        "env": "unset",
+        "arena_miB": 85.0,
+        "mode": "BF16 (below boundary)",
+        "tokens8": [
+          148431,
+          62497,
+          148287,
+          198,
+          220,
+          16,
+          13,
+          198
+        ]
+      }
+    ]
+  }
 }
