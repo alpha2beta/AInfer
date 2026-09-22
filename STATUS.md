@@ -139,7 +139,7 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 
 **KV8 16K Scale (2026-09-21):** 16K real prefill: BF16 678,505 ms (24.15 tok/s) vs KV8 550,544 ms (29.76 tok/s, 1.23×). 16K needle: KV8 4/4 (100%) vs BF16 3/4 (one `OUT_OF_DEVICE_MEMORY` during init on the distract case). At 16K+ KV8 is the stable path; production default stays BF16 for <16K.
 
-**KV8 32K Scale (2026-09-22):** 32K real prefill under KV8: 2,423,229 ms (40.4 min, 13.52 tok/s), 4.4× the 16K time for 2× tokens (near-quadratic). 32K needle (32000 tokens): KV8 **4/4 (100%)** across depths 0.0/0.5/1.0 + distractor; per-case prefill ~14.0–14.3 tok/s, decode ~1.75 tok/s over 32K KV. KV8 retrieval-qualified 4K → 16K → 32K, all 100%. BF16 32K control running. Reports: `report_prefill_32k_kv8.json`, `report_long_context_32k_kv8.json`.
+**KV8 32K Scale (2026-09-22):** 32K real prefill: BF16 2,745,590 ms (45.8 min, 11.93 tok/s) vs KV8 **2,423,229 ms (40.4 min, 13.52 tok/s, 1.13×)** — KV8 edge narrows vs 1.23× at 16K as O(P²) attention compute dominates. 32K needle (32000 tokens): KV8 **4/4 (100%)** across depths 0.0/0.5/1.0 + distractor; per-case prefill ~14.0–14.3 tok/s, decode ~1.75 tok/s over 32K KV. KV8 retrieval-qualified 4K → 16K → 32K, all 100%; BF16 completed 32K without OOM this time. Reports: `report_prefill_32k_bf16.json`, `report_prefill_32k_kv8.json`, `report_long_context_32k_kv8.json`.
 
 
 
