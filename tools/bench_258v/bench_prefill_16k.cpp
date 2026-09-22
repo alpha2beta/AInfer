@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -15,8 +16,8 @@ int main(int argc, char **argv) {
   const char *binfer = argc > 1 ? argv[1] : "models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer";
   const char *spv = argc > 2 ? argv[2] : "tools/kernels_258v/all_kernels.spv";
   const char *report = argc > 3 ? argv[3] : "tools/bench_258v/report_prefill_16k_258v.json";
-  constexpr int P = 16384;
-  constexpr int MAXCTX = P + 256;
+  const int P = argc > 4 ? std::atoi(argv[4]) : 16384;
+  const int MAXCTX = P + 256;
 
   std::vector<int> pattern = {151644, 8948, 198, 2610, 525, 264, 10925,
                               151645, 198, 248045, 74455, 198, 248068, 271,
@@ -34,13 +35,21 @@ int main(int argc, char **argv) {
   auto init1 = std::chrono::steady_clock::now();
 
   int first = 0;
-  runtime.reset_state();
-  auto warm0 = std::chrono::steady_clock::now();
-  if (!runtime.prefill(prompt, &first)) {
-    std::fprintf(stderr, "warm-up prefill failed\n");
-    return 1;
+  const bool skip_warm = argc > 5 && std::atoi(argv[5]) != 0;
+  auto ms = [](auto a, auto b) {
+    return std::chrono::duration<double, std::milli>(b - a).count();
+  };
+  double warm_ms = 0.0;
+  if (!skip_warm) {
+    runtime.reset_state();
+    auto warm0 = std::chrono::steady_clock::now();
+    if (!runtime.prefill(prompt, &first)) {
+      std::fprintf(stderr, "warm-up prefill failed\n");
+      return 1;
+    }
+    auto warm1 = std::chrono::steady_clock::now();
+    warm_ms = ms(warm0, warm1);
   }
-  auto warm1 = std::chrono::steady_clock::now();
 
   runtime.reset_state();
   auto run0 = std::chrono::steady_clock::now();
@@ -50,15 +59,11 @@ int main(int argc, char **argv) {
   }
   auto run1 = std::chrono::steady_clock::now();
 
-  auto ms = [](auto a, auto b) {
-    return std::chrono::duration<double, std::milli>(b - a).count();
-  };
   double init_ms = ms(init0, init1);
-  double warm_ms = ms(warm0, warm1);
   double measured_ms = ms(run0, run1);
   double tok_s = P / (measured_ms * 1e-3);
-  std::printf("16K prefill: %.2f ms (%.3f tok/s), warm %.2f ms, first=%d\n",
-              measured_ms, tok_s, warm_ms, first);
+  std::printf("%d prefill: %.2f ms (%.3f tok/s), warm %.2f ms, first=%d\n",
+              P, measured_ms, tok_s, warm_ms, first);
 
   std::ofstream out(report);
   if (!out) return 1;

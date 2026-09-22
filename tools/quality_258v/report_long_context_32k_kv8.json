@@ -1,0 +1,77 @@
+{
+  "task": "T6.5",
+  "device": "Intel Arc 140V (Lunar Lake 258V)",
+  "timestamp": "2026-09-22T16:31:51Z",
+  "total_tiers": 1,
+  "total_cases": 4,
+  "total_passed": 4,
+  "overall_pass_rate_pct": 100.0,
+  "tiers": {
+    "32K": {
+      "tier": "32K",
+      "target_tokens": 32000,
+      "total_cases": 4,
+      "passed_cases": 4,
+      "pass_rate_pct": 100.0,
+      "cases": [
+        {
+          "case_id": "32K-d0.00",
+          "depth": 0.0,
+          "code": "391029",
+          "distractor": false,
+          "prompt_tokens": 32000,
+          "needle_pos": 0,
+          "needle_depth_pct": 0.0,
+          "generated_text": "391029<|im_end|>",
+          "passed": true,
+          "prefill_ms": 2244350.0,
+          "prefill_tok_per_s": 14.26,
+          "decode_tok_per_s": 1.75
+        },
+        {
+          "case_id": "32K-d0.50",
+          "depth": 0.5,
+          "code": "910293",
+          "distractor": false,
+          "prompt_tokens": 32000,
+          "needle_pos": 15969,
+          "needle_depth_pct": 49.9,
+          "generated_text": "910293<|im_end|>",
+          "passed": true,
+          "prefill_ms": 2269190.0,
+          "prefill_tok_per_s": 14.1,
+          "decode_tok_per_s": 1.76
+        },
+        {
+          "case_id": "32K-d1.00",
+          "depth": 1.0,
+          "code": "201938",
+          "distractor": false,
+          "prompt_tokens": 32000,
+          "needle_pos": 31938,
+          "needle_depth_pct": 99.8,
+          "generated_text": "201938<|im_end|>",
+          "passed": true,
+          "prefill_ms": 2281670.0,
+          "prefill_tok_per_s": 14.02,
+          "decode_tok_per_s": 1.76
+        },
+        {
+          "case_id": "32K-d0.50-distract",
+          "depth": 0.5,
+          "code": "850192",
+          "distractor": true,
+          "prompt_tokens": 32000,
+          "needle_pos": 23933,
+          "needle_depth_pct": 74.8,
+          "generated_text": "850192<|im_end|>",
+          "passed": true,
+          "prefill_ms": 2252640.0,
+          "prefill_tok_per_s": 14.21,
+          "decode_tok_per_s": 1.76
+        }
+      ]
+    }
+  },
+  "verdict": "T6.5 Multi-Tier Long-Context Retrieval PASSED (4/4, 100.0%) across 4K, 16K, 32K tiers on Arc 140V."
+}
