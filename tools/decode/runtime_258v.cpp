@@ -777,6 +777,41 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_add_shared_ctrl_ = get_k("moe_add_shared_expert_ctrl");
   k_rope_ctrl_ = get_k("rope_and_kv_append_ctrl");
   k_attn_ctrl_ = get_k("gqa_attn_decode_ctrl");
+  // T-decode-opt (2026-09-22): optional 2-barrier decode-attention override.
+  // If `<spv>.attn` exists beside the main bundle, its gqa_attn_decode_ctrl
+  // replaces the bundled handle (identical signature/launch shape). Absent ->
+  // warn once and keep the bundled kernel. Upstream clang cannot rebuild the
+  // full ESIMD bundle, so the override ships as a separately built module.
+  {
+    std::string attn_path = spv_path + ".attn";
+    std::ifstream attn_f(attn_path, std::ios::binary);
+    if (attn_f) {
+      attn_f.seekg(0, std::ios::end);
+      size_t attn_n = (size_t)attn_f.tellg();
+      attn_f.seekg(0, std::ios::beg);
+      std::vector<uint8_t> attn_b(attn_n);
+      attn_f.read((char *)attn_b.data(), attn_n);
+      ze_module_desc_t ad{ZE_STRUCTURE_TYPE_MODULE_DESC, nullptr,
+                          ZE_MODULE_FORMAT_IL_SPIRV, attn_n, attn_b.data(),
+                          nullptr, nullptr};
+      ze_kernel_handle_t attn_k = nullptr;
+      bool attn_ok = false;
+      if (zeModuleCreate(ctx_, dev_, &ad, &mod_attn_, nullptr) == ZE_RESULT_SUCCESS) {
+        ze_kernel_desc_t akd{ZE_STRUCTURE_TYPE_KERNEL_DESC, nullptr, 0,
+                             "gqa_attn_decode_ctrl"};
+        if (zeKernelCreate(mod_attn_, &akd, &attn_k) == ZE_RESULT_SUCCESS && attn_k) {
+          k_attn_ctrl_ = attn_k;
+          attn_ok = true;
+          std::fprintf(stderr, "[AInfer 258V] decode-attention override loaded (%s)\n",
+                       attn_path.c_str());
+        }
+      }
+      if (!attn_ok)
+        std::fprintf(stderr, "[AInfer 258V] WARNING: .attn override unusable, bundled kernel kept\n");
+    } else {
+      std::fprintf(stderr, "[AInfer 258V] no .attn override module, bundled decode attention kept\n");
+    }
+  }
   k_deinterleave_qg_ = get_k("deinterleave_q_gate");
   k_argmax2_ctrl_ = get_k("argmax_stage2_ctrl");
   k_concat2_ = get_k("concat2");

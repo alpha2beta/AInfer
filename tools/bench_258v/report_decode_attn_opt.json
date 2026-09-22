@@ -1,0 +1,201 @@
+{
+  "task": "T-decode-opt",
+  "device": "Intel Arc 140V (Lunar Lake 258V)",
+  "change": "gqa_attn_decode_ctrl/kv8_attn_ctrl: 10 barriers/position -> 3 (8-thread 4-chain reduction + SLM broadcast); optional all_kernels.spv.attn override module",
+  "v1_note": "single-thread 256-deep serial chain was SLOWER (8.65 vs 11.39 tok/s at 4K BF16); superseded by v2",
+  "runs": {
+    "bf16_4k_old": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 4096,
+      "generated_tokens": 16,
+      "prefill_ms": 31128.2,
+      "decode_tok_per_s": 11.3912,
+      "generated_ids": [
+        220,
+        248068,
+        198,
+        760,
+        1156,
+        1879,
+        369,
+        264,
+        50240,
+        11,
+        7132,
+        36412,
+        11,
+        321,
+        13375,
+        30656
+      ]
+    },
+    "bf16_4k_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 4096,
+      "generated_tokens": 16,
+      "prefill_ms": 31024.5,
+      "decode_tok_per_s": 13.6232,
+      "generated_ids": [
+        220,
+        248068,
+        198,
+        760,
+        1156,
+        1879,
+        369,
+        264,
+        50240,
+        11,
+        7132,
+        36412,
+        11,
+        321,
+        13375,
+        30656
+      ]
+    },
+    "kv8_4k_old": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 4096,
+      "generated_tokens": 16,
+      "prefill_ms": 40398.1,
+      "decode_tok_per_s": 10.1268,
+      "generated_ids": [
+        1425,
+        220,
+        248068,
+        198,
+        197,
+        197,
+        510,
+        371,
+        29,
+        198,
+        197,
+        197,
+        10948,
+        29,
+        198,
+        297
+      ]
+    },
+    "kv8_4k_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 4096,
+      "generated_tokens": 16,
+      "prefill_ms": 33571,
+      "decode_tok_per_s": 13.6266,
+      "generated_ids": [
+        1425,
+        220,
+        248068,
+        198,
+        197,
+        197,
+        510,
+        371,
+        29,
+        198,
+        197,
+        197,
+        10948,
+        29,
+        198,
+        297
+      ]
+    },
+    "bf16_8_old": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 8,
+      "generated_tokens": 8,
+      "prefill_ms": 131.46,
+      "decode_tok_per_s": 35.8809,
+      "generated_ids": [
+        148431,
+        62497,
+        148287,
+        198,
+        220,
+        16,
+        13,
+        198
+      ]
+    },
+    "bf16_8_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 8,
+      "generated_tokens": 8,
+      "prefill_ms": 134.333,
+      "decode_tok_per_s": 35.7384,
+      "generated_ids": [
+        148431,
+        62497,
+        148287,
+        198,
+        220,
+        16,
+        13,
+        198
+      ]
+    },
+    "kv8_8_old": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 8,
+      "generated_tokens": 8,
+      "prefill_ms": 143.27,
+      "decode_tok_per_s": 35.8147,
+      "generated_ids": [
+        148431,
+        62497,
+        148287,
+        198,
+        220,
+        16,
+        13,
+        198
+      ]
+    },
+    "kv8_8_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 8,
+      "generated_tokens": 8,
+      "prefill_ms": 126.622,
+      "decode_tok_per_s": 35.7433,
+      "generated_ids": [
+        148431,
+        62497,
+        148287,
+        198,
+        220,
+        16,
+        13,
+        198
+      ]
+    },
+    "bf16_16k_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 16384,
+      "generated_tokens": 16,
+      "prefill_ms": 684372,
+      "decode_tok_per_s": 3.92353,
+      "generated_ids": [
+        95871,
+        121919,
+        220,
+        220,
+        97032,
+        95761,
+        271,
+        248068,
+        198,
+        9764,
+        728,
+        15060,
+        22903,
+        411,
+        1879,
+        13
+      ]
+    }
+  }
+}

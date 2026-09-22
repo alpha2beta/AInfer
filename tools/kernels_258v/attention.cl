@@ -126,12 +126,12 @@ __kernel void gqa_attn_decode_bf16(
 
     int kv_h = qh / GQA_GROUP_SIZE; // 0 or 1
 
-    __local float s_q[HEAD_DIM];
+    // T-decode-opt (2026-09-22): 3 barriers per position instead of 10;
+    // 8 threads x 32 partials with 4 independent accumulator chains.
     __local float s_red[HEAD_DIM];
+    __local float s_score[1];
 
-    // Load query head into SLM
-    s_q[tid] = q[qh * HEAD_DIM + tid];
-    barrier(CLK_LOCAL_MEM_FENCE);
+    float qv = q[qh * HEAD_DIM + tid];
 
     // Running Online Softmax State
     float run_max = -1e30f;
@@ -145,19 +145,30 @@ __kernel void gqa_attn_decode_bf16(
         float k_val = bf16_to_float(k_slot[tid]);
 
         // Dot product Q[tid] * K[tid]
-        s_red[tid] = s_q[tid] * k_val;
+        s_red[tid] = qv * k_val;
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        // SLM reduction for dot product
-        for (int s = 128; s > 0; s >>= 1) {
-            if (tid < s) {
-                s_red[tid] += s_red[tid + s];
+        if (tid < 8) {
+            __local float *base = s_red + tid * 32;
+            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                a0 += base[i * 4 + 0];
+                a1 += base[i * 4 + 1];
+                a2 += base[i * 4 + 2];
+                a3 += base[i * 4 + 3];
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+            s_red[tid] = (a0 + a1) + (a2 + a3);
         }
-
-        float score = s_red[0] * ATTN_SCALE;
         barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (tid == 0) {
+            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
+                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
+            s_score[0] = s * ATTN_SCALE;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        float score = s_score[0];
 
         // Load V token
         __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;

@@ -76,18 +76,36 @@ __kernel void kv8_attn_ctrl(
   uint total = (uint)ctrl[1] + 1;
   if (total > max_ctx) total = max_ctx;
   int kv = qh / GQA;
+  // T-decode-opt (2026-09-22): 3 barriers per position instead of 10;
+  // 8 threads x 32 partials with 4 independent accumulator chains.
   __local float red[D];
+  __local float lscore[1];
   float mx = -1.0e30f, sum = 0.0f, acc = 0.0f;
   float qv = q[qh * D + d];
   for (uint t = 0; t < total; ++t) {
     float kval = (float)kc[((size_t)kv * max_ctx + t) * D + d] * ks[t * NKV + kv];
     red[d] = qv * kval;
     barrier(CLK_LOCAL_MEM_FENCE);
-    for (int step = 128; step > 0; step >>= 1) {
-      if (d < step) red[d] += red[d + step];
-      barrier(CLK_LOCAL_MEM_FENCE);
+    if (d < 8) {
+      __local float *base = red + d * 32;
+      float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+      #pragma unroll
+      for (int i = 0; i < 8; ++i) {
+        a0 += base[i * 4 + 0];
+        a1 += base[i * 4 + 1];
+        a2 += base[i * 4 + 2];
+        a3 += base[i * 4 + 3];
+      }
+      red[d] = (a0 + a1) + (a2 + a3);
     }
-    float score = red[0] * SCALE;
+    barrier(CLK_LOCAL_MEM_FENCE);
+    if (d == 0) {
+      float s = red[0] + red[1] + red[2] + red[3]
+              + red[4] + red[5] + red[6] + red[7];
+      lscore[0] = s * SCALE;
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    float score = lscore[0];
     float vv = (float)vc[((size_t)kv * max_ctx + t) * D + d] * vs[t * NKV + kv];
     if (score > mx) {
       float e = exp(mx - score);
@@ -99,7 +117,8 @@ __kernel void kv8_attn_ctrl(
       acc += e * vv;
       sum += e;
     }
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // No trailing barrier: next iteration's red[d] write is ordered by the
+    // store barrier at loop top, and lscore is re-broadcast before use.
   }
   float g = gate[qh * D + d];
   out[qh * D + d] = (acc / sum) / (1.0f + exp(-g));

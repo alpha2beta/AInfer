@@ -503,6 +503,7 @@ private:
   ze_fence_handle_t fence_ = nullptr;
   ze_module_handle_t mod_ = nullptr;
   ze_module_handle_t mod_kv8_ = nullptr;
+  ze_module_handle_t mod_attn_ = nullptr; // T-decode-opt override module (optional)
   char dev_name_[256] = "Intel Arc 140V";
 
   // Static Arenas (T5.1)

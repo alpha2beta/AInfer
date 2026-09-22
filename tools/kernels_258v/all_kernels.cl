@@ -1171,11 +1171,12 @@ __kernel void gqa_attn_decode_bf16(
 
     int kv_h = qh / GQA_GROUP_SIZE;
 
-    __local float s_q[HEAD_DIM];
+    // T-decode-opt (2026-09-22): 3 barriers per position instead of 10;
+    // see gqa_attn_decode_ctrl for rationale.
     __local float s_red[HEAD_DIM];
+    __local float s_score[1];
 
-    s_q[tid] = q[qh * HEAD_DIM + tid];
-    barrier(CLK_LOCAL_MEM_FENCE);
+    float qv = q[qh * HEAD_DIM + tid];
 
     float run_max = -1e30f;
     float run_sum = 0.0f;
@@ -1187,18 +1188,30 @@ __kernel void gqa_attn_decode_bf16(
         __global const ushort * k_slot = k_cache + (kv_h * max_ctx + t) * HEAD_DIM;
         float k_val = bf16_to_float(k_slot[tid]);
 
-        s_red[tid] = s_q[tid] * k_val;
+        s_red[tid] = qv * k_val;
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        for (int s = 128; s > 0; s >>= 1) {
-            if (tid < s) {
-                s_red[tid] += s_red[tid + s];
+        if (tid < 8) {
+            __local float *base = s_red + tid * 32;
+            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                a0 += base[i * 4 + 0];
+                a1 += base[i * 4 + 1];
+                a2 += base[i * 4 + 2];
+                a3 += base[i * 4 + 3];
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+            s_red[tid] = (a0 + a1) + (a2 + a3);
         }
-
-        float score = s_red[0] * ATTN_SCALE;
         barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (tid == 0) {
+            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
+                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
+            s_score[0] = s * ATTN_SCALE;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        float score = s_score[0];
 
         __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;
         float v_val = bf16_to_float(v_slot[tid]);
@@ -1350,11 +1363,16 @@ __kernel void gqa_attn_decode_ctrl(
 
     int kv_h = qh / GQA_GROUP_SIZE;
 
-    __local float s_q[HEAD_DIM];
+    // T-decode-opt (2026-09-22): 3 barriers per position instead of 10.
+    // The old SLM tree reduction (8 barriers) + broadcast (1) + store (1)
+    // dominated long-context decode. 8 threads x 32 partials with 4
+    // independent accumulator chains (no long dependency chain); thread 0
+    // combines 8 and broadcasts via a 1-float SLM slot. All barriers uniform.
+    // v2: v1's single 256-deep serial chain was SLOWER than the tree.
     __local float s_red[HEAD_DIM];
+    __local float s_score[1];
 
-    s_q[tid] = q[qh * HEAD_DIM + tid];
-    barrier(CLK_LOCAL_MEM_FENCE);
+    float qv = q[qh * HEAD_DIM + tid];
 
     float run_max = -1e30f;
     float run_sum = 0.0f;
@@ -1366,18 +1384,30 @@ __kernel void gqa_attn_decode_ctrl(
         __global const ushort * k_slot = k_cache + (kv_h * max_ctx + t) * HEAD_DIM;
         float k_val = bf16_to_float(k_slot[tid]);
 
-        s_red[tid] = s_q[tid] * k_val;
+        s_red[tid] = qv * k_val;
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        for (int s = 128; s > 0; s >>= 1) {
-            if (tid < s) {
-                s_red[tid] += s_red[tid + s];
+        if (tid < 8) {
+            __local float *base = s_red + tid * 32;
+            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                a0 += base[i * 4 + 0];
+                a1 += base[i * 4 + 1];
+                a2 += base[i * 4 + 2];
+                a3 += base[i * 4 + 3];
             }
-            barrier(CLK_LOCAL_MEM_FENCE);
+            s_red[tid] = (a0 + a1) + (a2 + a3);
         }
-
-        float score = s_red[0] * ATTN_SCALE;
         barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (tid == 0) {
+            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
+                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
+            s_score[0] = s * ATTN_SCALE;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        float score = s_score[0];
 
         __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;
         float v_val = bf16_to_float(v_slot[tid]);
