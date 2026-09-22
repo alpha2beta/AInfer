@@ -9,7 +9,9 @@ Endpoints:
   GET  /healthz              -> Runtime and device health status
   GET  /readyz               -> Readiness check
   GET  /v1/models            -> Model listing
-  POST /v1/chat/completions  -> OpenAI-compatible chat completion (streaming SSE & full JSON)
+  POST /v1/chat/completions  -> OpenAI-compatible chat completion (streaming SSE & full JSON;
+                                Hermes-native function calling: `tools` are rendered by the
+                                pinned template and <tool_call> XML is returned as `tool_calls`)
   POST /v1/completions       -> OpenAI-compatible prompt completion
 
 Features:
@@ -22,6 +24,7 @@ import argparse
 import ctypes
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -41,6 +44,71 @@ MODEL_ALIAS = "symrex/Tiel-Coder-35B-A3B-Genesis-Hermes"
 
 # Ensure Level Zero loader finds driver
 os.environ["LD_LIBRARY_PATH"] = SYSROOT_LIB + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+
+
+# T8.4: native Hermes tool-calling bridge (OpenAI-compatible).
+#
+# The pinned chat template renders an OpenAI-style `tools` list into a
+# <tools> system block and instructs the model to emit
+#   <tool_call><function=NAME><parameter=P>value</parameter>...</function></tool_call>
+# These helpers convert between that wire format and the OpenAI JSON shape
+# that agents (e.g. OpenCode) expect.
+_TOOL_CALL_RE = re.compile(
+    r"(?:<tool_call>\s*)?<function=([^>\s]+)>(.*?)</function>\s*(?:</tool_call>)?",
+    re.DOTALL)
+_PARAM_RE = re.compile(r"<parameter=([^>\s]+)>(.*?)</parameter>", re.DOTALL)
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _normalize_tool_messages(messages):
+    """Make client history template-safe in place; returns the same list.
+
+    The pinned template iterates `tool_call.function.arguments|items`, so
+    OpenAI string-encoded arguments must be parsed to dicts first. String
+    content that is not valid JSON is kept under a single "value" key rather
+    than failing the render.
+    """
+    for m in messages:
+        if not isinstance(m, dict) or m.get("role") != "assistant":
+            continue
+        tcs = m.get("tool_calls")
+        if not isinstance(tcs, list):
+            continue
+        for tc in tcs:
+            fn = tc.get("function") if isinstance(tc, dict) else None
+            if isinstance(fn, dict) and isinstance(fn.get("arguments"), str):
+                try:
+                    fn["arguments"] = json.loads(fn["arguments"])
+                except Exception:
+                    fn["arguments"] = {"value": fn["arguments"]}
+    return messages
+
+
+def _parse_hermes_tool_calls(text, req_id):
+    """Split generated text into (prefix_text, openai_tool_calls).
+
+    Returns ([], no calls) when the model answered in plain text. The prefix
+    (optional Hermes reasoning before the first call) has <think> blocks
+    stripped so clients receive clean content.
+    """
+    matches = list(_TOOL_CALL_RE.finditer(text or ""))
+    if not matches:
+        return text, []
+    calls = []
+    for i, m in enumerate(matches):
+        args = {}
+        for pm in _PARAM_RE.finditer(m.group(2)):
+            args[pm.group(1).strip()] = pm.group(2).strip()
+        calls.append({
+            "id": f"call_{req_id}_{i}",
+            "type": "function",
+            "function": {
+                "name": m.group(1).strip(),
+                "arguments": json.dumps(args, ensure_ascii=False),
+            },
+        })
+    prefix = _THINK_RE.sub("", text[:matches[0].start()]).strip()
+    return prefix, calls
 
 
 class AInferCtypesBinding:
@@ -291,8 +359,19 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     messages = body.get("messages", [])
                     if not messages or not isinstance(messages, list):
                         self._send_json(400, {"error": {"message": "Field 'messages' must be a non-empty array", "type": "invalid_request_error"}})
+                    # T8.4: forward OpenAI-style tools to the Hermes template
+                    # (tool_choice "none" disables; forced function names are
+                    # passed through as available tools — no server-side force).
+                    raw_tools = body.get("tools")
+                    tool_choice = body.get("tool_choice", "auto")
+                    tools_for_template = None
+                    parse_tools = False
+                    if isinstance(raw_tools, list) and raw_tools and tool_choice != "none":
+                        tools_for_template = raw_tools
+                        parse_tools = True
+                    messages = _normalize_tool_messages(messages)
                     try:
-                        prompt_text = tokenizer_tool.render_chat(messages, add_generation_prompt=True, enable_thinking=False)
+                        prompt_text = tokenizer_tool.render_chat(messages, add_generation_prompt=True, enable_thinking=False, tools=tools_for_template)
                     except Exception:
                         prompt_text = ""
                         for m in messages:
@@ -314,14 +393,14 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
             # T8.2: Serialize generation through single-flight worker lock
             with STATE.worker_lock:
-                self._execute_generation(prompt_ids, max_tokens, stream, timeout_s, is_chat)
+                self._execute_generation(prompt_ids, max_tokens, stream, timeout_s, is_chat, parse_tools if is_chat else False)
 
         finally:
             with STATE.depth_lock:
                 STATE.queue_depth -= 1
             STATE.queue_semaphore.release()
 
-    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat):
+    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat, parse_tools=False):
         # T8.2 & T8.3: Check device health before running
         if not STATE.binding.check_device_health():
             self._send_json(500, {"error": {"message": "Level Zero device reported failure or loss", "type": "device_error"}})
@@ -340,9 +419,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             t_prefill = time.perf_counter()
 
             if stream:
-                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat)
+                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, parse_tools)
             else:
-                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat)
+                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, parse_tools)
 
             STATE.total_requests += 1
 
@@ -356,7 +435,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # T8.2: Always reset state on finish or abort so GPU memory/SSM buffers are clean
             STATE.binding.reset_state()
 
-    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat):
+    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, parse_tools=False):
         generated_ids = [first_tok]
 
         # Decode loop
@@ -391,6 +470,14 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         output_text = tokenizer_tool.decode(STATE.tokenizer, generated_ids, skip_special_tokens=True)
 
         if is_chat:
+            # T8.4: translate native Hermes <tool_call> XML into OpenAI tool_calls.
+            prefix, tool_calls = _parse_hermes_tool_calls(output_text, req_id) if parse_tools else (output_text, [])
+            if tool_calls:
+                message = {"role": "assistant", "content": prefix or None, "tool_calls": tool_calls}
+                finish_reason = "tool_calls"
+            else:
+                message = {"role": "assistant", "content": output_text}
+                finish_reason = "stop" if generated_ids[-1] in (248044, 248046) else "length"
             resp = {
                 "id": req_id,
                 "object": "chat.completion",
@@ -399,8 +486,8 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 "choices": [
                     {
                         "index": 0,
-                        "message": {"role": "assistant", "content": output_text},
-                        "finish_reason": "stop" if generated_ids[-1] in (248044, 248046) else "length",
+                        "message": message,
+                        "finish_reason": finish_reason,
                     }
                 ],
                 "usage": {
@@ -436,7 +523,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         self._send_json(200, resp)
 
-    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat):
+    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, parse_tools=False):
         # Establish Server-Sent Events stream
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -455,6 +542,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         first_text = tokenizer_tool.decode(STATE.tokenizer, [first_tok], skip_special_tokens=False)
         STATE.total_tokens_generated += 1
         gen_count = 1
+        streamed_parts = [first_text]  # T8.4: accumulate for end-of-stream tool-call parse
 
         if is_chat:
             send_sse_chunk({
@@ -505,6 +593,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     break
 
                 chunk_text = tokenizer_tool.decode(STATE.tokenizer, [cur_tok], skip_special_tokens=False)
+                streamed_parts.append(chunk_text)
                 if is_chat:
                     send_sse_chunk({
                         "id": req_id,
@@ -531,6 +620,24 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         # Emit terminal SSE chunk + [DONE]
         finish_reason = "stop" if cur_tok in (248044, 248046) else "length"
         if is_chat:
+            # T8.4: if the streamed text carries Hermes tool calls, emit them
+            # as an OpenAI tool_calls delta before the terminal chunk. (Raw
+            # XML already streamed as content chunks above; clients that
+            # accumulate deltas still converge on the same calls.)
+            _, stream_tool_calls = _parse_hermes_tool_calls("".join(streamed_parts), req_id) if parse_tools else ("", [])
+            if stream_tool_calls:
+                send_sse_chunk({
+                    "id": req_id,
+                    "object": "chat.completion.chunk",
+                    "created": created_time,
+                    "model": MODEL_ID,
+                    "choices": [{"index": 0, "delta": {"tool_calls": [
+                        {"index": i, "id": tc["id"], "type": "function",
+                         "function": {"name": tc["function"]["name"],
+                                      "arguments": tc["function"]["arguments"]}}
+                        for i, tc in enumerate(stream_tool_calls)]}, "finish_reason": None}],
+                })
+                finish_reason = "tool_calls"
             send_sse_chunk({
                 "id": req_id,
                 "object": "chat.completion.chunk",

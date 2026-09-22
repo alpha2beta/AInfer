@@ -51,12 +51,16 @@ def decode(tok, ids, skip_special_tokens=False):
     return tok.decode(ids, skip_special_tokens=skip_special_tokens)
 
 
-def render_chat(messages, add_generation_prompt=True, enable_thinking=False):
+def render_chat(messages, add_generation_prompt=True, enable_thinking=False, tools=None):
     """Render with the pinned chat_template.jinja.
 
     Defaults mirror the T4.4 CLI path: thinking disabled gives a minimal,
     deterministic prompt. Callers needing parity with HF defaults must pass
     the same kwargs to both renderers (see validation report).
+
+    tools: OpenAI-style list of {"type": "function", "function": {...}} dicts
+    (or None). The pinned Hermes template renders them into a <tools> system
+    block natively; None preserves the exact legacy prompt.
     """
     from jinja2 import Environment, BaseLoader
     with open(os.path.join(MODEL_DIR, "chat_template.jinja")) as f:
@@ -69,7 +73,7 @@ def render_chat(messages, add_generation_prompt=True, enable_thinking=False):
     return tmpl.render(messages=messages,
                        add_generation_prompt=add_generation_prompt,
                        enable_thinking=enable_thinking,
-                       tools=None,
+                       tools=tools,
                        bos_token=None, eos_token="<|im_end|>",
                        add_vision_id=True)
 
