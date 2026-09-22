@@ -141,6 +141,8 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 
 **KV8 32K Scale (2026-09-22):** 32K real prefill: BF16 2,745,590 ms (45.8 min, 11.93 tok/s) vs KV8 **2,423,229 ms (40.4 min, 13.52 tok/s, 1.13×)** — KV8 edge narrows vs 1.23× at 16K as O(P²) attention compute dominates. 32K needle (32000 tokens): KV8 **4/4 (100%)** across depths 0.0/0.5/1.0 + distractor; per-case prefill ~14.0–14.3 tok/s, decode ~1.75 tok/s over 32K KV. KV8 retrieval-qualified 4K → 16K → 32K, all 100%; BF16 completed 32K without OOM this time. Reports: `report_prefill_32k_bf16.json`, `report_prefill_32k_kv8.json`, `report_long_context_32k_kv8.json`.
 
+**Decode-attention opt v2 (2026-09-22):** decode attention went 10 → 3 SLM barriers/position (8-thread 4-chain reduction + broadcast; v1 serial chain was slower and discarded). Same-harness gains: 4K BF16 11.39 → 13.62 (1.20×), 4K KV8 10.13 → 13.63 (1.35×), 16K BF16 3.92 (~1.21×), 32K BF16 1.75 → **2.13 (1.22×)** — flat ~1.2×, barriers were ~20% of attention time. Parity: short + 4K bit-identical both paths; MTP re-verified 160/160 BF16 (1.229×) + KV8 (1.243×). Ships as optional `all_kernels.spv.attn` override (upstream clang cannot rebuild the ESIMD bundle). Report: `report_decode_attn_opt.json`.
+
 
 
 

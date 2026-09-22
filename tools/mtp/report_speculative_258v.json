@@ -7,9 +7,9 @@
   "speculative_verification": {
     "status": "PASSED",
     "bit_exact_parity": true,
-    "mean_baseline_tok_s": 35.7155,
-    "mean_speculative_tok_s": 42.7876,
-    "realized_speedup": 1.19801
+    "mean_baseline_tok_s": 33.0178,
+    "mean_speculative_tok_s": 40.5767,
+    "realized_speedup": 1.22893
   },
   "prompts": [
     {
@@ -17,29 +17,29 @@
       "name": "Python reverse string",
       "bit_exact": true,
       "tokens_compared": 32,
-      "baseline_tok_s": 35.8109,
-      "speculative_tok_s": 39.7437,
-      "speedup": 1.10982,
-      "acceptance_rate": 0.6
+      "baseline_tok_s": 33.1559,
+      "speculative_tok_s": 35.6179,
+      "speedup": 1.07425,
+      "acceptance_rate": 0.52381
     },
     {
       "prompt_idx": 1,
       "name": "Arithmetic reasoning",
       "bit_exact": true,
       "tokens_compared": 32,
-      "baseline_tok_s": 35.2087,
-      "speculative_tok_s": 34.817,
-      "speedup": 0.988877,
-      "acceptance_rate": 0.391304
+      "baseline_tok_s": 33.2262,
+      "speculative_tok_s": 36.9267,
+      "speedup": 1.11137,
+      "acceptance_rate": 0.6
     },
     {
       "prompt_idx": 2,
       "name": "Factual knowledge",
       "bit_exact": true,
       "tokens_compared": 32,
-      "baseline_tok_s": 36.1426,
-      "speculative_tok_s": 45.5777,
-      "speedup": 1.26105,
+      "baseline_tok_s": 32.7382,
+      "speculative_tok_s": 41.2717,
+      "speedup": 1.26066,
       "acceptance_rate": 0.722222
     },
     {
@@ -47,9 +47,9 @@
       "name": "Code loop range",
       "bit_exact": true,
       "tokens_compared": 32,
-      "baseline_tok_s": 35.9505,
-      "speculative_tok_s": 42.4363,
-      "speedup": 1.18041,
+      "baseline_tok_s": 32.8496,
+      "speculative_tok_s": 41.9774,
+      "speedup": 1.27787,
       "acceptance_rate": 0.777778
     },
     {
@@ -57,9 +57,9 @@
       "name": "Logic puzzle",
       "bit_exact": true,
       "tokens_compared": 32,
-      "baseline_tok_s": 35.465,
-      "speculative_tok_s": 51.3631,
-      "speedup": 1.44828,
+      "baseline_tok_s": 33.1193,
+      "speculative_tok_s": 47.0896,
+      "speedup": 1.42182,
       "acceptance_rate": 0.9375
     }
   ]

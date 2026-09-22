@@ -196,6 +196,42 @@
         1879,
         13
       ]
+    },
+    "bf16_32k_v2": {
+      "device": "Intel(R) Arc(TM) Graphics",
+      "prompt_tokens": 32768,
+      "generated_tokens": 16,
+      "prefill_ms": 2781280.0,
+      "decode_tok_per_s": 2.13373,
+      "generated_ids": [
+        363,
+        197,
+        197,
+        26,
+        197,
+        26,
+        197,
+        26,
+        197,
+        26,
+        197,
+        97475,
+        96585,
+        220,
+        220,
+        97032
+      ]
     }
-  }
+  },
+  "confirmation_32k": {
+    "bf16_decode_tok_per_s": 2.13,
+    "old_baseline": 1.75,
+    "speedup": 1.22,
+    "note": "same-harness CLI runs; old 32K 1.75 from needle harness is consistent (old CLI 4K/16K matched needle within 15%)"
+  },
+  "mtp_reverification": {
+    "bf16": "160/160 bit-exact, 1.229x (report_speculative_258v.json re-run under new kernel)",
+    "kv8": "160/160 bit-exact, 1.243x (report_mtp_kv8.json re-run under new kernel)"
+  },
+  "conclusion": "consistent ~1.2x decode gain 4K->32K; barrier share ~20% of attention time, rest is KV loads + exp/softmax ALU (scales with P in both versions)"
 }
