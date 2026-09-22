@@ -1295,13 +1295,17 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   gate 126/126. P64K phase profile remains optional extension.)
 
 ### B60-R4 Controlled baseline reproduction (P1)
-- Status: `[~]` (2026-09-20: OV GenAI 2026.4.0 reproduced on same B60 and
-  schema-normalized, `tools/bench/report_r4_ov_{1..4}.json` (greedy, warmup
-  discarded, max-new=32; decode 25.8-26.2 tok/s; prefill 516 @235tok,
-  1044 @884tok; OV KV=f16 recorded in command note — schema kv enum is
-  bf16/int8 only). llama SYCL/FP16/114-MTP prior numbers remain classified
-  same_class_external (14.86/17.0/29.64 tps; pp 184-1008) — no llama build on
-  this box; schema-normalized llama rerun still open.)
+- Status: `[x]` (2026-09-22: llama SYCL reproduced LOCALLY on same B60 —
+  `llama-bench` build-sycl-f16 `c745be2a2 b10229`, `Dirk-Qwen3.8-27B-UD-Q4_K_XL.gguf`
+  Q4_K, f16 KV (schema enum nearest bf16): pp512 515.89 tok/s (samples
+  515.83/515.93/515.91), pp4096 485.67 tok/s (485.61/485.74/485.66), tg
+  14.84–14.86 tok/s (matches prior external 14.86 exactly). Own steady decode
+  measured at max-new=32: 13.95 tok/s (`report_r4_ours_decode32_p256`), within
+  6.1% of llama tg. Raw `tools/bench/evidence/r4_llama_p*.json` +
+  `r4_ours_decode32_p256.json`, normalized `tools/bench/report_r4_llama_p*.json`
+  + `report_r4_ours_decode32_p256.json`; gate 154/154. OV GenAI 2026.4.0 prior
+  `report_r4_ov_{1..4}.json` retained (decode 25.8–26.2 tok/s; prefill 516
+  @235tok, 1044 @884tok). All baselines now `local_reproduced`.)
 
 ### B60-R5 DPAS projection feasibility (P1)
 - Status: `[x]` (2026-09-21: ChunkGemmPP DONE — planar nibble-plane
@@ -1341,7 +1345,14 @@ Phase gate: performance stable, explained by profiles, quality threshold preserv
   normalized `tools/bench/report_r7_{normal,flash}_p*.json`; gate 151/151.)
 
 ### B60-R8 Continuation decision (P0)
-- Status: `[ ]` (open: needs R4, R5, R6, R7; deliverable `B60_decision.md`)
+- Status: `[x]` (2026-09-22: deliverable `B60_decision.md` published —
+  verdict **continue as RESEARCH runtime (§6.2)**, not performance/production.
+  Prefill 13.8× behind aligned llama SYCL @P4096 (35.2 vs 485.7 tok/s);
+  decode within 6.1% (13.95 vs 14.85). §6.1 2×-prefill/−30%-64K not met;
+  §6.3 prefill-freeze trigger factually met but offset by competitive decode,
+  deterministic recorded execution, and partial investigation passes
+  (PP+BATCH+M512 +24.6% ≥ 15% go bar; recurrence negligible). Revisit on:
+  B60-native attention blocking, INT8-KV with quality gate, remaining P6.)
 
 ---
 
