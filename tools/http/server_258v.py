@@ -58,6 +58,7 @@ _TOOL_CALL_RE = re.compile(
     re.DOTALL)
 _PARAM_RE = re.compile(r"<parameter=([^>\s]+)>(.*?)</parameter>", re.DOTALL)
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+_TOOL_START_RE = re.compile(r"<tool_call>|<function=")
 
 
 def _normalize_tool_messages(messages):
@@ -546,20 +547,31 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             self.wfile.flush()
 
-        # Emit first token
+        # Emit first token (T8.4c: suppress raw <tool_call>/<function=> XML from
+        # content chunks — tool calls are delivered as tool_calls deltas only)
         first_text = tokenizer_tool.decode(STATE.tokenizer, [first_tok], skip_special_tokens=False)
         STATE.total_tokens_generated += 1
         gen_count = 1
         streamed_parts = [first_text]  # T8.4: accumulate for end-of-stream tool-call parse
+        suppressed = bool(_TOOL_START_RE.search(first_text))
 
         if is_chat:
-            send_sse_chunk({
-                "id": req_id,
-                "object": "chat.completion.chunk",
-                "created": created_time,
-                "model": MODEL_ID,
-                "choices": [{"index": 0, "delta": {"role": "assistant", "content": first_text}, "finish_reason": None}],
-            })
+            if suppressed:
+                send_sse_chunk({
+                    "id": req_id,
+                    "object": "chat.completion.chunk",
+                    "created": created_time,
+                    "model": MODEL_ID,
+                    "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+                })
+            else:
+                send_sse_chunk({
+                    "id": req_id,
+                    "object": "chat.completion.chunk",
+                    "created": created_time,
+                    "model": MODEL_ID,
+                    "choices": [{"index": 0, "delta": {"role": "assistant", "content": first_text}, "finish_reason": None}],
+                })
         else:
             send_sse_chunk({
                 "id": req_id,
@@ -602,7 +614,14 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
                 chunk_text = tokenizer_tool.decode(STATE.tokenizer, [cur_tok], skip_special_tokens=False)
                 streamed_parts.append(chunk_text)
-                if is_chat:
+                # T8.4c: once a tool-call marker appears anywhere in the
+                # accumulated text, stop emitting content chunks (suffix rule:
+                # reasoning comes before the call, never after).
+                if not suppressed and _TOOL_START_RE.search("".join(streamed_parts)):
+                    suppressed = True
+                if suppressed:
+                    pass
+                elif is_chat:
                     send_sse_chunk({
                         "id": req_id,
                         "object": "chat.completion.chunk",
