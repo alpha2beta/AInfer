@@ -1,0 +1,14 @@
+[Unit]
+Description=AInfer Persistent Resident Inference Server (258V, Arc 140V)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/AInfer
+Environment=LD_LIBRARY_PATH=%h/Projects/AInfer/tools/toolchain/sysroot/usr/lib
+ExecStart=%h/Projects/AInfer/tools/http/serve_lan.sh --port 8080 --max-ctx 4096 --timeout 600
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

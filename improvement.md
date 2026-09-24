@@ -200,7 +200,7 @@ prerequisites for daily IDE use.
 
 ### I3.4 Systemd User Service (`ainfer.service`)
 
-- Status: `[ ]`
+- Status: `[x]`
 - Complexity: **Low** (~1 day)
 - **Current state:** Server is started manually via `tools/http/serve_lan.sh`.
 - **Action:**
@@ -228,7 +228,7 @@ prerequisites for daily IDE use.
 
 ### I3.5 Battery & Thermal Power Management
 
-- Status: `[ ]`
+- Status: `[x]`
 - Complexity: **Low** (~1 day)
 - File: `tools/decode/runtime_258v.cpp` (fence wait loop)
 - **Current state:** `zeFenceHostSynchronize` uses active CPU spin-waiting, pegging 1 core at

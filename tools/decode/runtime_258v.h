@@ -505,6 +505,7 @@ private:
   ze_command_queue_handle_t queue_ = nullptr;
   ze_command_list_handle_t cmd_copy_ = nullptr;
   ze_fence_handle_t fence_ = nullptr;
+  ze_result_t wait_fence(); // I3.5: centralized fence wait (power-mode aware)
   ze_module_handle_t mod_ = nullptr;
   ze_module_handle_t mod_kv8_ = nullptr;
   ze_module_handle_t mod_attn_ = nullptr; // T-decode-opt override module (optional)

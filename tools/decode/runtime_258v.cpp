@@ -7,8 +7,28 @@
 #include <cstring>
 #include <iomanip>
 #include <sys/stat.h>
+#include <thread>
 
 namespace ainfer {
+
+// I3.5: power-mode aware fence wait. Default `performance` keeps the
+// zero-latency UINT64_MAX spin-wait. `AINFER_POWER_MODE=balanced` polls with a
+// 100 us timeout and yields between polls so the host thread does not peg a
+// core (saves ~5-10 W package power on battery; expected decode impact < 1%
+// at ~30 ms inter-token intervals).
+ze_result_t AInferRuntime258V::wait_fence() {
+  static const bool balanced = [] {
+    const char *m = std::getenv("AINFER_POWER_MODE");
+    return m && std::string(m) == "balanced";
+  }();
+  if (!balanced) return zeFenceHostSynchronize(fence_, UINT64_MAX);
+  for (;;) {
+    ze_result_t r = zeFenceHostSynchronize(fence_, 100000); // 100 us in ns
+    if (r == ZE_RESULT_SUCCESS) return r;
+    if (r != ZE_RESULT_NOT_READY) return r;
+    std::this_thread::yield();
+  }
+}
 
 static uint64_t rd64(std::ifstream &f) {
   uint64_t v = 0;
@@ -1900,7 +1920,7 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     if (!cmd_chunk) return false;
 
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_chunk, fence_));
-    CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+    CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
 
     if (is_terminal) {
@@ -1909,7 +1929,7 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
       if (!cmd_tail) return false;
 
       CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_tail, fence_));
-      CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+      CHECK_L0(wait_fence());
       CHECK_L0(zeFenceReset(fence_));
 
       // Read back terminal sampled / argmax token directly from control block (T5.4)
@@ -1953,7 +1973,7 @@ bool AInferRuntime258V::decode_step(int *out_next_token) {
 
   // Execute unified pre-recorded command list (embed + 40 layers + tail) with zero allocations (T5.3/T5.4)
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_step_, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
 
   int next_tok = d_ctrl_->selected_token;
@@ -1980,7 +2000,7 @@ bool AInferRuntime258V::teacher_forced_eval(const std::vector<int> &prompt_ids, 
     std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_step_, fence_));
-    CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+    CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
 
     out_predicted_tokens.push_back(d_ctrl_->selected_token);
@@ -2034,7 +2054,7 @@ bool AInferRuntime258V::profile_step_breakdown(double &embed_ms, double &layers_
   // 1. Time cmd_embed_
   auto t_start = std::chrono::steady_clock::now();
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_embed_, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
   auto t_embed = std::chrono::steady_clock::now();
   embed_ms = std::chrono::duration<double, std::milli>(t_embed - t_start).count();
@@ -2045,7 +2065,7 @@ bool AInferRuntime258V::profile_step_breakdown(double &embed_ms, double &layers_
   for (int l = 0; l < TOTAL_LAYERS; ++l) {
     auto t_l0 = std::chrono::steady_clock::now();
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_layers_[l], fence_));
-    CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+    CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
     auto t_l1 = std::chrono::steady_clock::now();
     layer_times_ms[l] = std::chrono::duration<double, std::milli>(t_l1 - t_l0).count();
@@ -2056,7 +2076,7 @@ bool AInferRuntime258V::profile_step_breakdown(double &embed_ms, double &layers_
   // 3. Time cmd_tail_
   auto t_tail_start = std::chrono::steady_clock::now();
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_tail_, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
   auto t_tail_end = std::chrono::steady_clock::now();
   tail_ms = std::chrono::duration<double, std::milli>(t_tail_end - t_tail_start).count();
@@ -2071,7 +2091,7 @@ bool AInferRuntime258V::profile_step_breakdown(double &embed_ms, double &layers_
 
   auto t_step0 = std::chrono::steady_clock::now();
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_step_, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
   auto t_step1 = std::chrono::steady_clock::now();
   step_ms = std::chrono::duration<double, std::milli>(t_step1 - t_step0).count();
@@ -3025,7 +3045,7 @@ bool AInferRuntime258V::mtp_draft_step(int *out_draft_token, double *out_latency
   auto t0 = std::chrono::high_resolution_clock::now();
 
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &mtp_.cmd_draft, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
 
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -3513,7 +3533,7 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
   // 3. Execute dual-token verification forward pass (B = 2)
   auto t_v0 = std::chrono::high_resolution_clock::now();
   CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_verify_m2_, fence_));
-  CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+  CHECK_L0(wait_fence());
   CHECK_L0(zeFenceReset(fence_));
   auto t_v1 = std::chrono::high_resolution_clock::now();
   double v_ms = std::chrono::duration<double, std::milli>(t_v1 - t_v0).count();
@@ -3558,7 +3578,7 @@ bool AInferRuntime258V::speculative_step(int *out_tok1, int *out_tok2, int *out_
     // Execute recorded GPU rollback copy
     auto t_rb0 = std::chrono::high_resolution_clock::now();
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_rollback_, fence_));
-    CHECK_L0(zeFenceHostSynchronize(fence_, UINT64_MAX));
+    CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
     auto t_rb1 = std::chrono::high_resolution_clock::now();
     rb_ms = std::chrono::duration<double, std::milli>(t_rb1 - t_rb0).count();
