@@ -530,6 +530,8 @@
   - I3.5: centralized `wait_fence()` (`tools/decode/runtime_258v.h:508`, `runtime_258v.cpp:14`) replacing all 11 production `zeFenceHostSynchronize(UINT64_MAX)` spin-waits (benchmark timing lambda keeps raw waits). `AINFER_POWER_MODE=balanced` polls at 100 us + yield; default `performance` unchanged. Verified on device: golden 8-token output bit-identical both modes (performance 36.40 tok/s, balanced 36.69 tok/s — no regression).
 - **2026-09-24 (I3.3 B=512 qualification — DONE):**
   - Finding: `MAX_PREFILL_CHUNK=512` + 256 MiB workspace already in place (`tools/decode/runtime_258v.h:627`) — I3.3 reduced to verification, no code change. Multi-chunk prefill (P=600 → 512+88, P=1024 → 2×512) vs `AINFER_RECR_SERIAL=1`: **8/8 bit-identical both lengths**; chunked prefill +3.9% (P=600: 305.9 vs 294.3 tok/s) and +4.5% (P=1024: 292.6 vs 279.9 tok/s). Report: `tools/bench_258v/report_b512_qualification.json`.
+- **2026-09-24 (Long-context performance claim correction):**
+  - Corrected the broad “AInfer outperforms llama.cpp” wording: the committed **1.20×** result is limited to the short-context T7.5 benchmark. A live ~6.7K-token observation measured AInfer **84.3 pp / 9.4 tg tok/s** versus llama.cpp **183.2 pp / 23.0 tg tok/s**; same-model comparability still requires verification. Added `claim_correction.md` and a release-truth caveat to `STATUS.md`.
 - **2026-09-24 (P0 Improvements — I1.1 Stop Sequences & I1.2 FIM Autocomplete — DONE):**
   - **I1.1 Stop Sequence Parsing:** Implemented `StreamStopBuffer` and `IncrementalDecoder` in `tools/http/server_258v.py` supporting prefix-buffering, multi-character/multi-token stop sequences across token boundaries, and early loop termination in both streaming and non-streaming modes. Truncates matched stop sequences cleanly and sets `finish_reason: "stop"`.
   - **I1.2 Native FIM (Fill-In-The-Middle):** Added support for `/v1/completions` with `suffix`, formatting prompts natively as `<|fim_prefix|>{prompt}<|fim_suffix|>{suffix}<|fim_middle|>` and automatically registering native FIM stop tokens (`<|fim_middle|>`, `<|fim_suffix|>`, `<|fim_prefix|>`, `<|fim_pad|>`, `<|file_sep|>`) and token IDs (`248060`..`248065`). Defaults `max_tokens: 256` for FIM.
@@ -554,5 +556,4 @@
     - **Gate M4 Qualification (`test_runtime_258v`):** All 5 test suites passed cleanly with golden output token determinism.
     - **Toggles:** Production runtime defaults to 100% bit-exact pure-FP32 kernels; `AINFER_M2_DPAS=1` available for systolic DPAS benchmarking.
     - **Report:** Emitted authoritative verification report to `tools/mtp/report_speculative_258v.json`.
-
 
