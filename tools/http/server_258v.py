@@ -25,6 +25,8 @@ import ctypes
 import json
 import os
 import re
+import select
+import socket
 import sys
 import threading
 import time
@@ -110,6 +112,101 @@ def _parse_hermes_tool_calls(text, req_id):
         })
     prefix = _THINK_RE.sub("", text[:matches[0].start()]).strip()
     return prefix, calls
+
+
+EOS_TOKEN_IDS = {248044, 248046}
+FIM_STOP_TOKENS = ["<|fim_middle|>", "<|fim_suffix|>", "<|fim_prefix|>", "<|fim_pad|>", "<|file_sep|>"]
+FIM_STOP_TOKEN_IDS = {248060, 248061, 248062, 248063, 248065}
+
+
+class IncrementalDecoder:
+    """Incrementally decodes token IDs without partial UTF-8 replacement artifacts."""
+
+    def __init__(self, tokenizer):
+        self.tokenizer = tokenizer
+        self.token_ids = []
+        self.decoded_text = ""
+
+    def step(self, token_id):
+        self.token_ids.append(token_id)
+        full_text = tokenizer_tool.decode(self.tokenizer, self.token_ids, skip_special_tokens=False)
+        if full_text.endswith("\ufffd"):
+            return ""
+        if len(full_text) >= len(self.decoded_text):
+            new_text = full_text[len(self.decoded_text):]
+            self.decoded_text = full_text
+            return new_text
+        return ""
+
+    def flush(self):
+        full_text = tokenizer_tool.decode(self.tokenizer, self.token_ids, skip_special_tokens=False)
+        if len(full_text) > len(self.decoded_text):
+            new_text = full_text[len(self.decoded_text):]
+            self.decoded_text = full_text
+            return new_text
+        return ""
+
+
+class StreamStopBuffer:
+    """Buffers minimal trailing text to match stop sequences across token boundaries."""
+
+    def __init__(self, stop_sequences=None):
+        self.stop_sequences = [s for s in (stop_sequences or []) if s]
+        self.buffer = ""
+        self.stopped = False
+        self.matched_stop = None
+
+    def append(self, text: str) -> str:
+        if self.stopped or not text:
+            return ""
+        self.buffer += text
+
+        if not self.stop_sequences:
+            to_emit = self.buffer
+            self.buffer = ""
+            return to_emit
+
+        # 1. Check if any stop sequence is completely present in buffer
+        earliest_idx = -1
+        matched_seq = None
+        for s in self.stop_sequences:
+            idx = self.buffer.find(s)
+            if idx != -1 and (earliest_idx == -1 or idx < earliest_idx):
+                earliest_idx = idx
+                matched_seq = s
+
+        if earliest_idx != -1:
+            self.stopped = True
+            self.matched_stop = matched_seq
+            to_emit = self.buffer[:earliest_idx]
+            self.buffer = ""  # discard stop sequence and any trailing text
+            return to_emit
+
+        # 2. Check if the suffix of self.buffer is a prefix of any stop sequence
+        longest_prefix_len = 0
+        for s in self.stop_sequences:
+            max_k = min(len(self.buffer), len(s) - 1)
+            for k in range(max_k, 0, -1):
+                if k > longest_prefix_len and self.buffer.endswith(s[:k]):
+                    longest_prefix_len = k
+                    break
+
+        if longest_prefix_len > 0:
+            emit_end = len(self.buffer) - longest_prefix_len
+            to_emit = self.buffer[:emit_end]
+            self.buffer = self.buffer[emit_end:]
+            return to_emit
+        else:
+            to_emit = self.buffer
+            self.buffer = ""
+            return to_emit
+
+    def flush(self) -> str:
+        if self.stopped:
+            return ""
+        to_emit = self.buffer
+        self.buffer = ""
+        return to_emit
 
 
 class AInferCtypesBinding:
@@ -218,6 +315,9 @@ class AInferCtypesBinding:
             self.lib.ainfer_destroy(self.handle)
             self.handle = None
 
+    def __del__(self):
+        self.close()
+
 
 class ServerState:
     """Manages thread synchronization, bounded queueing, and metrics."""
@@ -253,6 +353,21 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Override standard noisy logging
         sys.stderr.write(f"[{self.log_date_time_string()}] {self.command} {self.path} {args[1] if len(args) > 1 else ''}\n")
+
+    def is_client_disconnected(self):
+        """Check if the client has closed or reset the TCP connection."""
+        try:
+            sock = getattr(self, "connection", None)
+            if sock is None:
+                return True
+            r, _, _ = select.select([sock], [], [], 0)
+            if r:
+                data = sock.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT)
+                if len(data) == 0:
+                    return True
+        except (ConnectionResetError, BrokenPipeError, OSError):
+            return True
+        return False
 
     def do_GET(self):
         if self.path == "/healthz":
@@ -353,17 +468,29 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": {"message": f"Malformed JSON: {str(e)}", "type": "invalid_request_error"}})
                 return
 
+            raw_stop = body.get("stop")
+            if raw_stop is None:
+                raw_stop = body.get("stop_sequences")
+            stop_sequences = []
+            if isinstance(raw_stop, str):
+                if raw_stop:
+                    stop_sequences.append(raw_stop)
+            elif isinstance(raw_stop, list):
+                for s in raw_stop:
+                    if isinstance(s, str) and s:
+                        stop_sequences.append(s)
+
             stream = bool(body.get("stream", False))
-            max_tokens = int(body.get("max_tokens", 64))
-            max_tokens = max(1, min(max_tokens, 2048))
             timeout_s = float(body.get("timeout", STATE.default_timeout))
 
             # Render Prompt
             try:
                 if is_chat:
+                    is_fim = False
                     messages = body.get("messages", [])
                     if not messages or not isinstance(messages, list):
                         self._send_json(400, {"error": {"message": "Field 'messages' must be a non-empty array", "type": "invalid_request_error"}})
+                        return
                     # T8.4: forward OpenAI-style tools to the Hermes template
                     # (tool_choice "none" disables; forced function names are
                     # passed through as available tools — no server-side force).
@@ -382,14 +509,46 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                         for m in messages:
                             prompt_text += f"<|im_start|>{m.get('role', 'user')}\n{m.get('content', '')}<|im_end|>\n"
                         prompt_text += "<|im_start|>assistant\n"
+                    stop_token_ids = set(EOS_TOKEN_IDS)
                 else:
                     prompt = body.get("prompt", "")
                     if isinstance(prompt, list):
                         prompt = " ".join(prompt)
-                    if not prompt or not isinstance(prompt, str):
+                    if not isinstance(prompt, str):
+                        self._send_json(400, {"error": {"message": "Field 'prompt' must be a string", "type": "invalid_request_error"}})
+                        return
+
+                    suffix = body.get("suffix")
+                    if isinstance(suffix, list):
+                        suffix = " ".join(suffix)
+
+                    is_fim = False
+                    if suffix is not None and isinstance(suffix, str):
+                        is_fim = True
+                        if "<|fim_middle|>" in prompt or "<|fim_prefix|>" in prompt:
+                            prompt_text = prompt
+                        else:
+                            prompt_text = f"<|fim_prefix|>{prompt}<|fim_suffix|>{suffix}<|fim_middle|>"
+                    elif "<|fim_middle|>" in prompt:
+                        is_fim = True
+                        prompt_text = prompt
+                    else:
+                        prompt_text = prompt
+
+                    if not prompt_text:
                         self._send_json(400, {"error": {"message": "Field 'prompt' must be a non-empty string", "type": "invalid_request_error"}})
                         return
-                    prompt_text = prompt
+
+                    stop_token_ids = set(EOS_TOKEN_IDS)
+                    if is_fim:
+                        stop_token_ids.update(FIM_STOP_TOKEN_IDS)
+                        for fim_tok in FIM_STOP_TOKENS:
+                            if fim_tok not in stop_sequences:
+                                stop_sequences.append(fim_tok)
+
+                max_tokens_default = 256 if (not is_chat and is_fim) else 64
+                max_tokens = int(body.get("max_tokens", max_tokens_default))
+                max_tokens = max(1, min(max_tokens, 2048))
 
                 prompt_ids = tokenizer_tool.encode(STATE.tokenizer, prompt_text)
             except Exception as e:
@@ -398,14 +557,23 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
             # T8.2: Serialize generation through single-flight worker lock
             with STATE.worker_lock:
-                self._execute_generation(prompt_ids, max_tokens, stream, timeout_s, is_chat, parse_tools if is_chat else False)
+                self._execute_generation(
+                    prompt_ids=prompt_ids,
+                    max_tokens=max_tokens,
+                    stream=stream,
+                    timeout_s=timeout_s,
+                    is_chat=is_chat,
+                    stop_sequences=stop_sequences,
+                    stop_token_ids=stop_token_ids,
+                    parse_tools=parse_tools if is_chat else False,
+                )
 
         finally:
             with STATE.depth_lock:
                 STATE.queue_depth -= 1
             STATE.queue_semaphore.release()
 
-    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat, parse_tools=False):
+    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
         # T8.2 & T8.3: Check device health before running
         if not STATE.binding.check_device_health():
             self._send_json(500, {"error": {"message": "Level Zero device reported failure or loss", "type": "device_error"}})
@@ -423,10 +591,14 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             first_tok = STATE.binding.prefill(prompt_ids)
             t_prefill = time.perf_counter()
 
+            if self.is_client_disconnected():
+                sys.stderr.write(f"[Server] Client disconnected after prefill ({req_id}). Aborting.\n")
+                return
+
             if stream:
-                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, parse_tools)
+                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
             else:
-                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, parse_tools)
+                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
 
             STATE.total_requests += 1
 
@@ -440,11 +612,38 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # T8.2: Always reset state on finish or abort so GPU memory/SSM buffers are clean
             STATE.binding.reset_state()
 
-    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, parse_tools=False):
+    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+        stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
+        stop_sequences = [s for s in (stop_sequences or []) if s]
+        decoder = IncrementalDecoder(STATE.tokenizer)
+
         generated_ids = [first_tok]
+        decoder.step(first_tok)
+
+        stopped = False
+        finish_reason = "length"
+        output_text = None
+
+        if first_tok in stop_token_ids:
+            stopped = True
+            finish_reason = "stop"
+            output_text = ""
+        elif stop_sequences:
+            earliest_idx = -1
+            for s in stop_sequences:
+                idx = decoder.decoded_text.find(s)
+                if idx != -1 and (earliest_idx == -1 or idx < earliest_idx):
+                    earliest_idx = idx
+            if earliest_idx != -1:
+                stopped = True
+                finish_reason = "stop"
+                output_text = decoder.decoded_text[:earliest_idx]
 
         # Decode loop
-        while len(generated_ids) < max_tokens:
+        while not stopped and len(generated_ids) < max_tokens:
+            if self.is_client_disconnected():
+                sys.stderr.write(f"[Server] Client disconnected mid-generation ({req_id}). Aborting decode loop.\n")
+                return
             if time.perf_counter() - t_start > timeout_s:
                 sys.stderr.write(f"[Server] Execution timeout ({timeout_s}s) exceeded for {req_id}\n")
                 break
@@ -453,26 +652,45 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 if res is None:
                     break
                 t1, t2, nem, _ = res
-                if nem >= 1:
-                    generated_ids.append(t1)
-                    if t1 in (248044, 248046) or len(generated_ids) >= max_tokens:
-                        break
-                if nem == 2:
-                    generated_ids.append(t2)
-                    if t2 in (248044, 248046) or len(generated_ids) >= max_tokens:
-                        break
+                tokens_to_emit = [t1] if nem == 1 else [t1, t2]
             else:
                 nxt = STATE.binding.decode_step()
                 if nxt is None:
                     break
-                generated_ids.append(nxt)
-                # Break on EOS tokens (248044, 248046)
-                if nxt in (248044, 248046):
+                tokens_to_emit = [nxt]
+
+            for tok in tokens_to_emit:
+                generated_ids.append(tok)
+                decoder.step(tok)
+
+                if tok in stop_token_ids:
+                    stopped = True
+                    finish_reason = "stop"
+                    break
+
+                if stop_sequences:
+                    earliest_idx = -1
+                    for s in stop_sequences:
+                        idx = decoder.decoded_text.find(s)
+                        if idx != -1 and (earliest_idx == -1 or idx < earliest_idx):
+                            earliest_idx = idx
+                    if earliest_idx != -1:
+                        stopped = True
+                        finish_reason = "stop"
+                        output_text = decoder.decoded_text[:earliest_idx]
+                        break
+
+                if len(generated_ids) >= max_tokens:
+                    stopped = True
+                    finish_reason = "length"
                     break
 
         t_end = time.perf_counter()
         STATE.total_tokens_generated += len(generated_ids)
-        output_text = tokenizer_tool.decode(STATE.tokenizer, generated_ids, skip_special_tokens=True)
+
+        if output_text is None:
+            decoder.flush()
+            output_text = tokenizer_tool.decode(STATE.tokenizer, generated_ids, skip_special_tokens=True)
 
         if is_chat:
             # T8.4: translate native Hermes <tool_call> XML into OpenAI tool_calls.
@@ -486,7 +704,6 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 finish_reason = "tool_calls"
             else:
                 message = {"role": "assistant", "content": output_text}
-                finish_reason = "stop" if generated_ids[-1] in (248044, 248046) else "length"
             resp = {
                 "id": req_id,
                 "object": "chat.completion",
@@ -520,7 +737,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     {
                         "index": 0,
                         "text": output_text,
-                        "finish_reason": "stop" if generated_ids[-1] in (248044, 248046) else "length",
+                        "finish_reason": finish_reason,
                     }
                 ],
                 "usage": {
@@ -532,7 +749,12 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         self._send_json(200, resp)
 
-    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, parse_tools=False):
+    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+        stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
+        stop_sequences = [s for s in (stop_sequences or []) if s]
+        decoder = IncrementalDecoder(STATE.tokenizer)
+        stop_buffer = StreamStopBuffer(stop_sequences)
+
         # Establish Server-Sent Events stream
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -547,45 +769,70 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             self.wfile.flush()
 
-        # Emit first token (T8.4c: suppress raw <tool_call>/<function=> XML from
-        # content chunks — tool calls are delivered as tool_calls deltas only)
-        first_text = tokenizer_tool.decode(STATE.tokenizer, [first_tok], skip_special_tokens=False)
-        STATE.total_tokens_generated += 1
-        gen_count = 1
-        streamed_parts = [first_text]  # T8.4: accumulate for end-of-stream tool-call parse
-        suppressed = bool(_TOOL_START_RE.search(first_text))
-
         if is_chat:
-            if suppressed:
-                send_sse_chunk({
-                    "id": req_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_time,
-                    "model": MODEL_ID,
-                    "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
-                })
-            else:
-                send_sse_chunk({
-                    "id": req_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_time,
-                    "model": MODEL_ID,
-                    "choices": [{"index": 0, "delta": {"role": "assistant", "content": first_text}, "finish_reason": None}],
-                })
-        else:
             send_sse_chunk({
                 "id": req_id,
-                "object": "text_completion.chunk",
+                "object": "chat.completion.chunk",
                 "created": created_time,
                 "model": MODEL_ID,
-                "choices": [{"index": 0, "text": first_text, "finish_reason": None}],
+                "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
             })
+
+        STATE.total_tokens_generated += 1
+        gen_count = 1
+        suppressed = False
+        stopped = False
+        finish_reason = "length"
+
+        def emit_text_chunk(text):
+            nonlocal suppressed, stopped
+            if not text or stopped:
+                return
+            if not suppressed and _TOOL_START_RE.search(decoder.decoded_text):
+                suppressed = True
+            if suppressed:
+                return
+            try:
+                if is_chat:
+                    send_sse_chunk({
+                        "id": req_id,
+                        "object": "chat.completion.chunk",
+                        "created": created_time,
+                        "model": MODEL_ID,
+                        "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}],
+                    })
+                else:
+                    send_sse_chunk({
+                        "id": req_id,
+                        "object": "text_completion.chunk",
+                        "created": created_time,
+                        "model": MODEL_ID,
+                        "choices": [{"index": 0, "text": text, "finish_reason": None}],
+                    })
+            except (BrokenPipeError, ConnectionResetError, OSError):
+                sys.stderr.write(f"[Server] Client disconnected during SSE emission ({req_id}). Aborting stream.\n")
+                stopped = True
+
+        # Process first token
+        if first_tok in stop_token_ids:
+            stopped = True
+            finish_reason = "stop"
+        else:
+            chunk_text = decoder.step(first_tok)
+            safe_text = stop_buffer.append(chunk_text)
+            emit_text_chunk(safe_text)
+            if stop_buffer.stopped:
+                stopped = True
+                finish_reason = "stop"
 
         # Decode streaming loop
         cur_tok = first_tok
-        while gen_count < max_tokens:
-            if cur_tok in (248044, 248046):
+        while not stopped and gen_count < max_tokens:
+            if self.is_client_disconnected():
+                sys.stderr.write(f"[Server] Client disconnected mid-stream ({req_id}). Aborting stream loop.\n")
+                stopped = True
                 break
+
             if time.perf_counter() - t_start > timeout_s:
                 sys.stderr.write(f"[Server] Stream timeout exceeded for {req_id}\n")
                 break
@@ -602,50 +849,46 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     break
                 tokens_to_emit = [nxt]
 
-            stopped = False
             for nxt in tokens_to_emit:
                 cur_tok = nxt
                 gen_count += 1
                 STATE.total_tokens_generated += 1
 
-                if cur_tok in (248044, 248046):
+                if cur_tok in stop_token_ids:
                     stopped = True
+                    finish_reason = "stop"
                     break
 
-                chunk_text = tokenizer_tool.decode(STATE.tokenizer, [cur_tok], skip_special_tokens=False)
-                streamed_parts.append(chunk_text)
-                # T8.4c: once a tool-call marker appears anywhere in the
-                # accumulated text, stop emitting content chunks (suffix rule:
-                # reasoning comes before the call, never after).
-                if not suppressed and _TOOL_START_RE.search("".join(streamed_parts)):
-                    suppressed = True
-                if suppressed:
-                    pass
-                elif is_chat:
-                    send_sse_chunk({
-                        "id": req_id,
-                        "object": "chat.completion.chunk",
-                        "created": created_time,
-                        "model": MODEL_ID,
-                        "choices": [{"index": 0, "delta": {"content": chunk_text}, "finish_reason": None}],
-                    })
-                else:
-                    send_sse_chunk({
-                        "id": req_id,
-                        "object": "text_completion.chunk",
-                        "created": created_time,
-                        "model": MODEL_ID,
-                        "choices": [{"index": 0, "text": chunk_text, "finish_reason": None}],
-                    })
+                chunk_text = decoder.step(cur_tok)
+                safe_text = stop_buffer.append(chunk_text)
+                emit_text_chunk(safe_text)
+
+                if stop_buffer.stopped:
+                    stopped = True
+                    finish_reason = "stop"
+                    break
+
                 if gen_count >= max_tokens:
                     stopped = True
+                    finish_reason = "length"
                     break
 
-            if stopped:
-                break
+        if stopped and self.is_client_disconnected():
+            return
+
+        # Flush decoder and stop buffer if not stopped by a stop sequence
+        if not stop_buffer.stopped:
+            flushed_text = decoder.flush()
+            if flushed_text:
+                safe_text = stop_buffer.append(flushed_text)
+                emit_text_chunk(safe_text)
+            remaining_text = stop_buffer.flush()
+            emit_text_chunk(remaining_text)
+
+        if stopped and self.is_client_disconnected():
+            return
 
         # Emit terminal SSE chunk + [DONE]
-        finish_reason = "stop" if cur_tok in (248044, 248046) else "length"
         if is_chat:
             # T8.4: if the streamed text carries Hermes tool calls, emit them
             # as an OpenAI tool_calls delta before the terminal chunk. (Raw
@@ -653,7 +896,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # accumulate deltas still converge on the same calls.)
             # T8.4b: unconditional (see _complete_response) — parse even when
             # the request carried no `tools` array.
-            _, stream_tool_calls = _parse_hermes_tool_calls("".join(streamed_parts), req_id)
+            _, stream_tool_calls = _parse_hermes_tool_calls(decoder.decoded_text, req_id)
             if stream_tool_calls:
                 send_sse_chunk({
                     "id": req_id,
@@ -697,7 +940,15 @@ def main():
     parser.add_argument("--queue-size", type=int, default=16, help="Max waiting queue depth (default: 16)")
     parser.add_argument("--timeout", type=float, default=60.0, help="Execution timeout in seconds (default: 60)")
     parser.add_argument("--speculative", action=argparse.BooleanOptionalAction, default=True, help="Enable dual-token MTP speculative decoding verification (default: True)")
+    parser.add_argument("--fast-load", action=argparse.BooleanOptionalAction, default=True, help="Use verified cache stamp to skip redundant 19 GiB CRC re-scan (default: True)")
+    parser.add_argument("--verify", action="store_true", help="Force full 19 GiB payload CRC verification on startup")
     args = parser.parse_args()
+
+    if args.verify:
+        os.environ["AINFER_VERIFY_CRC"] = "1"
+        os.environ["AINFER_FAST_LOAD"] = "0"
+    elif args.fast_load:
+        os.environ["AINFER_FAST_LOAD"] = "1"
 
     print("=================================================================")
     print("--- AInfer Resident In-Process HTTP Server Daemon (Xe2 258V) ---")

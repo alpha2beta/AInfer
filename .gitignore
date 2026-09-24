@@ -45,6 +45,7 @@ tools/l0probe/build/
 *.spv.attn
 *.so
 *.bin
+*.verified
 tools/bench_gemv/bench_dpas_prototype
 tools/bench_258v/bench_258v
 tools/bench_258v/bench_deltanet
@@ -76,3 +77,9 @@ tools/membench/alloc_policy
 tools/membench/dispatch_profile
 tools/membench/alloc_validate
 tools/bench_258v/profile_prefill
+tools/bench_258v/bench_p441
+tools/kernels_258v/bench_deltanet_chunk
+tools/kernels_258v/bench_gemv_m2
+tools/kernels_258v/bench_lm_head_m2
+tools/kernels_258v/asm_dump/
+tools/mtp/profile_verify_components
