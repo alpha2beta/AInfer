@@ -183,7 +183,7 @@ prerequisites for daily IDE use.
 
 ### I3.3 Macro-Chunk Expansion to B=512
 
-- Status: `[ ]`
+- Status: `[x]`
 - Complexity: **Medium** (~2 days)
 - Files: `tools/decode/runtime_258v.h` (`MAX_PREFILL_CHUNK`),
   `tools/decode/runtime_258v.cpp` (workspace sub-allocation)

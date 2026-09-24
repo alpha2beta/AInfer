@@ -1,0 +1,69 @@
+{
+  "task": "I3.3",
+  "device": "Intel Arc 140V (Lunar Lake 258V)",
+  "finding": "MAX_PREFILL_CHUNK=512 + 256 MiB workspace already in place (runtime_258v.h:627); I3.3 reduced to verification: multi-chunk paths handle B=512, chunked vs serial bit-exact, measurable gain at P>=512",
+  "runs": {
+    "P600_chunked": {
+      "prefill_ms": 1961.67,
+      "prefill_tok_per_s": 305.86,
+      "tokens8": [
+        220,
+        220,
+        103749,
+        95761,
+        97475,
+        96585,
+        271,
+        248068
+      ]
+    },
+    "P600_serial": {
+      "prefill_ms": 2038.95,
+      "prefill_tok_per_s": 294.27,
+      "tokens8": [
+        220,
+        220,
+        103749,
+        95761,
+        97475,
+        96585,
+        271,
+        248068
+      ]
+    },
+    "P1024_chunked": {
+      "prefill_ms": 3498.82,
+      "prefill_tok_per_s": 292.63,
+      "tokens8": [
+        198,
+        103749,
+        95761,
+        271,
+        248068,
+        198,
+        760,
+        1156
+      ]
+    },
+    "P1024_serial": {
+      "prefill_ms": 3658.23,
+      "prefill_tok_per_s": 279.88,
+      "tokens8": [
+        198,
+        103749,
+        95761,
+        271,
+        248068,
+        198,
+        760,
+        1156
+      ]
+    }
+  },
+  "parity": "8/8 bit-identical both lengths (chunked vs AINFER_RECR_SERIAL=1)",
+  "gain": {
+    "P600": "+3.9%",
+    "P1024": "+4.5%"
+  },
+  "status": "PASSED"
+}
