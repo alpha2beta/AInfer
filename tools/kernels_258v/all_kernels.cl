@@ -153,8 +153,8 @@ __kernel void int4_gemv_m1(
 }
 
 // =========================================================================
-// 1a. INT4 Symmetric Group-128 Dual-Token GEMV (Speculative Verification)
-// Evaluates 2 tokens simultaneously in registers with a single pass over weights.
+// 1a. INT4 Symmetric Group-128 Dual-Token Pure FP32 Vector GEMV (Default)
+// Coalesced 16B loads, 100% bit-exact mathematical parity with decode GEMV
 // =========================================================================
 __kernel void int4_gemv_m2(
     __global float * restrict y,              // [2, M] row-major: y[0 * M + m], y[1 * M + m]
@@ -293,6 +293,98 @@ __kernel void int4_gemv_m2(
 
     y[m] = total_sum0;
     y[(size_t)M + m] = total_sum1;
+}
+
+// =========================================================================
+// 1b. INT4 Symmetric Group-128 Dual-Token DPAS GEMV (Experimental)
+// Evaluates 2 tokens simultaneously using native Intel Xe2 hardware DPAS systolic
+// operations (M=2, K=16, N=16) with group-level FP32 scaling and coalesced 16B vector loads.
+// =========================================================================
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void int4_gemv_m2_dpas(
+    __global float * restrict y,              // [2, M] row-major: y[0 * M + m], y[1 * M + m]
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict x,        // [2, K] row-major: x[0 * K + k], x[1 * K + k]
+    int M,
+    int K
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_m = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    int m_tile_idx = grp_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    int m = m_base + lid;
+    int safe_m = (m < M) ? m : 0;
+
+    int num_groups = K / GROUP_SIZE;
+    __global const uchar *row_w = w_packed + (size_t)safe_m * (K / 2);
+    __global const ushort *row_s = w_scale + (size_t)safe_m * num_groups;
+
+    float2 total_acc = (float2)(0.0f);
+
+    for (int g = 0; g < num_groups; ++g) {
+        float2 grp_acc = (float2)(0.0f);
+        __global const uchar16 *grp_w = (__global const uchar16 *)(row_w + g * (GROUP_SIZE / 2));
+        int k_grp = g * GROUP_SIZE;
+
+        #pragma unroll
+        for (int pr = 0; pr < 4; ++pr) {
+            int k = k_grp + pr * 32;
+
+            float x0_0 = x[k + lid];
+            float x0_1 = x[k + 16 + lid];
+            float x1_0 = x[(size_t)K + k + lid];
+            float x1_1 = x[(size_t)K + k + 16 + lid];
+
+            short2 a0;
+            a0.s0 = as_short((half)x0_0);
+            a0.s1 = as_short((half)x1_0);
+
+            short2 a1;
+            a1.s0 = as_short((half)x0_1);
+            a1.s1 = as_short((half)x1_1);
+
+            uchar16 raw_w = grp_w[pr];
+
+            half w_deq0[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar b = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(b << 4)) >> 4;
+                int n1 = (int)((char)b) >> 4;
+                w_deq0[2 * i]     = (half)n0;
+                w_deq0[2 * i + 1] = (half)n1;
+            }
+
+            half w_deq1[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar b = ((uchar *)&raw_w)[8 + i];
+                int n0 = (int)((char)(b << 4)) >> 4;
+                int n1 = (int)((char)b) >> 4;
+                w_deq1[2 * i]     = (half)n0;
+                w_deq1[2 * i + 1] = (half)n1;
+            }
+
+            int8 b0, b1;
+            __builtin_memcpy(&b0, w_deq0, 32);
+            __builtin_memcpy(&b1, w_deq1, 32);
+
+            grp_acc = intel_sub_group_f16_f16_matrix_mad_k16(a0, b0, grp_acc);
+            grp_acc = intel_sub_group_f16_f16_matrix_mad_k16(a1, b1, grp_acc);
+        }
+
+        float scale = bf16_to_fp32(row_s[g]);
+        total_acc += grp_acc * scale;
+    }
+
+    if (m < M) {
+        y[m] = total_acc.s0;
+        y[(size_t)M + m] = total_acc.s1;
+    }
 }
 
 // =========================================================================
@@ -2590,6 +2682,177 @@ __kernel void deltanet_recurrent_batch_v2(
     }
 }
 
+// =========================================================================
+// DeltaNet Chunked Parallel Scan Batch (I2.3)
+// Chunk-parallel associative scan formulation (C=16 chunk tile).
+// Intra-chunk: unrolled forward substitution of M D = V - V_init.
+// 16x reduction in sequential dependency barriers.
+// =========================================================================
+__kernel void deltanet_chunked_batch(
+    __global float * restrict out,
+    __global float * restrict state,
+    __global const float * restrict q,
+    __global const float * restrict k,
+    __global const float * restrict v,
+    __global const float * restrict g,
+    __global const float * restrict beta,
+    int B
+) {
+    int h = get_group_id(0);
+    if (h >= H_V) return;
+    int j = get_local_id(0);
+
+    int kh = h / 2;
+    __global float * S_h = state + (size_t)h * (S_V * S_V);
+
+    // Staging buffers in SLM (C = 16)
+    __local float s_q[16][128];
+    __local float s_k[16][128];
+    __local float s_KKT[16][16];
+    __local float s_QKT[16][16];
+    __local float s_gamma_mat[16][16];
+    __local float s_gamma_from_0[16];
+    __local float s_beta[16];
+
+    // Load initial state column j into private registers
+    float s_col[128];
+    #pragma unroll 4
+    for (int i = 0; i < 128; ++i) {
+        s_col[i] = S_h[i * 128 + j];
+    }
+
+    for (int t0 = 0; t0 < B; t0 += 16) {
+        int c_len = min(16, B - t0);
+
+        // 1. Cooperative SLM staging
+        for (int t = 0; t < c_len; ++t) {
+            s_k[t][j] = k[(size_t)(t0 + t) * (H_K * S_V) + kh * S_V + j];
+            s_q[t][j] = q[(size_t)(t0 + t) * (H_K * S_V) + kh * S_V + j];
+        }
+
+        if (j < c_len) {
+            s_beta[j] = beta[(size_t)(t0 + j) * H_V + h];
+        }
+
+        if (j == 0) {
+            float prod = 1.0f;
+            for (int t = 0; t < c_len; ++t) {
+                prod *= g[(size_t)(t0 + t) * H_V + h];
+                s_gamma_from_0[t] = prod;
+            }
+            for (int t = 0; t < c_len; ++t) {
+                s_gamma_mat[t][t] = 1.0f;
+                float decay = 1.0f;
+                for (int s = t - 1; s >= 0; --s) {
+                    decay *= g[(size_t)(t0 + s + 1) * H_V + h];
+                    s_gamma_mat[t][s] = decay;
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 2. Parallel KKT and QKT computation
+        for (int p_idx = 0; p_idx < 2; ++p_idx) {
+            int p = j * 2 + p_idx;
+            int t = p >> 4;
+            int s = p & 15;
+            if (t < c_len && s < c_len) {
+                if (s < t) {
+                    float k_acc = 0.0f;
+                    #pragma unroll 4
+                    for (int i = 0; i < 128; ++i) {
+                        k_acc += s_k[t][i] * s_k[s][i];
+                    }
+                    s_KKT[t][s] = k_acc;
+                }
+                if (s <= t) {
+                    float q_acc = 0.0f;
+                    #pragma unroll 4
+                    for (int i = 0; i < 128; ++i) {
+                        q_acc += s_q[t][i] * s_k[s][i];
+                    }
+                    s_QKT[t][s] = q_acc;
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 3. Compute V_init and O_state from s_col
+        float V_init[16];
+        float O_state[16];
+        float v_local[16];
+        for (int t = 0; t < c_len; ++t) {
+            v_local[t] = v[(size_t)(t0 + t) * C_QKV + 4096 + h * S_V + j];
+
+            float v_acc0 = 0.0f, v_acc1 = 0.0f, v_acc2 = 0.0f, v_acc3 = 0.0f;
+            float o_acc0 = 0.0f, o_acc1 = 0.0f, o_acc2 = 0.0f, o_acc3 = 0.0f;
+            #pragma unroll 2
+            for (int i = 0; i < 128; i += 4) {
+                v_acc0 += s_col[i]     * s_k[t][i];
+                v_acc1 += s_col[i + 1] * s_k[t][i + 1];
+                v_acc2 += s_col[i + 2] * s_k[t][i + 2];
+                v_acc3 += s_col[i + 3] * s_k[t][i + 3];
+
+                o_acc0 += s_col[i]     * s_q[t][i];
+                o_acc1 += s_col[i + 1] * s_q[t][i + 1];
+                o_acc2 += s_col[i + 2] * s_q[t][i + 2];
+                o_acc3 += s_col[i + 3] * s_q[t][i + 3];
+            }
+            float v_acc = (v_acc0 + v_acc1) + (v_acc2 + v_acc3);
+            float o_acc = (o_acc0 + o_acc1) + (o_acc2 + o_acc3);
+
+            V_init[t] = s_gamma_from_0[t] * v_acc;
+            O_state[t] = s_gamma_from_0[t] * o_acc;
+        }
+
+        // 4. Forward substitution to solve M D = V - V_init
+        float D[16];
+        for (int t = 0; t < c_len; ++t) {
+            float rhs = v_local[t] - V_init[t];
+            float sum = 0.0f;
+            for (int s = 0; s < t; ++s) {
+                sum += s_gamma_mat[t][s] * s_KKT[t][s] * D[s];
+            }
+            D[t] = (rhs - sum) * s_beta[t];
+        }
+
+        // 5. Compute output for tokens in this chunk
+        for (int t = 0; t < c_len; ++t) {
+            float o_intra = 0.0f;
+            for (int s = 0; s <= t; ++s) {
+                o_intra += s_gamma_mat[t][s] * s_QKT[t][s] * D[s];
+            }
+            float out_val = (O_state[t] + o_intra) * SCALE_128;
+            out[(size_t)(t0 + t) * (H_V * S_V) + h * S_V + j] = out_val;
+        }
+
+        // 6. Update state for next chunk
+        float chunk_decay = s_gamma_from_0[c_len - 1];
+        float w[16];
+        #pragma unroll
+        for (int s = 0; s < c_len; ++s) {
+            w[s] = s_gamma_mat[c_len - 1][s] * D[s];
+        }
+        #pragma unroll 2
+        for (int i = 0; i < 128; ++i) {
+            float d_acc = 0.0f;
+            #pragma unroll
+            for (int s = 0; s < c_len; ++s) {
+                d_acc += w[s] * s_k[s][i];
+            }
+            s_col[i] = chunk_decay * s_col[i] + d_acc;
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // 7. Write final state
+    #pragma unroll 4
+    for (int i = 0; i < 128; ++i) {
+        S_h[i * 128 + j] = s_col[i];
+    }
+}
+
 __kernel void deltanet_head_norm_silu_z_batch(
     __global float * restrict final_out,
     __global const float * restrict attn_out,
@@ -4087,6 +4350,9 @@ __kernel void deltanet_recurrent_m2_spec(
     out[(size_t)(H_V * S_V) + h * S_V + j] = o_acc1 * SCALE_128;
 }
 
+// =========================================================================
+// Dual-Token LM Head Pure FP32 GEMV + Stage 1 Argmax (Default)
+// =========================================================================
 __kernel void int4_gemv_m2_lm_head_argmax1(
     __global float * restrict y,              // [2 * M] (optional, can be NULL)
     __global const uchar * restrict w_packed, // [M, K / 2]
@@ -4261,6 +4527,142 @@ __kernel void int4_gemv_m2_lm_head_argmax1(
         stage1_idxs_1[gid] = s_idx1[0];
     }
 }
+
+// =========================================================================
+// Dual-Token LM Head DPAS GEMV + Stage 1 Argmax (Experimental)
+// =========================================================================
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void int4_gemv_m2_lm_head_argmax1_dpas(
+    __global float * restrict y,              // [2 * M] (optional, can be NULL)
+    __global const uchar * restrict w_packed, // [M, K / 2]
+    __global const ushort * restrict w_scale, // [M, K / 128]
+    __global const float * restrict x,        // [2 * K] (Token 0 at x, Token 1 at x + K)
+    __global float * restrict stage1_vals_0,  // [970]
+    __global uint * restrict stage1_idxs_0,   // [970]
+    __global float * restrict stage1_vals_1,  // [970]
+    __global uint * restrict stage1_idxs_1,   // [970]
+    int M,
+    int K
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_m = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+    int tid = get_local_id(0);          // 0..255
+
+    int m_tile_idx = grp_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    int m = m_base + lid;
+
+    float total_sum0 = -1e30f;
+    float total_sum1 = -1e30f;
+    uint my_idx = (m < M) ? (uint)m : 0xFFFFFFFF;
+
+    if (m < M) {
+        int num_groups = K / GROUP_SIZE;
+        __global const uchar *row_w = w_packed + (size_t)m * (K / 2);
+        __global const ushort *row_s = w_scale + (size_t)m * num_groups;
+
+        float2 total_acc = (float2)(0.0f);
+
+        for (int g = 0; g < num_groups; ++g) {
+            float2 grp_acc = (float2)(0.0f);
+            __global const uchar16 *grp_w = (__global const uchar16 *)(row_w + g * (GROUP_SIZE / 2));
+            int k_grp = g * GROUP_SIZE;
+
+            #pragma unroll
+            for (int pr = 0; pr < 4; ++pr) {
+                int k = k_grp + pr * 32;
+
+                float x0_0 = x[k + lid];
+                float x0_1 = x[k + 16 + lid];
+                float x1_0 = x[(size_t)K + k + lid];
+                float x1_1 = x[(size_t)K + k + 16 + lid];
+
+                short2 a0;
+                a0.s0 = as_short((half)x0_0);
+                a0.s1 = as_short((half)x1_0);
+
+                short2 a1;
+                a1.s0 = as_short((half)x0_1);
+                a1.s1 = as_short((half)x1_1);
+
+                uchar16 raw_w = grp_w[pr];
+
+                half w_deq0[16];
+                #pragma unroll
+                for (int i = 0; i < 8; ++i) {
+                    uchar b = ((uchar *)&raw_w)[i];
+                    int n0 = (int)((char)(b << 4)) >> 4;
+                    int n1 = (int)((char)b) >> 4;
+                    w_deq0[2 * i]     = (half)n0;
+                    w_deq0[2 * i + 1] = (half)n1;
+                }
+
+                half w_deq1[16];
+                #pragma unroll
+                for (int i = 0; i < 8; ++i) {
+                    uchar b = ((uchar *)&raw_w)[8 + i];
+                    int n0 = (int)((char)(b << 4)) >> 4;
+                    int n1 = (int)((char)b) >> 4;
+                    w_deq1[2 * i]     = (half)n0;
+                    w_deq1[2 * i + 1] = (half)n1;
+                }
+
+                int8 b0, b1;
+                __builtin_memcpy(&b0, w_deq0, 32);
+                __builtin_memcpy(&b1, w_deq1, 32);
+
+                grp_acc = intel_sub_group_f16_f16_matrix_mad_k16(a0, b0, grp_acc);
+                grp_acc = intel_sub_group_f16_f16_matrix_mad_k16(a1, b1, grp_acc);
+            }
+
+            float scale = bf16_to_fp32(row_s[g]);
+            total_acc += grp_acc * scale;
+        }
+
+        total_sum0 = total_acc.s0;
+        total_sum1 = total_acc.s1;
+
+        if (y != NULL) {
+            y[m] = total_sum0;
+            y[(size_t)M + m] = total_sum1;
+        }
+    }
+
+    __local float s_val0[256];
+    __local uint s_idx0[256];
+    __local float s_val1[256];
+    __local uint s_idx1[256];
+
+    s_val0[tid] = total_sum0;
+    s_idx0[tid] = my_idx;
+    s_val1[tid] = total_sum1;
+    s_idx1[tid] = my_idx;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int s = 128; s > 0; s >>= 1) {
+        if (tid < s) {
+            if (s_val0[tid + s] > s_val0[tid] || (s_val0[tid + s] == s_val0[tid] && s_idx0[tid + s] < s_idx0[tid])) {
+                s_val0[tid] = s_val0[tid + s];
+                s_idx0[tid] = s_idx0[tid + s];
+            }
+            if (s_val1[tid + s] > s_val1[tid] || (s_val1[tid + s] == s_val1[tid] && s_idx1[tid + s] < s_idx1[tid])) {
+                s_val1[tid] = s_val1[tid + s];
+                s_idx1[tid] = s_idx1[tid + s];
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (tid == 0) {
+        stage1_vals_0[grp_m] = s_val0[0];
+        stage1_idxs_0[grp_m] = s_idx0[0];
+        stage1_vals_1[grp_m] = s_val1[0];
+        stage1_idxs_1[grp_m] = s_idx1[0];
+    }
+}
+
 
 
 

@@ -3,57 +3,57 @@
   "results": [
     {
       "prompt_tokens": 8,
-      "prefill_latency_ms": 115.662,
-      "prefill_tok_per_s": 69.167,
-      "ms_per_tok": 14.4578
+      "prefill_latency_ms": 114.219,
+      "prefill_tok_per_s": 70.0408,
+      "ms_per_tok": 14.2774
     },
     {
       "prompt_tokens": 16,
-      "prefill_latency_ms": 154.413,
-      "prefill_tok_per_s": 103.618,
-      "ms_per_tok": 9.65081
+      "prefill_latency_ms": 140.01,
+      "prefill_tok_per_s": 114.277,
+      "ms_per_tok": 8.75064
     },
     {
       "prompt_tokens": 32,
-      "prefill_latency_ms": 192.587,
-      "prefill_tok_per_s": 166.159,
-      "ms_per_tok": 6.01834
+      "prefill_latency_ms": 187.015,
+      "prefill_tok_per_s": 171.109,
+      "ms_per_tok": 5.84422
     },
     {
       "prompt_tokens": 64,
-      "prefill_latency_ms": 274.503,
-      "prefill_tok_per_s": 233.148,
-      "ms_per_tok": 4.28911
+      "prefill_latency_ms": 265.169,
+      "prefill_tok_per_s": 241.356,
+      "ms_per_tok": 4.14326
     },
     {
       "prompt_tokens": 128,
-      "prefill_latency_ms": 409.906,
-      "prefill_tok_per_s": 312.267,
-      "ms_per_tok": 3.20239
+      "prefill_latency_ms": 388.934,
+      "prefill_tok_per_s": 329.105,
+      "ms_per_tok": 3.03854
     },
     {
       "prompt_tokens": 256,
-      "prefill_latency_ms": 706.241,
-      "prefill_tok_per_s": 362.482,
-      "ms_per_tok": 2.75875
+      "prefill_latency_ms": 666.372,
+      "prefill_tok_per_s": 384.17,
+      "ms_per_tok": 2.60302
     },
     {
       "prompt_tokens": 512,
-      "prefill_latency_ms": 1454.81,
-      "prefill_tok_per_s": 351.935,
-      "ms_per_tok": 2.84143
+      "prefill_latency_ms": 1372.11,
+      "prefill_tok_per_s": 373.149,
+      "ms_per_tok": 2.6799
     },
     {
       "prompt_tokens": 1024,
-      "prefill_latency_ms": 3484.35,
-      "prefill_tok_per_s": 293.886,
-      "ms_per_tok": 3.40268
+      "prefill_latency_ms": 3250.18,
+      "prefill_tok_per_s": 315.06,
+      "ms_per_tok": 3.174
     },
     {
       "prompt_tokens": 2048,
-      "prefill_latency_ms": 9217.11,
-      "prefill_tok_per_s": 222.195,
-      "ms_per_tok": 4.50054
+      "prefill_latency_ms": 8856.85,
+      "prefill_tok_per_s": 231.233,
+      "ms_per_tok": 4.32463
     }
   ]
 }
