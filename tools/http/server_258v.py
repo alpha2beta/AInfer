@@ -119,6 +119,21 @@ FIM_STOP_TOKENS = ["<|fim_middle|>", "<|fim_suffix|>", "<|fim_prefix|>", "<|fim_
 FIM_STOP_TOKEN_IDS = {248060, 248061, 248062, 248063, 248065}
 
 
+def _log_request_perf(req_id, prompt_tokens, gen_tokens, prefill_s, decode_s, finish_reason):
+    """One-line live performance log per finished request (stderr).
+
+    pp = prompt processing (prefill) tok/s, tg = token generation (decode)
+    tok/s. Same convention as the JSON `timings` (tg excludes the prefill
+    token). Guards against zero-duration divisions on tiny prompts.
+    """
+    pp = prompt_tokens / max(1e-6, prefill_s)
+    tg = (gen_tokens - 1) / max(1e-6, decode_s)
+    sys.stderr.write(
+        f"[Server] {req_id} done: prompt={prompt_tokens}tok pp={pp:.1f} tok/s | "
+        f"gen={gen_tokens}tok tg={tg:.1f} tok/s | "
+        f"total={prefill_s + decode_s:.2f}s finish={finish_reason}\n")
+
+
 class IncrementalDecoder:
     """Incrementally decodes token IDs without partial UTF-8 replacement artifacts."""
 
@@ -596,7 +611,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             if stream:
-                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
+                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, len(prompt_ids), stop_sequences, stop_token_ids, parse_tools)
             else:
                 self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
 
@@ -727,6 +742,8 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     "decode_tokens_per_s": round((len(generated_ids) - 1) / max(1e-5, (t_end - t_prefill)), 2),
                 },
             }
+            _log_request_perf(req_id, len(prompt_ids), len(generated_ids),
+                              t_prefill - t_start, t_end - t_prefill, finish_reason)
         else:
             resp = {
                 "id": req_id,
@@ -746,10 +763,12 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     "total_tokens": len(prompt_ids) + len(generated_ids),
                 },
             }
+            _log_request_perf(req_id, len(prompt_ids), len(generated_ids),
+                              t_prefill - t_start, t_end - t_prefill, finish_reason)
 
         self._send_json(200, resp)
 
-    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, prompt_len=0, stop_sequences=None, stop_token_ids=None, parse_tools=False):
         stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
         stop_sequences = [s for s in (stop_sequences or []) if s]
         decoder = IncrementalDecoder(STATE.tokenizer)
@@ -928,6 +947,11 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
+
+        # Live pp/tg performance log (stderr) for the finished stream.
+        t_end = time.perf_counter()
+        _log_request_perf(req_id, prompt_len, gen_count,
+                          t_prefill - t_start, t_end - t_prefill, finish_reason)
 
 
 def main():
