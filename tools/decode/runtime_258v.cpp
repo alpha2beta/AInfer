@@ -6,6 +6,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <iomanip>
+#include <sys/stat.h>
 
 namespace ainfer {
 
@@ -87,6 +88,8 @@ bool AInferRuntime258V::load_model_metadata(const std::string &path) {
     std::fprintf(stderr, "Missing Directory or MoE Section\n");
     return false;
   }
+  dir_crc_ = dir_crc;
+  moe_crc_ = moe_crc;
 
   // Validate MoE Section 6
   f.seekg((std::streamoff)moe_off);
@@ -680,6 +683,52 @@ bool AInferRuntime258V::verify_payload_crcs(const std::string &path) {
   return true;
 }
 
+bool AInferRuntime258V::check_verified_stamp(const std::string &binfer_path) const {
+  std::string stamp_path = binfer_path + ".verified";
+  struct stat st;
+  if (stat(binfer_path.c_str(), &st) != 0) return false;
+
+  std::ifstream sf(stamp_path);
+  if (!sf) return false;
+
+  uint64_t file_size = 0;
+  int64_t mtime_sec = 0;
+  int64_t mtime_nsec = 0;
+  uint32_t dir_crc = 0;
+  uint32_t moe_crc = 0;
+  size_t tensor_count = 0;
+
+  if (!(sf >> file_size >> mtime_sec >> mtime_nsec >> dir_crc >> moe_crc >> tensor_count)) {
+    return false;
+  }
+
+  if (file_size != (uint64_t)st.st_size) return false;
+  if (mtime_sec != (int64_t)st.st_mtim.tv_sec) return false;
+  if (mtime_nsec != (int64_t)st.st_mtim.tv_nsec) return false;
+  if (dir_crc != dir_crc_) return false;
+  if (moe_crc != moe_crc_) return false;
+  if (tensor_count != entries_.size()) return false;
+
+  return true;
+}
+
+bool AInferRuntime258V::write_verified_stamp(const std::string &binfer_path) const {
+  std::string stamp_path = binfer_path + ".verified";
+  struct stat st;
+  if (stat(binfer_path.c_str(), &st) != 0) return false;
+
+  std::ofstream sf(stamp_path, std::ios::trunc);
+  if (!sf) return false;
+
+  sf << (uint64_t)st.st_size << "\n"
+     << (int64_t)st.st_mtim.tv_sec << "\n"
+     << (int64_t)st.st_mtim.tv_nsec << "\n"
+     << dir_crc_ << "\n"
+     << moe_crc_ << "\n"
+     << entries_.size() << "\n";
+  return true;
+}
+
 bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   std::ifstream spv_f(spv_path, std::ios::binary);
   if (!spv_f) {
@@ -856,11 +905,15 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_conv_batch_ = get_k("conv1d_update_silu_batch");
   k_l2_norm_qk_batch_ = get_k("head_l2_norm_qk_batch");
   k_gate_prep_batch_ = get_k("gate_prep_batch");
-  // v2 double-buffers 4 recurrence steps per workgroup barrier (1 B/4
-  // barriers vs B); AINFER_RECR_V1=1 restores the v1 kernel.
-  k_recr_batch_ = std::getenv("AINFER_RECR_V1")
-                      ? get_k("deltanet_recurrent_batch")
-                      : get_k("deltanet_recurrent_batch_v2");
+  // I2.3: Chunked parallel DeltaNet associative scan (C=16 chunk tile).
+  // AINFER_RECR_SERIAL=1 falls back to v2 serial recurrence; AINFER_RECR_V1=1 falls back to v1.
+  if (std::getenv("AINFER_RECR_V1")) {
+    k_recr_batch_ = get_k("deltanet_recurrent_batch");
+  } else if (std::getenv("AINFER_RECR_SERIAL")) {
+    k_recr_batch_ = get_k("deltanet_recurrent_batch_v2");
+  } else {
+    k_recr_batch_ = get_k("deltanet_chunked_batch");
+  }
   k_hnorm_batch_ = get_k("deltanet_head_norm_silu_z_batch");
   k_deinterleave_qg_batch_ = get_k("deinterleave_q_gate_batch");
   k_rope_batch_ = get_k("rope_and_kv_append_batch");
@@ -881,11 +934,19 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_block_resadd_moe_batch_ = get_k("block_resadd_moe_batch");
   k_resadd_batch_ = get_k("resadd_batch");
 
-  // Speculative verification kernels (T10.1)
+  // Speculative verification kernels (T10.1 / I3.1)
   k_conv_m2_spec_ = get_k("conv1d_update_silu_m2_spec");
   k_recr_m2_spec_ = get_k("deltanet_recurrent_m2_spec");
-  k_lm_head_m2_argmax1_ = get_k("int4_gemv_m2_lm_head_argmax1");
-  k_gemv_m2_ = get_k("int4_gemv_m2");
+  const char *m2_dpas_env = std::getenv("AINFER_M2_DPAS");
+  bool force_dpas = (m2_dpas_env && m2_dpas_env[0] == '1');
+  if (force_dpas) {
+    std::printf("[AInfer 258V] AINFER_M2_DPAS=1: Using experimental DPAS systolic kernels for verification GEMV & LM Head\n");
+    k_lm_head_m2_argmax1_ = get_k("int4_gemv_m2_lm_head_argmax1_dpas");
+    k_gemv_m2_ = get_k("int4_gemv_m2_dpas");
+  } else {
+    k_lm_head_m2_argmax1_ = get_k("int4_gemv_m2_lm_head_argmax1");
+    k_gemv_m2_ = get_k("int4_gemv_m2");
+  }
 
   if (!k_gemv_ || !k_router_ || !k_norm2048_ || !k_norm256_ || !k_silu512_ || !k_resadd_ ||
       !k_conv_ || !k_recr_ || !k_hnorm_ || !k_embed_ || !k_gemv_add_scaled_ ||
@@ -1324,10 +1385,24 @@ bool AInferRuntime258V::init(const std::string &binfer_path, const std::string &
   std::printf("[AInfer 258V] 4. Streaming weights into static GPU arenas\n");
   auto t0 = std::chrono::steady_clock::now();
   if (!upload_weights(binfer_path)) return false;
-  std::printf("[AInfer 258V] 4b. Verifying tensor payload CRCs (T9.5)\n");
-  if (!verify_payload_crcs(binfer_path)) {
-    std::fprintf(stderr, "[AInfer 258V] Payload CRC verification FAILED\n");
-    return false;
+
+  bool no_fast_load = (std::getenv("AINFER_FAST_LOAD") != nullptr &&
+                       std::strcmp(std::getenv("AINFER_FAST_LOAD"), "0") == 0);
+  bool force_verify = ((std::getenv("AINFER_VERIFY_CRC") != nullptr &&
+                        std::strcmp(std::getenv("AINFER_VERIFY_CRC"), "0") != 0) ||
+                       no_fast_load);
+
+  bool stamp_ok = !force_verify && check_verified_stamp(binfer_path);
+
+  if (stamp_ok) {
+    std::printf("[AInfer 258V] 4b. Verified stamp matched (skipping redundant 19 GiB CRC re-scan)\n");
+  } else {
+    std::printf("[AInfer 258V] 4b. Verifying tensor payload CRCs (T9.5)\n");
+    if (!verify_payload_crcs(binfer_path)) {
+      std::fprintf(stderr, "[AInfer 258V] Payload CRC verification FAILED\n");
+      return false;
+    }
+    write_verified_stamp(binfer_path);
   }
   auto t1 = std::chrono::steady_clock::now();
   double upload_s = std::chrono::duration<double>(t1 - t0).count();

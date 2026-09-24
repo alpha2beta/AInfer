@@ -478,6 +478,8 @@ private:
   bool allocate_static_arenas();
   bool verify_bindings() const; // T9.1: init-time null + arena-containment audit
   bool verify_payload_crcs(const std::string &path); // T9.5: per-tensor payload CRCs vs directory
+  bool check_verified_stamp(const std::string &binfer_path) const; // I2.2: verified stamp check
+  bool write_verified_stamp(const std::string &binfer_path) const; // I2.2: write verified stamp
   // T9.1: single range-checked container-offset resolvers (all call sites
   // delegate here; container offsets are untrusted input).
   void *checked_pay(const std::string &nm) const;
@@ -491,6 +493,8 @@ private:
   std::unordered_map<std::string, BinferEntry> entries_;
   uint64_t pay_lo_ = UINT64_MAX, pay_hi_ = 0;
   uint64_t sc_lo_ = UINT64_MAX, sc_hi_ = 0;
+  uint32_t dir_crc_ = 0;
+  uint32_t moe_crc_ = 0;
   uint32_t max_ctx_ = 2048;
   bool kv8_enabled_ = false;
 
