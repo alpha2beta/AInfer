@@ -619,3 +619,5 @@
   - Honest correction: `report_bisect_noflash.json` deleted — its DIFF predates the EOS-harness fix (LENGTH artifact, not kernel divergence); exoneration rests on unit tests.
 - **2026-09-25 (Auto-KV8 boundary 16K → 4K — DONE):**
   - `max_ctx >= 4096` now auto-engages KV8 (`tools/decode/runtime_258v.cpp`; `serve_lan.sh` messages/preflight synced). Validated on device: 4352/unset → 42.50 MiB KV8 arena, 4352/`=0` → 85.00 MiB BF16, 2048/unset → 40.00 MiB BF16; 8/8 goldens identical all arms. Justification: 4K tier carries full KV8 evidence (4/4 needle, 186/200 corpus parity, 160/160 MTP). Note: default `serve_lan.sh --max-ctx 4096` now serves KV8.
+- **2026-09-25 (Per-chunk prefill progress log — DONE):**
+  - `prefill()` now emits llama.cpp-style progress lines per 512-token chunk (`[Prefill] n_tokens = 512, progress = 0.30, t = 3.63 s (140.9 tok/s)`), so server logs show live pp rate during long prefills instead of only the final average. `AINFER_LOG_CHUNKS=0` silences. Verified on a 6.7K run (14 lines, correct shape); overhead bounded to one clock read + one stderr line per chunk (~µs vs seconds-long chunks). No numerics touched.

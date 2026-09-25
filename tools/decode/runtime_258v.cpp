@@ -2259,6 +2259,16 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     ze_command_list_handle_t cmd_chunk = get_or_record_prefill_chunk_list(B);
     if (!cmd_chunk) return false;
 
+    // Per-chunk progress log in llama.cpp slot-timing style, so server logs
+    // show live pp rate per chunk instead of only the final average:
+    //   [Prefill] n_tokens = 512, progress = 0.30, t = 1.50 s (341.9 tok/s)
+    // AINFER_LOG_CHUNKS=0 silences it. Times the whole chunk iteration
+    // (forward + opt-in MTP fill + terminal tail), matching total prefill.
+    static const bool log_chunks = [] {
+      const char *e = std::getenv("AINFER_LOG_CHUNKS");
+      return !(e && e[0] == '0');
+    }();
+    auto t_c0 = std::chrono::steady_clock::now();
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_chunk, fence_));
     CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
@@ -2301,6 +2311,15 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
       std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
       if (out_first_token) *out_first_token = next_tok;
+    }
+
+    if (log_chunks) {
+      double chunk_s =
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - t_c0).count();
+      std::fprintf(stderr,
+                   "[Prefill] n_tokens = %d, progress = %.2f, t = %.2f s (%.1f tok/s)\n",
+                   B, (double)(pos + B) / (double)P, chunk_s,
+                   (double)B / std::max(1e-9, chunk_s));
     }
 
     pos += B;
