@@ -1,51 +1,165 @@
-# AInfer (258v branch) — Qwen3.5-MoE inference on Intel Core Ultra 7 258V
+# AInfer (258v branch) — Qwen3.5-MoE Inference Runtime on Intel Core Ultra 7 258V
 
-Port of the AInfer inference runtime to Lunar Lake: integrated Arc 140V
-Xe2 GPU, 32 GB unified LPDDR5X-8533, CachyOS. Target model
-`symrex/Tiel-Coder-35B-A3B-Genesis-Hermes` (Qwen3.5-MoE sparse hybrid:
-40 layers = 30 DeltaNet linear attention + 10 full attention, 256 routed
-experts / 8 active, ~35B total / ~3B active params).
+A custom, bare-metal Level Zero inference runtime engineered specifically for Intel Lunar Lake architecture (**Intel Core Ultra 7 258V**, integrated Arc 140V Xe2 GPU, 32 GB unified LPDDR5X-8533 memory) running **CachyOS**.
 
-Related branches: `B60` (Qwen3.8-27B dense on Intel Arc Pro B60),
-`main` (initial snapshot).
+Pinned target model: **[`symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized`](https://huggingface.co/symrex/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF-dequantized)** (dequantized SafeTensors release of `LuffyTheFox/Tiel-Coder-35B-A3B-Genesis-Hermes-GGUF` fine-tune; base architecture `Qwen3.5-MoE` / `model_type: qwen3_5_moe`). Sparse hybrid MoE: 40 text layers (30 DeltaNet linear attention + 10 full attention), 256 routed experts / 8 active per token, ~35.95B total / ~3B active parameters per token, batch size 1, text-only.
 
-## Measured status (see `optimization.md` for the full record)
+Quantization format: INT4 symmetric group-128 weights, BF16 scales, high-precision router gates and RMSNorm (`.binfer` container).
 
-| Path | Result |
-|---|---|
-| Decode, sustained | **34.88 tok/s** (+18.9% vs llama.cpp Vulkan 29.33; 3.49× vs 8-thread CPU) |
-| Prefill, chunked batched + DPAS tiling | **up to 352 tok/s** @P=441 (from 39.3; peak 89.3 @P=32 early) |
-| Warm TTFT (P=21) | **237 ms** (from 534 ms, −55.6%) |
-| Quality | Gate M4 7/7 bit-exact golden sequence; 0 KB RSS growth; deterministic reset |
+---
 
-Key techniques: unified single-list recording, batched 8-expert MoE dispatch
-(3 kernels replace 960 launches), fused LM-head GEMV+argmax, chunked
-batched prefill GEMM, DPAS systolic tiling (M_tile=32; v5/M64 and no-SLM
-reverted as negative results), attention butterfly + recurrence tuning.
-OpenVINO GenAI on the same class of hardware: ~35 tok/s decode parity,
-~525 tok/s prefill claim under investigation.
+## 1. Measured Performance & Status (Release Truth)
 
-## Layout
+Authoritative metrics on physical Intel Arc 140V Xe2 hardware (see [`STATUS.md`](STATUS.md) and [`improvement.md`](improvement.md)):
 
-- `tools/kernels_258v/` — OpenCL kernels (`all_kernels.cl`: MoE, DeltaNet, attention, GEMM) + per-kernel reports + A/B bench harnesses
-- `tools/bench_258v/` — benchmarks (`bench_258v`, `bench_prefill*`, scaling sweeps, llama-comparison runner)
-- `tools/decode/runtime_258v.*` — resident runtime: static arenas (18.03 GiB committed), pre-recorded command lists; `test_runtime_258v.cpp` (Gate M4)
-- `tools/http/server_258v.py` — persistent resident daemon (SSE `/v1/chat/completions`, port 8088)
-- `prefill_optimization_review.md` — chunked-prefill technical review; `target_machine_identity.json` / `target_model_identity.json` — pinned environment
-- `optimization.md` — full optimization record (Pillars 1–10 + B70 cookbook transfer notes)
-- `optimization_258v_MoE.md` — earlier snapshot of the same program
-- `B60_*.md` — frozen copies of the B60 branch docs for cross-reference
+| Workload / Metric | AInfer Measured Result | Notes / Comparison |
+|---|---|---|
+| **Greedy Decode (Short Context)** | **35.91 tok/s** (up to 36.08 tok/s) | +22.4% vs llama.cpp Vulkan (29.33 tok/s); 3.60× vs 8-thread CPU |
+| **MTP Speculative Decode** | **45.62 tok/s** mean (up to **51.72 tok/s**) | 1.44× peak speedup (93.8% acceptance), 100% bit-exact parity (160/160 tokens) |
+| **Warm TTFT ($P=21$)** | **178.43 ms** (cold 185.03 ms) | Jitter p50 = 27.75 ms, stddev = 0.46 ms |
+| **Prefill Scaling ($P=128$)** | **347.30 tok/s** | Chunked parallel DeltaNet associative scan ($C=16$) |
+| **Prefill Scaling ($P=256$)** | **414.37 tok/s** | Macro-chunk batched DPAS prefill |
+| **Prefill Scaling ($P=512$)** | **424.49 tok/s** | High arithmetic intensity saturation |
+| **Prefill Scaling ($P=1024$)** | **388.43 tok/s** | Blocked FlashAttention query tiling ($B=8, T=16$) |
+| **Long-Context Prefill ($P=6,720$)** | **174.68 tok/s** (warmup **180.07 tok/s**) | **0.95× parity with llama.cpp** (183.2 tok/s); total time 38.5 s (cut from ~80 s) |
+| **Long-Context Decode ($P=6,720$)** | **12.27 tok/s** greedy / **12.88 tok/s** spec | Subgroup butterfly decode attention; parity verified at 6.7K context |
+| **Fast Cold Startup** | **10.32 s** (`--fast-load`) | 4.65× faster than baseline 48 s; verified stamp bypasses redundant CRC scan |
+| **Unified Memory Footprint** | **18.18–18.22 GiB committed** | Leaves **>13.8 GiB headroom** on 32 GB RAM; 0 KB RSS leak over 10 runs |
+| **Quality & Parity Gates** | **Gates M0–M8 Signed Off** | Gate M4: 7/7 test suites passed bit-exact; CTest: 6/6 green (2.02 s) |
 
-## Environment notes
+---
 
-CachyOS rolling, Intel GPU stack for Lunar Lake (Level Zero / NEO).
-Unified memory: arenas live in shared LPDDR5X (13.97 GiB headroom at
-18.03 committed). Power matters here (17W PL1 / 37W PL2) — report PL1
-with every benchmark. 5.58-min steady-state run settles at 55.8 °C.
+## 2. Core Architecture & Key Innovations
 
-## Docs
+- **Unified Single-Process Resident Runtime**: Entire 35.95B model weights reside permanently in unified memory. In-memory prefill seamlessly transitions into decode without disk reloads or PCIe transfers.
+- **Zero-Allocation Recorded Command Lists**: 40 layer command lists, embed list, and tail list are recorded once at startup into Level Zero command lists. A 128-byte `RuntimeControl` buffer on device drives positions, expert routing, and dynamic loop control without command list rebuilding.
+- **Chunked Parallel DeltaNet Scan (I2.3)**: Replaces serial recurrent loops with a chunk-parallel associative scan ($C=16$ chunk tile). Intra-chunk triangular solve $M D = V - V_{init}$ executes in SLM across 128 threads, cutting recurrent dependency barriers by 16× and lifting prefill throughput across all prompt lengths.
+- **Blocked FlashAttention for Prefill (I3.7)**: Resolves the $O(B \times T)$ memory bandwidth bottleneck when the KV cache exceeds the 8 MB GPU L2 cache. Processes $B_{\text{tile}}=8$ queries concurrently per workgroup, sharing an SLM tile of $T_{\text{tile}}=16$ key/value tokens with aligned 16-byte vector loads (`ushort8`) and in-register online softmax.
+- **SIMD16 Subgroup Butterfly Decode Attention (I3.6)**: Replaces 3-barrier SLM tree reductions with register-only butterfly shuffle reductions (`intel_sub_group_shuffle`) and double-buffered SLM staging, reducing synchronization barrier frequency by 48×.
+- **Pure-FP32 MTP Dual-Token Verification (I3.1)**: Coalesced 16-byte vector GEMV (`int4_gemv_m2`) processes dual-token speculative verification in a single weight pass, maintaining 100% bit-exact mathematical parity with autoregressive greedy decode while reaching up to 51.7 tok/s.
+- **Consolidated MoE Micro-GEMM Characterization (I3.2)**: Evaluated active-expert compaction vs fixed-grid dispatch across 256 routed experts (8 active). Proved 100% bit-exact mathematical parity (`0.00e+00` diff) and an 85.2% reduction in dispatch workgroups (2048 → 304). Characterized Intel Xe2 hardware thread dispatch behavior: empty workgroups terminate in < 1 clock cycle (< 0.05 ms overhead across 1,744 idle workgroups), proving fixed-grid dispatch optimal for production.
+- **Dynamic Auto-KV8 Policy**: Production default is high-precision BF16 KV cache for short/medium context; Auto-KV8 automatically engages when `max_ctx >= 16384` to halve KV read traffic where attention memory bandwidth dominates.
+- **Instant Client Disconnect Abort (I2.1)**: Socket status polling via non-blocking `select` and peek `recv` terminates GPU execution within a single decode step of client disconnect and resets Level Zero state.
+- **Native FIM & Streaming Stop Buffering (I1.1, I1.2)**: Full OpenAI API compatibility for IDE tab autocomplete (`/v1/completions` with suffix) using native Qwen FIM tokens and prefix-buffering multi-token stop sequences.
 
-- `optimization.md` — current performance truth (read first)
-- `AInfer_258V_migration_plan.md`, `migration_scope.md` — port scope
-- `STATUS.md`, `plan.md`, `tasks.md`, `progress.md` — branch-local status
-  (note: several `B60_*` files are frozen B60 copies, not live docs)
+---
+
+## 3. Repository Structure
+
+```
+AInfer/
+├── models/                     # Model metadata, tokenizers, and .binfer containers
+├── tools/
+│   ├── kernels_258v/           # OpenCL SPIR-V kernels (all_kernels.cl), microbenchmarks
+│   ├── decode/                 # C++ Level Zero runtime (runtime_258v.cpp), C API, Gate M4 tests
+│   ├── bench_258v/             # Standardized T7.1 benchmark, prefill sweeps, shootout harnesses
+│   ├── http/                   # Resident HTTP server (server_258v.py), LAN launcher, systemd unit
+│   ├── mtp/                    # Multi-token prediction speculative decoding harnesses and tests
+│   ├── quality_258v/           # Tokenizer parity, 200-case quality corpus, teacher-forced eval
+│   ├── membench/               # Memory allocation policy & CPU/GPU contention benchmarks
+│   ├── toolchain/              # Pinned CachyOS package cache, sysroot, rollback automation (T1.2)
+│   └── fuzz/                   # Robustness, fault-injection, and differential fuzzing suites
+├── STATUS.md                   # Single-source authoritative release truth
+├── improvement.md              # Optimization roadmap & completed P0/P1/P2 task catalog
+├── claim_correction.md         # Long-context benchmark methodology & comparison with llama.cpp
+├── progress.md                 # Engineering trajectory and detailed changelog
+├── plan.md / tasks.md          # Architectural plan and stable task definitions (T0.1–X2)
+└── memory_feasibility_estimate.md # 32 GB unified memory budget analysis
+```
+
+---
+
+## 4. Building and Testing
+
+### Prerequisites
+- OS: CachyOS (or Arch Linux) on Intel Core Ultra 7 258V.
+- Dependencies: Pinned Level Zero loader (`libze_loader.so.1`), Intel Compute Runtime, GCC 15+, CMake 3.25+, Python 3.11+ venv.
+- Sysroot: Local packages are cached in `tools/toolchain/cache/` and extracted to `tools/toolchain/sysroot/`.
+
+### Build
+```bash
+# Configure using the 258v CMake preset
+cmake --preset 258v
+
+# Build runtime components and tests
+cmake --build --preset 258v
+```
+
+### Automated Regression Suite
+```bash
+# Run the 6 automated unit & regression tests
+ctest --preset 258v
+```
+*Current status: 6/6 tests passing (100% green) in ~2.0 seconds.*
+
+### Gate M4 On-Device Runtime Qualification
+```bash
+# Rebuild and run the full on-device Gate M4 verification suite
+g++ -O3 -std=c++17 tools/decode/runtime_258v.cpp tools/decode/test_runtime_258v.cpp \
+  -Itools/l0probe/include -Ltools/toolchain/sysroot/usr/lib -lze_loader \
+  -o tools/decode/test_runtime_258v
+
+LD_LIBRARY_PATH=tools/toolchain/sysroot/usr/lib ./tools/decode/test_runtime_258v
+```
+
+---
+
+## 5. Running the Resident Inference Server
+
+A persistent resident inference daemon serves OpenAI-compatible endpoints (`/v1/chat/completions`, `/v1/completions`, `/healthz`, `/readyz`).
+
+### Start the Server (LAN accessible)
+```bash
+# Launch server with fast startup and speculative decoding enabled
+./tools/http/serve_lan.sh --port 8080 --fast-load --speculative
+```
+
+### Systemd User Service (Optional)
+To run AInfer as a persistent background daemon:
+```bash
+# Install user service
+./tools/http/install_service.sh install
+
+# Start or check status
+systemctl --user start ainfer
+systemctl --user status ainfer
+```
+
+### Client Request Examples
+
+**Chat Completion (SSE Streaming):**
+```bash
+curl -N http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tiel-coder-35b",
+    "messages": [
+      {"role": "system", "content": "You are a helpful coding assistant."},
+      {"role": "user", "content": "Write a Python function to compute Fibonacci numbers."}
+    ],
+    "max_tokens": 128,
+    "stream": true
+  }'
+```
+
+**Fill-In-The-Middle (FIM) Autocomplete:**
+```bash
+curl http://localhost:8080/v1/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "tiel-coder-35b",
+    "prompt": "def quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[0]\n",
+    "suffix": "    return quicksort(left) + middle + quicksort(right)\n",
+    "max_tokens": 64
+  }'
+```
+
+---
+
+## 6. Documentation Reference
+
+- **[`STATUS.md`](STATUS.md)**: **Single-source release truth** (hardware specs, phase gates, benchmark records).
+- **[`improvement.md`](improvement.md)**: Detailed technical reports for all completed optimizations (I1.1–I3.7).
+- **[`claim_correction.md`](claim_correction.md)**: Transparent benchmark analysis comparing AInfer against llama.cpp across context lengths.
+- **[`progress.md`](progress.md)**: Chronological engineering log and comprehensive change history.
+- **[`memory_feasibility_estimate.md`](memory_feasibility_estimate.md)**: Detailed memory breakdown across context tiers (4K to 128K).
