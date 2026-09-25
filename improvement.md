@@ -483,7 +483,7 @@ missing Chain-of-Thought (CoT) reasoning, and full ~7K re-prefill on every conve
 
 ### I4.3 Native CoT / Reasoning Streaming (`enable_thinking`, `delta.reasoning_content`)
 
-- Status: `[ ]`
+- Status: `[x]` DONE 2026-09-25 (verified live on :8080, both paths)
 - Complexity: **Medium** (~1-2 days)
 - Files: `tools/http/server_258v.py`, `tools/tokenizer/tok.py`
 - **Problem:**

@@ -61,6 +61,146 @@ _TOOL_CALL_RE = re.compile(
 _PARAM_RE = re.compile(r"<parameter=([^>\s]+)>(.*?)</parameter>", re.DOTALL)
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 _TOOL_START_RE = re.compile(r"<tool_call>|<function=")
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+# Structural markers that skip_special_tokens=True used to strip. I4.3 keeps
+# skip=False in JSON mode so <think> tags survive for the split; these are
+# stripped structurally (trailing-only) instead.
+_TRAILING_MARKERS = ("<|endoftext|>", "<|im_end|>", "<|fim_middle|>",
+                     "<|fim_suffix|>", "<|fim_prefix|>", "<|fim_pad|>", "<|file_sep|>")
+
+
+def _strip_trailing_markers(text):
+    """Remove structural special-token strings from the end of generated text."""
+    s = text or ""
+    while True:
+        t = s.rstrip()
+        for m in _TRAILING_MARKERS:
+            if t.endswith(m):
+                s = t[:-len(m)]
+                break
+        else:
+            return s
+
+
+def _resolve_enable_thinking(body, is_chat):
+    """I4.3: resolve native-reasoning opt-in from the request body.
+
+    Accepts OpenAI-style `reasoning_effort` ("none" disables) and
+    Anthropic-style `thinking` (bool or {"type": "enabled"/"disabled"}).
+    Default is ON for chat (this is a reasoning model; the pinned template
+    opens `<think>` unless explicitly closed) and OFF for plain completions.
+    """
+    if not is_chat:
+        return False
+    enabled = True
+    t = body.get("thinking", None)
+    if isinstance(t, dict):
+        enabled = str(t.get("type", "enabled")).lower() not in ("disabled", "none", "false", "no", "0")
+    elif isinstance(t, str):
+        enabled = t.lower() not in ("disabled", "none", "false", "no", "0", "")
+    elif t is not None:
+        enabled = bool(t)
+    re_ = body.get("reasoning_effort", None)
+    if isinstance(re_, str) and re_.lower() in ("none", "disabled", "false", "no"):
+        enabled = False
+    return enabled
+
+
+class ThinkSplitter:
+    """Incremental <think>/</think> splitter for native reasoning (I4.3).
+
+    When enabled, generation starts inside an open thinking block (the
+    prompt ends with `<think>`), so text routes to `reasoning` until the
+    first `</think>`, then to `content`. A short holdback absorbs tags
+    split across token boundaries; a model-echoed reopen `<think>` at the
+    start is consumed. When disabled, everything passes through as content
+    (zero behavior change vs the pre-I4.3 path).
+    """
+
+    def __init__(self, enabled):
+        self.enabled = enabled
+        self.in_think = bool(enabled)
+        self.started = not bool(enabled)
+        self.buf = ""
+
+    def _close_holdback(self):
+        hold = 0
+        maxk = min(len(self.buf), len(_THINK_CLOSE) - 1)
+        for k in range(maxk, 0, -1):
+            if _THINK_CLOSE.startswith(self.buf[-k:]):
+                hold = k
+                break
+        return hold
+
+    def feed(self, text):
+        """Consume new text; returns a list of (kind, segment) with
+        kind in ("reasoning", "content")."""
+        if not text:
+            return []
+        if not self.enabled:
+            return [("content", text)]
+        self.buf += text
+        out = []
+        while True:
+            if not self.started:
+                stripped = self.buf.lstrip()
+                if stripped.startswith(_THINK_OPEN):
+                    # Model echoed the prompt's open tag: keep any leading
+                    # whitespace as reasoning, consume the tag.
+                    ws = self.buf[:len(self.buf) - len(stripped)]
+                    if ws:
+                        out.append(("reasoning", ws))
+                    self.buf = stripped[len(_THINK_OPEN):]
+                    self.started = True
+                    continue
+                if stripped == "" or _THINK_OPEN.startswith(stripped):
+                    return out  # too short to decide; wait for more text
+                self.started = True
+                continue
+            if self.in_think:
+                idx = self.buf.find(_THINK_CLOSE)
+                if idx != -1:
+                    if idx > 0:
+                        out.append(("reasoning", self.buf[:idx]))
+                    self.buf = self.buf[idx + len(_THINK_CLOSE):]
+                    self.in_think = False
+                    if self.buf.startswith("\n"):
+                        self.buf = self.buf[1:]
+                    continue
+                hold = self._close_holdback()
+                emit_up_to = len(self.buf) - hold
+                if emit_up_to > 0:
+                    out.append(("reasoning", self.buf[:emit_up_to]))
+                    self.buf = self.buf[emit_up_to:]
+                return out
+            if self.buf:
+                out.append(("content", self.buf))
+                self.buf = ""
+            return out
+
+    def flush(self):
+        """Emit any residual buffered text in the current state."""
+        if not self.buf:
+            return []
+        seg = self.buf
+        self.buf = ""
+        if not self.enabled or not self.in_think:
+            return [("content", seg)]
+        return [("reasoning", seg)]
+
+
+def _split_thinking(text, enabled):
+    """Split full generated text into (reasoning, content) for JSON mode."""
+    if not enabled:
+        return "", text
+    stripped = text.lstrip()
+    if stripped.startswith(_THINK_OPEN):
+        text = text[:len(text) - len(stripped)] + stripped[len(_THINK_OPEN):]
+    idx = text.find(_THINK_CLOSE)
+    if idx == -1:
+        return "", text  # unclosed: fail open to content so answers never vanish
+    return text[:idx].strip(), text[idx + len(_THINK_CLOSE):].lstrip("\n")
 
 
 def _normalize_tool_messages(messages):
@@ -504,6 +644,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
             # Render Prompt
             try:
+                enable_thinking = False
                 if is_chat:
                     is_fim = False
                     messages = body.get("messages", [])
@@ -521,13 +662,18 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                         tools_for_template = raw_tools
                         parse_tools = True
                     messages = _normalize_tool_messages(messages)
+                    # I4.3: native reasoning defaults ON for chat; the pinned
+                    # template then ends the prompt with an open `<think>`.
+                    enable_thinking = _resolve_enable_thinking(body, is_chat=True)
                     try:
-                        prompt_text = tokenizer_tool.render_chat(messages, add_generation_prompt=True, enable_thinking=False, tools=tools_for_template)
+                        prompt_text = tokenizer_tool.render_chat(messages, add_generation_prompt=True, enable_thinking=enable_thinking, tools=tools_for_template)
                     except Exception:
                         prompt_text = ""
                         for m in messages:
                             prompt_text += f"<|im_start|>{m.get('role', 'user')}\n{m.get('content', '')}<|im_end|>\n"
                         prompt_text += "<|im_start|>assistant\n"
+                        if enable_thinking:
+                            prompt_text += "<think>\n"
                     stop_token_ids = set(EOS_TOKEN_IDS)
                 else:
                     prompt = body.get("prompt", "")
@@ -585,6 +731,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                     stop_sequences=stop_sequences,
                     stop_token_ids=stop_token_ids,
                     parse_tools=parse_tools if is_chat else False,
+                    enable_thinking=enable_thinking,
                 )
 
         finally:
@@ -592,7 +739,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 STATE.queue_depth -= 1
             STATE.queue_semaphore.release()
 
-    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+    def _execute_generation(self, prompt_ids, max_tokens, stream, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False, enable_thinking=False):
         # T8.2 & T8.3: Check device health before running
         if not STATE.binding.check_device_health():
             self._send_json(500, {"error": {"message": "Level Zero device reported failure or loss", "type": "device_error"}})
@@ -657,9 +804,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             if stream:
-                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, len(prompt_ids), stop_sequences, stop_token_ids, parse_tools, headers_sent=True)
+                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, len(prompt_ids), stop_sequences, stop_token_ids, parse_tools, headers_sent=True, enable_thinking=enable_thinking)
             else:
-                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
+                self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools, enable_thinking=enable_thinking)
 
             STATE.total_requests += 1
 
@@ -679,7 +826,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # T8.2: Always reset state on finish or abort so GPU memory/SSM buffers are clean
             STATE.binding.reset_state()
 
-    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+    def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False, enable_thinking=False):
         stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
         stop_sequences = [s for s in (stop_sequences or []) if s]
         decoder = IncrementalDecoder(STATE.tokenizer)
@@ -757,7 +904,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         if output_text is None:
             decoder.flush()
-            output_text = tokenizer_tool.decode(STATE.tokenizer, generated_ids, skip_special_tokens=True)
+            # I4.3: keep special tokens so <think> tags survive for the
+            # split; structural markers are stripped after the split instead.
+            output_text = tokenizer_tool.decode(STATE.tokenizer, generated_ids, skip_special_tokens=False)
 
         if is_chat:
             # T8.4: translate native Hermes <tool_call> XML into OpenAI tool_calls.
@@ -765,12 +914,26 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # prompt text and send no `tools` array; the model still emits
             # Hermes XML, which must come back as tool_calls for the loop to
             # function. Plain answers contain no such blocks and pass through.
-            prefix, tool_calls = _parse_hermes_tool_calls(output_text, req_id)
+            # I4.3: split native thinking first; reasoning is preserved in
+            # `reasoning_content` instead of being stripped.
+            reasoning, content_text = _split_thinking(output_text, enable_thinking)
+            reasoning = _strip_trailing_markers(reasoning)
+            content_text = _strip_trailing_markers(content_text)
+            prefix, tool_calls = _parse_hermes_tool_calls(content_text, req_id)
             if tool_calls:
                 message = {"role": "assistant", "content": prefix or None, "tool_calls": tool_calls}
                 finish_reason = "tool_calls"
             else:
-                message = {"role": "assistant", "content": output_text}
+                message = {"role": "assistant", "content": content_text}
+            if reasoning:
+                message["reasoning_content"] = reasoning
+            if tool_calls:
+                message = {"role": "assistant", "content": prefix or None, "tool_calls": tool_calls}
+                finish_reason = "tool_calls"
+            else:
+                message = {"role": "assistant", "content": content_text}
+            if reasoning:
+                message["reasoning_content"] = reasoning
             resp = {
                 "id": req_id,
                 "object": "chat.completion",
@@ -820,7 +983,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         self._send_json(200, resp)
 
-    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, prompt_len=0, stop_sequences=None, stop_token_ids=None, parse_tools=False, headers_sent=False):
+    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, prompt_len=0, stop_sequences=None, stop_token_ids=None, parse_tools=False, headers_sent=False, enable_thinking=False):
         stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
         stop_sequences = [s for s in (stop_sequences or []) if s]
         decoder = IncrementalDecoder(STATE.tokenizer)
@@ -859,22 +1022,35 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         stopped = False
         finish_reason = "length"
 
+        think_splitter = ThinkSplitter(enabled=is_chat and enable_thinking)
+
         def emit_text_chunk(text):
+            # I4.3: route through the think splitter first. Reasoning segments
+            # always stream (they precede any tool XML); the raw-XML
+            # suppression below gates content segments only.
+            if not text:
+                return
+            for _kind, _seg in think_splitter.feed(text):
+                emit_chunk_seg(_seg, _kind)
+
+        def emit_chunk_seg(seg, kind):
             nonlocal suppressed, stopped
-            if not text or stopped:
+            if not seg or stopped:
                 return
-            if not suppressed and _TOOL_START_RE.search(decoder.decoded_text):
-                suppressed = True
-            if suppressed:
-                return
+            if kind == "content":
+                if not suppressed and _TOOL_START_RE.search(decoder.decoded_text):
+                    suppressed = True
+                if suppressed:
+                    return
             try:
                 if is_chat:
+                    delta = {"reasoning_content": seg} if kind == "reasoning" else {"content": seg}
                     send_sse_chunk({
                         "id": req_id,
                         "object": "chat.completion.chunk",
                         "created": created_time,
                         "model": MODEL_ID,
-                        "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}],
+                        "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
                     })
                 else:
                     send_sse_chunk({
@@ -882,7 +1058,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                         "object": "text_completion.chunk",
                         "created": created_time,
                         "model": MODEL_ID,
-                        "choices": [{"index": 0, "text": text, "finish_reason": None}],
+                        "choices": [{"index": 0, "text": seg, "finish_reason": None}],
                     })
             except (BrokenPipeError, ConnectionResetError, OSError):
                 sys.stderr.write(f"[Server] Client disconnected during SSE emission ({req_id}). Aborting stream.\n")
@@ -959,6 +1135,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 emit_text_chunk(safe_text)
             remaining_text = stop_buffer.flush()
             emit_text_chunk(remaining_text)
+            # I4.3: release the splitter holdback (split-tag guard chars).
+            for _kind, _seg in think_splitter.flush():
+                emit_chunk_seg(_seg, _kind)
 
         if stopped and self.is_client_disconnected():
             return
