@@ -23,6 +23,9 @@
 #   streaming (stream:true — server sends SSE prefill keepalives) and a
 #   client-side timeout >= 600 s; keep max_tokens modest per turn.
 #   Launch with --max-ctx large enough for tools+history (e.g. 16384).
+# - Multi-turn prefix cache is ON by default (I4.4): follow-up turns sharing
+#   >= 512 prompt tokens skip re-prefill (server log shows Prefix/Anchor
+#   hit). AINFER_PREFIX_CACHE=0 disables (every turn full-prefills).
 # - KV policy: unset env -> auto-KV8 at max-ctx >= 4096; --kv8 forces INT8 KV
 #   (halves KV traffic); --bf16 forces BF16 KV.
 set -euo pipefail

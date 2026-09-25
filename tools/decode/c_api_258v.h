@@ -8,6 +8,12 @@ extern "C" {
 void *ainfer_create();
 int ainfer_init(void *handle, const char *binfer_path, const char *spv_path, uint32_t max_ctx);
 int ainfer_prefill(void *handle, const int *prompt_ids, int count, int *out_first_token);
+int ainfer_prefill_incremental(void *handle, const int *suffix_ids, int count, int start_pos,
+                               int *out_first_token);
+int ainfer_prefix_cached_len(void *handle);
+int ainfer_prefill_anchor(void *handle, const int *new_ids, int count, int anchor_pos,
+                          int *out_first_token);
+int ainfer_prefix_anchor_len(void *handle);
 int ainfer_decode_step(void *handle, int *out_next_token);
 int ainfer_init_speculative(void *handle);
 int ainfer_speculative_step(void *handle, int *out_tok1, int *out_tok2, int *out_num_emitted, int *out_accepted);

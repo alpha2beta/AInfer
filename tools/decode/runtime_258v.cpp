@@ -271,6 +271,14 @@ bool AInferRuntime258V::allocate_static_arenas() {
   ssm_state_bytes_ = total_ssm_recr_bytes + total_ssm_conv_bytes;
   CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_conv_bytes, 4096, dev_, &ssm_conv_arena_));
 
+  // 5b. I4.4: post-prefill SSM snapshot slots for prefix-cache restore
+  // (device memory; ~66 MiB, separate from MTP rollback scratch).
+  CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_recr_bytes, 4096, dev_, &d_prefix_ssm_));
+  CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_conv_bytes, 4096, dev_, &d_prefix_conv_));
+  // 5c. I4.4b: terminal-chunk-boundary snapshot slots (chat-append anchor, +66 MiB).
+  CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_recr_bytes, 4096, dev_, &d_anchor_ssm_));
+  CHECK_L0(zeMemAllocDevice(ctx_, &dmem_desc, total_ssm_conv_bytes, 4096, dev_, &d_anchor_conv_));
+
   // 6. Activation Workspace Arena (256 MiB: chunk buffers scale with
   // MAX_PREFILL_CHUNK = 512; ~190 MiB used, overflow guard below verifies)
   workspace_bytes_ = 256ULL << 20; // 256 MiB
@@ -2211,6 +2219,76 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_mtp_prefill_chunk_list
   return list;
 }
 
+// I4.4: snapshot the post-prefill SSM arenas for prefix-cache restore.
+bool AInferRuntime258V::snapshot_prefix_state(int len) {
+  if (!d_prefix_ssm_ || !d_prefix_conv_ || !ssm_recr_arena_ || !ssm_conv_arena_ || len < 0) {
+    prefix_cached_len_ = -1;
+    return false;
+  }
+  size_t recr_bytes = (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float);
+  size_t conv_bytes = (size_t)NUM_DELTANET_LAYERS * C_QKV * 3 * sizeof(float);
+  if (queue_) {
+    CHECK_L0(zeCommandQueueSynchronize(queue_, UINT64_MAX));
+  }
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_prefix_ssm_, ssm_recr_arena_, recr_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_prefix_conv_, ssm_conv_arena_, conv_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+  prefix_cached_len_ = len;
+  return true;
+}
+
+// I4.4: restore a previously snapshotted post-prefill SSM state. Returns
+// false WITHOUT changing any state unless the snapshot is for exactly len.
+bool AInferRuntime258V::restore_prefix_state(int len) {
+  if (!d_prefix_ssm_ || !d_prefix_conv_ || !ssm_recr_arena_ || !ssm_conv_arena_) return false;
+  if (len < 0 || prefix_cached_len_ != len) return false;
+  size_t recr_bytes = (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float);
+  size_t conv_bytes = (size_t)NUM_DELTANET_LAYERS * C_QKV * 3 * sizeof(float);
+  if (queue_) {
+    CHECK_L0(zeCommandQueueSynchronize(queue_, UINT64_MAX));
+  }
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, ssm_recr_arena_, d_prefix_ssm_, recr_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, ssm_conv_arena_, d_prefix_conv_, conv_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+  return true;
+}
+
+// I4.4b: snapshot the SSM arenas at the START of a prefill's terminal chunk
+// (absolute position pos). Refreshed on every prefill_range call, so the
+// anchor always describes the currently cached prompt.
+bool AInferRuntime258V::snapshot_anchor_state(int pos) {
+  if (!d_anchor_ssm_ || !d_anchor_conv_ || !ssm_recr_arena_ || !ssm_conv_arena_ || pos < 0) {
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  size_t recr_bytes = (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float);
+  size_t conv_bytes = (size_t)NUM_DELTANET_LAYERS * C_QKV * 3 * sizeof(float);
+  if (queue_) {
+    CHECK_L0(zeCommandQueueSynchronize(queue_, UINT64_MAX));
+  }
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_anchor_ssm_, ssm_recr_arena_, recr_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, d_anchor_conv_, ssm_conv_arena_, conv_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+  prefix_anchor_len_ = pos;
+  return true;
+}
+
+// I4.4b: restore a previously snapshotted terminal-chunk-boundary SSM state.
+// Returns false WITHOUT changing any state unless the anchor matches.
+bool AInferRuntime258V::restore_anchor_state(int pos) {
+  if (!d_anchor_ssm_ || !d_anchor_conv_ || !ssm_recr_arena_ || !ssm_conv_arena_) return false;
+  if (pos < 0 || prefix_anchor_len_ != pos) return false;
+  size_t recr_bytes = (size_t)NUM_DELTANET_LAYERS * H_V * S_V * S_V * sizeof(float);
+  size_t conv_bytes = (size_t)NUM_DELTANET_LAYERS * C_QKV * 3 * sizeof(float);
+  if (queue_) {
+    CHECK_L0(zeCommandQueueSynchronize(queue_, UINT64_MAX));
+  }
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, ssm_recr_arena_, d_anchor_ssm_, recr_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListAppendMemoryCopy(cmd_copy_, ssm_conv_arena_, d_anchor_conv_, conv_bytes, nullptr, 0, nullptr));
+  CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+  return true;
+}
+
 bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_first_token) {
   if (prompt_ids.empty()) return false;
   int P = (int)prompt_ids.size();
@@ -2218,31 +2296,137 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     std::fprintf(stderr, "Prompt size %d exceeds max context %u\n", P, max_ctx_);
     return false;
   }
+  if (!prefill_range(prompt_ids.data(), P, 0, P, out_first_token)) {
+    prefix_cached_len_ = -1;
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  // Snapshot the post-prefill state so a later append can resume here.
+  if (!snapshot_prefix_state(P)) return false;
+  return true;
+}
+
+// I4.4: incremental append prefill over a cached prefix.
+bool AInferRuntime258V::prefill_incremental(const std::vector<int> &suffix_ids, int start_pos,
+                                           int *out_first_token) {
+  if (suffix_ids.empty() || start_pos < 0) return false;
+  int total = start_pos + (int)suffix_ids.size();
+  if (total > (int)max_ctx_) {
+    std::fprintf(stderr, "Incremental prefill size %d exceeds max context %u\n", total, max_ctx_);
+    return false;
+  }
+  {
+    char guard_err[256];
+    if (!StepGuard::check_prompt_ids(suffix_ids.data(), suffix_ids.size(),
+                                     guard_err, sizeof(guard_err))) {
+      std::fprintf(stderr, "Incremental prefill rejected suffix: %s\n", guard_err);
+      return false;
+    }
+  }
+  // No valid snapshot for exactly start_pos -> caller falls back to full
+  // prefill. No device state is changed on this path.
+  if (!restore_prefix_state(start_pos)) return false;
+  // MTP verify state must be clean before decode after any prefill.
+  if (!zero_mtp_state()) {
+    prefix_cached_len_ = -1;
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  if (!prefill_range(suffix_ids.data(), (int)suffix_ids.size(), start_pos, total, out_first_token)) {
+    prefix_cached_len_ = -1;
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  if (!snapshot_prefix_state(total)) return false;
+  return true;
+}
+
+// I4.4b: rebase onto the terminal-chunk-boundary snapshot. new_ids is the
+// FULL new prompt; anchor_pos must equal prefix_anchor_len_() (taken from the
+// cached prefill's terminal chunk start) and lie strictly inside the prompt.
+// Restores SSM to the anchor, zeroes MTP state, forwards
+// new_ids[anchor_pos..], then re-snapshots end + anchor for the new prompt.
+bool AInferRuntime258V::prefill_from_anchor(const std::vector<int> &new_ids, int anchor_pos,
+                                           int *out_first_token) {
+  if (new_ids.empty() || anchor_pos < 0) return false;
+  int total = (int)new_ids.size();
+  if (anchor_pos >= total || total > (int)max_ctx_) {
+    std::fprintf(stderr, "Anchor prefill rejected: anchor %d total %d max %u\n",
+                 anchor_pos, total, max_ctx_);
+    return false;
+  }
+  {
+    char guard_err[256];
+    if (!StepGuard::check_prompt_ids(new_ids.data(), new_ids.size(),
+                                     guard_err, sizeof(guard_err))) {
+      std::fprintf(stderr, "Anchor prefill rejected prompt: %s\n", guard_err);
+      return false;
+    }
+  }
+  // No valid anchor snapshot -> caller falls back to full prefill. No device
+  // state is changed on this path.
+  if (!restore_anchor_state(anchor_pos)) {
+    std::fprintf(stderr, "Anchor prefill: no snapshot for anchor %d (cached anchor=%d)\n",
+                 anchor_pos, prefix_anchor_len_);
+    return false;
+  }
+  // MTP verify state must be clean before decode after any prefill.
+  if (!zero_mtp_state()) {
+    std::fprintf(stderr, "Anchor prefill: zero_mtp_state failed at anchor %d\n", anchor_pos);
+    prefix_cached_len_ = -1;
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  if (!prefill_range(new_ids.data() + anchor_pos, total - anchor_pos, anchor_pos, total,
+                     out_first_token)) {
+    std::fprintf(stderr, "Anchor prefill: prefill_range failed anchor=%d total=%d\n",
+                 anchor_pos, total);
+    prefix_cached_len_ = -1;
+    prefix_anchor_len_ = -1;
+    return false;
+  }
+  if (!snapshot_prefix_state(total)) {
+    std::fprintf(stderr, "Anchor prefill: end snapshot failed total=%d\n", total);
+    return false;
+  }
+  return true;
+}
+
+bool AInferRuntime258V::prefill_range(const int *ids, int count, int start_pos, int total,
+                                     int *out_first_token) {
+  if (!ids || count <= 0 || start_pos < 0 || start_pos + count > total || total > (int)max_ctx_) {
+    return false;
+  }
   // T9.2: reject out-of-vocabulary prompt IDs before anything dispatches
   // (device embed gather clamps as last resort, but invalid IDs must not
   // reach the command lists at all).
   {
     char guard_err[256];
-    if (!StepGuard::check_prompt_ids(prompt_ids.data(), prompt_ids.size(),
+    if (!StepGuard::check_prompt_ids(ids, count,
                                      guard_err, sizeof(guard_err))) {
       std::fprintf(stderr, "Prefill rejected prompt: %s\n", guard_err);
       return false;
     }
   }
 
-  // Chunked in-memory prefill using batched GEMM & state updates (T3.1 / T5.2)
-  int pos = 0;
-  while (pos < P) {
-    int B = std::min(P - pos, MAX_PREFILL_CHUNK);
-    bool is_terminal = (pos + B == P);
+  // Chunked in-memory prefill using batched GEMM & state updates (T3.1 / T5.2).
+  // Positions are absolute (h_ctrl_.position = pos): recorded chunk lists are
+  // keyed only on B and read positions from the device control block at
+  // execution, so ranges starting at start_pos > 0 append KV at the right
+  // slots and continue the restored SSM recurrence exactly.
+  int pos = start_pos;
+  const int end_pos = start_pos + count;
+  while (pos < end_pos) {
+    int B = std::min(end_pos - pos, MAX_PREFILL_CHUNK);
+    bool is_terminal = (pos + B == end_pos);
 
     // Copy prompt chunk tokens to shared device memory
-    std::memcpy(d_tokens_chunk_, &prompt_ids[pos], B * sizeof(int));
+    std::memcpy(d_tokens_chunk_, ids + (pos - start_pos), B * sizeof(int));
 
     // Update control block position (chunk start) and active length
     h_ctrl_.position = pos;
     h_ctrl_.active_length = pos + B;
-    h_ctrl_.token_id = prompt_ids[pos];
+    h_ctrl_.token_id = ids[pos - start_pos];
     // T9.2: per-chunk step validation before submission.
     {
       char guard_err[256];
@@ -2258,6 +2442,16 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     // Execute chunk forward pass across all 40 layers in a single recorded command list
     ze_command_list_handle_t cmd_chunk = get_or_record_prefill_chunk_list(B);
     if (!cmd_chunk) return false;
+
+    if (is_terminal) {
+      // I4.4b: snapshot SSM at the START of the terminal chunk (absolute pos)
+      // BEFORE it executes — this MUST precede the forward below. Prior
+      // chunks have completed (fence waited), so the arenas hold the exact
+      // post-prefix state for [start of prompt, pos). (A prior revision
+      // snapshotted after the forward and mislabeled post-chunk state,
+      // corrupting anchor restores — diagnosed 2026-09-25 via prompt-echo.)
+      if (!snapshot_anchor_state(pos)) return false;
+    }
 
     // Per-chunk progress log in llama.cpp slot-timing style, so server logs
     // show live pp rate per chunk instead of only the final average:
@@ -2306,8 +2500,8 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
       int next_tok = d_ctrl_->selected_token;
       h_ctrl_.selected_token = next_tok;
       h_ctrl_.token_id = next_tok;
-      h_ctrl_.position = P - 1;
-      h_ctrl_.active_length = P;
+      h_ctrl_.position = total - 1;
+      h_ctrl_.active_length = total;
       std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
 
       if (out_first_token) *out_first_token = next_tok;
@@ -2318,7 +2512,7 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
           std::chrono::duration<double>(std::chrono::steady_clock::now() - t_c0).count();
       std::fprintf(stderr,
                    "[Prefill] n_tokens = %d, progress = %.2f, t = %.2f s (%.1f tok/s)\n",
-                   B, (double)(pos + B) / (double)P, chunk_s,
+                   B, (double)(pos + B) / (double)total, chunk_s,
                    (double)B / std::max(1e-9, chunk_s));
     }
 
@@ -3299,8 +3493,23 @@ bool AInferRuntime258V::reset_state() {
     std::memcpy(d_ctrl_, &h_ctrl_, sizeof(RuntimeControl));
   }
 
+  // I4.4: MTP verify state persists across requests (speculative engine is
+  // initialized once at startup), so it must be zeroed before decode after
+  // ANY prefill — full (via reset_state) or incremental.
+  if (!zero_mtp_state()) return false;
+
+  // Synchronize immediate copy list to ensure all fills have completed on GPU
+  CHECK_L0(zeCommandListHostSynchronize(cmd_copy_, UINT64_MAX));
+
+  prefix_cached_len_ = -1; // full reset invalidates any prefix snapshot
+  prefix_anchor_len_ = -1;
+  return true;
+}
+
+bool AInferRuntime258V::zero_mtp_state() {
+  if (!cmd_copy_) return false;
   // Zero out MTP KV cache and buffers if initialized
-  if (mtp_.initialized) {
+  uint32_t zero = 0;
     if (mtp_.k_cache || mtp_.k_cache_i8) {
       size_t kv_sz = (size_t)NUM_KV_HEADS * max_ctx_ * HEAD_DIM *
                      (kv8_enabled_ ? sizeof(int8_t) : sizeof(uint16_t));
@@ -3318,7 +3527,6 @@ bool AInferRuntime258V::reset_state() {
     if (mtp_.d_draft_token) {
       *mtp_.d_draft_token = 0;
     }
-  }
 
   pending_draft_token_ = -1;
   if (d_verify_tokens_) {
@@ -4624,6 +4832,12 @@ void AInferRuntime258V::cleanup() {
   if (kv_scale_arena_) { zeMemFree(ctx_, kv_scale_arena_); kv_scale_arena_ = nullptr; }
   if (ssm_recr_arena_) { zeMemFree(ctx_, ssm_recr_arena_); ssm_recr_arena_ = nullptr; }
   if (ssm_conv_arena_) { zeMemFree(ctx_, ssm_conv_arena_); ssm_conv_arena_ = nullptr; }
+  if (d_prefix_ssm_) { zeMemFree(ctx_, d_prefix_ssm_); d_prefix_ssm_ = nullptr; }
+  if (d_prefix_conv_) { zeMemFree(ctx_, d_prefix_conv_); d_prefix_conv_ = nullptr; }
+  prefix_cached_len_ = -1;
+  if (d_anchor_ssm_) { zeMemFree(ctx_, d_anchor_ssm_); d_anchor_ssm_ = nullptr; }
+  if (d_anchor_conv_) { zeMemFree(ctx_, d_anchor_conv_); d_anchor_conv_ = nullptr; }
+  prefix_anchor_len_ = -1;
   if (workspace_arena_) { zeMemFree(ctx_, workspace_arena_); workspace_arena_ = nullptr; }
   if (d_ctrl_) { zeMemFree(ctx_, d_ctrl_); d_ctrl_ = nullptr; }
   if (d_tokens_chunk_) { zeMemFree(ctx_, d_tokens_chunk_); d_tokens_chunk_ = nullptr; }

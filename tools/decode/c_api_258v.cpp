@@ -24,6 +24,42 @@ int ainfer_prefill(void *handle, const int *prompt_ids, int count, int *out_firs
   return rt->prefill(ids, out_first_token) ? 0 : -1;
 }
 
+// I4.4: incremental append prefill over the snapshotted prefix of exactly
+// start_pos tokens. Returns nonzero when no valid snapshot exists (caller
+// falls back to ainfer_prefill); device state is unchanged on that path.
+int ainfer_prefill_incremental(void *handle, const int *suffix_ids, int count, int start_pos,
+                               int *out_first_token) {
+  if (!handle || !suffix_ids || count <= 0 || start_pos < 0) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  std::vector<int> ids(suffix_ids, suffix_ids + count);
+  return rt->prefill_incremental(ids, start_pos, out_first_token) ? 0 : -1;
+}
+
+// I4.4b: rebase onto the terminal-chunk-boundary anchor. new_ids is the FULL
+// new prompt; anchor_pos must equal ainfer_prefix_anchor_len(). Nonzero
+// return = no valid anchor (caller falls back to ainfer_prefill).
+int ainfer_prefill_anchor(void *handle, const int *new_ids, int count, int anchor_pos,
+                          int *out_first_token) {
+  if (!handle || !new_ids || count <= 0 || anchor_pos < 0) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  std::vector<int> ids(new_ids, new_ids + count);
+  return rt->prefill_from_anchor(ids, anchor_pos, out_first_token) ? 0 : -1;
+}
+
+// I4.4: length of the prompt whose post-prefill state is snapshotted, or -1.
+int ainfer_prefix_cached_len(void *handle) {
+  if (!handle) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  return rt->prefix_cached_len();
+}
+
+// I4.4b: terminal-chunk-boundary anchor position of the cached prompt, or -1.
+int ainfer_prefix_anchor_len(void *handle) {
+  if (!handle) return -1;
+  auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);
+  return rt->prefix_anchor_len();
+}
+
 int ainfer_decode_step(void *handle, int *out_next_token) {
   if (!handle || !out_next_token) return -1;
   auto *rt = reinterpret_cast<AInferRuntime258V *>(handle);

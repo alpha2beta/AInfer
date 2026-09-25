@@ -500,7 +500,7 @@ missing Chain-of-Thought (CoT) reasoning, and full ~7K re-prefill on every conve
 
 ### I4.4 In-Memory KV Prefix Caching for Multi-Turn Agent Sessions
 
-- Status: `[ ]`
+- Status: `[x]` DONE 2026-09-25 (verified live on :8080: exact + anchor hits, bit-parity, miss paths, chained turn, tool-call regression; `ctest --preset 258v` 6/6)
 - Complexity: **High** (~2-3 days)
 - Files: `tools/decode/runtime_258v.h`, `tools/decode/runtime_258v.cpp`, `tools/decode/c_api_258v.cpp`, `tools/http/server_258v.py`
 - **Problem:**

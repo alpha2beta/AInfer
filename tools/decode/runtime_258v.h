@@ -362,6 +362,28 @@ public:
   // T5.2: Chunked / token in-memory prefill writing directly into decode-layout KV & SSM states
   bool prefill(const std::vector<int> &prompt_ids, int *out_first_token = nullptr);
 
+  // I4.4: Incremental prefill over a cached prefix. Restores the SSM snapshot
+  // taken at the end of the prefill of cached_len == start_pos tokens, zeroes
+  // MTP verify state, then forwards suffix_ids at absolute positions
+  // [start_pos, start_pos + count). Returns false (no state changed) unless a
+  // valid snapshot for exactly start_pos exists — caller falls back to full
+  // prefill. Only pure appends are served (suffix extends the cached ids).
+  bool prefill_incremental(const std::vector<int> &suffix_ids, int start_pos,
+                           int *out_first_token = nullptr);
+  // I4.4b: rebase onto the terminal-chunk boundary snapshot. Multi-turn chat
+  // prompts are never pure token-extensions (the cached prompt's trailing
+  // generation prompt is replaced by the assistant turn), so the exact path
+  // above can never hit for chat. This path restores the SSM snapshot taken
+  // at the START of the cached prefill's terminal chunk (anchor_pos) and
+  // forwards new_ids[anchor_pos..] — at most one chunk + new tokens.
+  // Requires anchor_pos == prefix_anchor_len_() and anchor_pos < count.
+  bool prefill_from_anchor(const std::vector<int> &new_ids, int anchor_pos,
+                           int *out_first_token = nullptr);
+  // Length of the prompt whose post-prefill state is snapshotted, or -1.
+  int prefix_cached_len() const { return prefix_cached_len_; }
+  // Start position of the cached prefill's terminal chunk, or -1.
+  int prefix_anchor_len() const { return prefix_anchor_len_; }
+
   // T5.4: Execute one recorded decode step with zero host allocations
   bool decode_step(int *out_next_token);
 
@@ -532,6 +554,17 @@ private:
   void *kv_scale_arena_ = nullptr;
   void *ssm_recr_arena_ = nullptr;
   void *ssm_conv_arena_ = nullptr;
+  // I4.4: post-prefill SSM snapshot slots for prefix-cache restore (device
+  // memory; separate from the MTP rollback d_ssm_snap_/d_conv_snap_ scratch
+  // which speculative decode overwrites).
+  void *d_prefix_ssm_ = nullptr;
+  void *d_prefix_conv_ = nullptr;
+  int prefix_cached_len_ = -1; // prompt length the snapshot belongs to, or -1
+  // I4.4b: second snapshot slot at the START of the cached prefill's terminal
+  // chunk (+66 MiB). Chat-append reuse anchor; see prefill_from_anchor().
+  void *d_anchor_ssm_ = nullptr;
+  void *d_anchor_conv_ = nullptr;
+  int prefix_anchor_len_ = -1; // absolute chunk-start pos, or -1
   void *workspace_arena_ = nullptr;
   RuntimeControl *d_ctrl_ = nullptr; // Device control block
   RuntimeControl h_ctrl_{};          // Host shadow control block
@@ -736,6 +769,20 @@ private:
 
   ze_command_list_handle_t get_or_record_prefill_chunk_list(int B);
   ze_command_list_handle_t get_or_record_prefill_tail_list(int B);
+  // I4.4: shared chunk loop for full + incremental prefill. Forwards
+  // ids[0..count) at absolute positions [start_pos, start_pos + count);
+  // total = full prompt length (progress log denominator + terminal state).
+  bool prefill_range(const int *ids, int count, int start_pos, int total,
+                     int *out_first_token);
+  // I4.4b: split the SSM snapshot/restore helpers between the post-prefill
+  // (end) snapshot and the terminal-chunk-boundary (anchor) snapshot.
+  bool snapshot_prefix_state(int len);
+  bool restore_prefix_state(int len);
+  bool snapshot_anchor_state(int pos);
+  bool restore_anchor_state(int pos);
+  // I4.4: zero MTP verify state (extracted from reset_state; required before
+  // decode after ANY prefill since MTP KV persists across requests).
+  bool zero_mtp_state();
   // MTP prompt-KV fill: per-chunk MTP QKV + RoPE append into mtp_.k/v_cache
   // so long-context drafts attend over the prompt (not zeros). Recorded
   // lazily per B; executed inside prefill() right after each trunk chunk.

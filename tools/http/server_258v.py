@@ -263,7 +263,7 @@ FIM_STOP_TOKENS = ["<|fim_middle|>", "<|fim_suffix|>", "<|fim_prefix|>", "<|fim_
 FIM_STOP_TOKEN_IDS = {248060, 248061, 248062, 248063, 248065}
 
 
-def _log_request_perf(req_id, prompt_tokens, gen_tokens, prefill_s, decode_s, finish_reason):
+def _log_request_perf(req_id, prompt_tokens, gen_tokens, prefill_s, decode_s, finish_reason, extra=""):
     """One-line live performance log per finished request (stderr).
 
     pp = prompt processing (prefill) tok/s, tg = token generation (decode)
@@ -275,7 +275,26 @@ def _log_request_perf(req_id, prompt_tokens, gen_tokens, prefill_s, decode_s, fi
     sys.stderr.write(
         f"[Server] {req_id} done: prompt={prompt_tokens}tok pp={pp:.1f} tok/s | "
         f"gen={gen_tokens}tok tg={tg:.1f} tok/s | "
-        f"total={prefill_s + decode_s:.2f}s finish={finish_reason}\n")
+        f"total={prefill_s + decode_s:.2f}s finish={finish_reason}{extra}\n")
+
+
+# I4.4: in-memory KV prefix cache for multi-turn agent sessions.
+PREFIX_MIN_REUSE = 512  # only reuse cached prefixes of at least this length
+
+
+def _prefix_cache_enabled():
+    e = os.environ.get("AINFER_PREFIX_CACHE", "1")
+    return not (e.strip() == "0" or e.strip().lower() in ("off", "no", "false"))
+
+
+def _common_prefix_len(a, b):
+    """Length of the longest common token prefix of two id lists."""
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
 
 
 class IncrementalDecoder:
@@ -381,6 +400,21 @@ class AInferCtypesBinding:
         self.lib.ainfer_init.restype = ctypes.c_int
         self.lib.ainfer_prefill.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
         self.lib.ainfer_prefill.restype = ctypes.c_int
+        # I4.4: incremental append prefill over the snapshotted prefix.
+        # Present only in rebuilt libainfer_258v.so; absent -> prefix cache
+        # stays off (all requests take the full-prefill path).
+        try:
+            self.lib.ainfer_prefill_incremental.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+            self.lib.ainfer_prefill_incremental.restype = ctypes.c_int
+            self.lib.ainfer_prefix_cached_len.argtypes = [ctypes.c_void_p]
+            self.lib.ainfer_prefix_cached_len.restype = ctypes.c_int
+            self.lib.ainfer_prefill_anchor.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int), ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+            self.lib.ainfer_prefill_anchor.restype = ctypes.c_int
+            self.lib.ainfer_prefix_anchor_len.argtypes = [ctypes.c_void_p]
+            self.lib.ainfer_prefix_anchor_len.restype = ctypes.c_int
+            self.has_prefix_api = True
+        except AttributeError:
+            self.has_prefix_api = False
         self.lib.ainfer_decode_step.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
         self.lib.ainfer_decode_step.restype = ctypes.c_int
         self.lib.ainfer_reset_state.argtypes = [ctypes.c_void_p]
@@ -430,6 +464,40 @@ class AInferCtypesBinding:
         if rc != 0:
             raise RuntimeError(f"Prefill failed with code {rc}")
         return out_first.value
+
+    def prefill_incremental(self, suffix_ids, start_pos):
+        """I4.4: prefill suffix_ids at absolute positions [start_pos, ...).
+
+        Returns the first token, or None when no valid snapshot exists for
+        start_pos (or the native API is absent) — caller falls back to full
+        prefill. Raises RuntimeError on hard device failure."""
+        if not getattr(self, "has_prefix_api", False):
+            return None
+        c_suffix = (ctypes.c_int * len(suffix_ids))(*suffix_ids)
+        out_first = ctypes.c_int(0)
+        rc = self.lib.ainfer_prefill_incremental(self.handle, c_suffix, len(suffix_ids), start_pos, ctypes.byref(out_first))
+        if rc != 0:
+            return None
+        return out_first.value
+
+    def prefill_from_anchor(self, full_ids, anchor_pos):
+        """I4.4b: rebase full_ids onto the terminal-chunk-boundary anchor.
+
+        Returns the first token, or None when the anchor is stale — caller
+        falls back to full prefill."""
+        if not getattr(self, "has_prefix_api", False):
+            return None
+        c_ids = (ctypes.c_int * len(full_ids))(*full_ids)
+        out_first = ctypes.c_int(0)
+        rc = self.lib.ainfer_prefill_anchor(self.handle, c_ids, len(full_ids), anchor_pos, ctypes.byref(out_first))
+        if rc != 0:
+            return None
+        return out_first.value
+
+    def prefix_anchor_len(self):
+        if not getattr(self, "has_prefix_api", False):
+            return -1
+        return int(self.lib.ainfer_prefix_anchor_len(self.handle))
 
     def decode_step(self):
         out_next = ctypes.c_int(0)
@@ -493,6 +561,16 @@ class ServerState:
         self.total_requests = 0
         self.total_tokens_generated = 0
         self.start_time = time.time()
+        # I4.4: token ids whose post-prefill KV+SSM state is snapshotted on
+        # device (None = no reusable prefix). Only pure appends reuse it.
+        self.cached_prompt_ids = None
+        self.prefix_hits = 0
+        self.prefix_misses = 0
+        self.last_prefix_note = ""
+        # I4.4b: terminal-chunk-boundary anchor of the cached prompt (None =
+        # unknown/stale .so). Chat turns share everything except the trailing
+        # generation prompt, so they rebase here instead of exact-extending.
+        self.cached_anchor = None
 
 
 STATE = ServerState()
@@ -563,6 +641,14 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             # live daemon parses Hermes <tool_call> XML into OpenAI tool_calls.
             "tool_calling": "hermes-native",
             "server_build": "258v-t8.4",
+            # I4.4: prefix-cache observability.
+            "prefix_cache": {
+                "enabled": _prefix_cache_enabled(),
+                "cached_prompt_tokens": len(STATE.cached_prompt_ids) if STATE.cached_prompt_ids else 0,
+                "cached_anchor": STATE.cached_anchor,
+                "hits": STATE.prefix_hits,
+                "misses": STATE.prefix_misses,
+            },
         }
         self._send_json(200 if healthy else 500, data)
 
@@ -748,8 +834,43 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         req_id = f"chatcmpl-{int(time.time() * 1000)}" if is_chat else f"cmpl-{int(time.time() * 1000)}"
         created_time = int(time.time())
 
-        # Ensure state is clean before start
-        STATE.binding.reset_state()
+        # I4.4: prefix-cache dispatch. Two reuse shapes:
+        #   exact  — new prompt pure-extends cached ids (L == len cached):
+        #            restores the end snapshot, forwards only the suffix.
+        #   anchor — new prompt shares L >= 512 tokens with cached ids and L
+        #            covers the cached terminal-chunk boundary anchor: restores
+        #            the anchor snapshot, reforwards new[anchor..] (<= 1 chunk
+        #            of recompute + new tokens). This is the multi-turn chat
+        #            shape: the cached trailing generation prompt is replaced
+        #            by the assistant turn, so exact can never hit for chat.
+        # Anything else (diverged history, short prompt, disabled, stale .so)
+        # takes the full-prefill path with a clean reset.
+        cached = STATE.cached_prompt_ids
+        anchor = STATE.cached_anchor
+        prefix_len = _common_prefix_len(cached, prompt_ids) if cached else 0
+        use_exact = (
+            _prefix_cache_enabled()
+            and cached is not None
+            and prefix_len == len(cached) >= PREFIX_MIN_REUSE
+            and prefix_len < len(prompt_ids)
+        )
+        use_anchor = (
+            not use_exact
+            and _prefix_cache_enabled()
+            and cached is not None
+            and anchor is not None and anchor >= 0
+            and prefix_len >= PREFIX_MIN_REUSE
+            and anchor <= prefix_len < len(prompt_ids)
+            and anchor < len(prompt_ids)
+        )
+        if use_exact:
+            STATE.last_prefix_note = f" prefix={prefix_len}+{len(prompt_ids) - prefix_len}"
+        elif use_anchor:
+            STATE.last_prefix_note = f" anchor={anchor}+{len(prompt_ids) - anchor}"
+        else:
+            STATE.last_prefix_note = " full"
+            # Ensure state is clean before a full prefill
+            STATE.binding.reset_state()
 
         try:
             t_start = time.perf_counter()
@@ -792,7 +913,37 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 ka_thread = threading.Thread(target=_prefill_keepalive, daemon=True)
                 ka_thread.start()
             try:
-                first_tok = STATE.binding.prefill(prompt_ids)
+                if use_exact:
+                    suffix = prompt_ids[prefix_len:]
+                    first_tok = STATE.binding.prefill_incremental(suffix, prefix_len)
+                    if first_tok is None:
+                        # Stale snapshot (or stale .so): fall back to full.
+                        sys.stderr.write(f"[Server] Prefix miss ({req_id}): snapshot for {prefix_len} unavailable, full prefill\n")
+                        STATE.prefix_misses += 1
+                        STATE.last_prefix_note = " full-after-miss"
+                        STATE.binding.reset_state()
+                        first_tok = STATE.binding.prefill(prompt_ids)
+                    else:
+                        STATE.prefix_hits += 1
+                        sys.stderr.write(f"[Server] Prefix hit ({req_id}): reused {prefix_len}tok, prefilling {len(suffix)}tok\n")
+                elif use_anchor:
+                    first_tok = STATE.binding.prefill_from_anchor(prompt_ids, anchor)
+                    if first_tok is None:
+                        sys.stderr.write(f"[Server] Prefix miss ({req_id}): anchor {anchor} unavailable, full prefill\n")
+                        STATE.prefix_misses += 1
+                        STATE.last_prefix_note = " full-after-miss"
+                        STATE.binding.reset_state()
+                        first_tok = STATE.binding.prefill(prompt_ids)
+                    else:
+                        STATE.prefix_hits += 1
+                        sys.stderr.write(f"[Server] Anchor hit ({req_id}): shared {prefix_len}tok, anchor {anchor}, prefilling {len(prompt_ids) - anchor}tok\n")
+                else:
+                    if cached is not None and _prefix_cache_enabled():
+                        STATE.prefix_misses += 1
+                    first_tok = STATE.binding.prefill(prompt_ids)
+                # Prefill succeeded: device now holds exactly prompt_ids.
+                STATE.cached_prompt_ids = list(prompt_ids)
+                STATE.cached_anchor = STATE.binding.prefix_anchor_len()
             finally:
                 if stream:
                     prefill_done.set()
@@ -812,8 +963,22 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         except (BrokenPipeError, ConnectionResetError):
             sys.stderr.write(f"[Server] Client disconnected during request {req_id}. Aborting and resetting state.\n")
+            # I4.4: device state is indeterminate after an abort — drop cache.
+            STATE.cached_prompt_ids = None
+            STATE.cached_anchor = None
+            try:
+                STATE.binding.reset_state()
+            except Exception:
+                pass
         except Exception as e:
             sys.stderr.write(f"[Server] Error during generation: {e}\n")
+            # I4.4: prefill/decode failed — cached ids no longer match device.
+            STATE.cached_prompt_ids = None
+            STATE.cached_anchor = None
+            try:
+                STATE.binding.reset_state()
+            except Exception:
+                pass
             if not stream:
                 self._send_json(500, {"error": {"message": str(e), "type": "internal_error"}})
             else:
@@ -823,8 +988,10 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 except (BrokenPipeError, ConnectionResetError, OSError):
                     pass
         finally:
-            # T8.2: Always reset state on finish or abort so GPU memory/SSM buffers are clean
-            STATE.binding.reset_state()
+            # I4.4: NO unconditional reset here — a successful request leaves
+            # the KV prefix + post-prefill SSM snapshot on device for the next
+            # append. Cache is invalidated only on the exception paths above.
+            pass
 
     def _complete_response(self, req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences=None, stop_token_ids=None, parse_tools=False, enable_thinking=False):
         stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
@@ -951,7 +1118,8 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 },
             }
             _log_request_perf(req_id, len(prompt_ids), len(generated_ids),
-                              t_prefill - t_start, t_end - t_prefill, finish_reason)
+                              t_prefill - t_start, t_end - t_prefill, finish_reason,
+                              extra=STATE.last_prefix_note)
         else:
             resp = {
                 "id": req_id,
@@ -972,7 +1140,8 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 },
             }
             _log_request_perf(req_id, len(prompt_ids), len(generated_ids),
-                              t_prefill - t_start, t_end - t_prefill, finish_reason)
+                              t_prefill - t_start, t_end - t_prefill, finish_reason,
+                              extra=STATE.last_prefix_note)
 
         self._send_json(200, resp)
 
@@ -1179,7 +1348,8 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
         # Live pp/tg performance log (stderr) for the finished stream.
         t_end = time.perf_counter()
         _log_request_perf(req_id, prompt_len, gen_count,
-                          t_prefill - t_start, t_end - t_prefill, finish_reason)
+                          t_prefill - t_start, t_end - t_prefill, finish_reason,
+                          extra=STATE.last_prefix_note)
 
 
 def main():
