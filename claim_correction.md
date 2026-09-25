@@ -98,9 +98,27 @@ conducted on Intel Arc 140V at $P=6,720$ prompt tokens (`report_long_context_cat
      streaming (which consumes only ~16 ms at ~80 GB/s achieved bandwidth), the decode step is dominated
      by the **10 full-attention layers**, which take ~6.5 ms per layer (~65 ms total per step, or ~80% of
      step latency) due to sequential KV cache scanning across the 6.7K context length.
-3. **Speculative Decode Opportunity:** llama.cpp's 23.0 tok/s was achieved via speculative drafting.
-   At long context, AInfer's MTP draft layer currently does not prefill its prompt KV cache during
-   `prefill()`, leading to draft divergence on long prompts. Implementing prompt KV cache prefill
-   for the MTP draft layer will unlock speculative speedup ($\sim 1.5\text{--}1.8\times$) at long context,
-   targeting 18–22+ tok/s decode.
+3. **Speculative Decode at Long Context (2026-09-25 update):** with the MTP draft
+   determinism fix (see below), long-context speculative decoding is now **deterministic
+   and stable** across runs (60.0% acceptance × 2 runs, 14.9 tok/s, **1.20× vs greedy**),
+   but verify-vs-greedy parity still DIFFs (deterministic FP-order divergence between the
+   B=2 verify kernels and the decode kernels at 6.7K attention mass — short-context
+   160/160 parity is unaffected). The MTP prompt-KV fill was also evaluated: it is
+   numerically faithful but the MTP layer's long-context attention degrades drafts
+   (alpha 60% → 17%), so the fill ships **opt-in** (`AINFER_MTP_FILL=1`) and defaults off.
+   Remaining work: unify verify/decode attention reduction order for long-context parity,
+   then re-tune MTP alignment.
+
+### MTP Draft Determinism Fix (2026-09-25)
+
+Speculative acceptance jittered across identical runs (e.g. 55–78% on the same prompt)
+while final tokens usually still matched via verify correction. Bisection (fill on/off,
+flash on/off, greedy determinism 5/5 at 6.7K, draft determinism across processes) isolated
+the cause to the MTP draft list: it launched `rmsnorm_head_256` (SLM[64] design) with
+**256 threads**, reading/writing `local_ss[64..255]` out of bounds and harvesting
+process-dependent SLM garbage into draft Q/K norms. Every other call site (trunk decode,
+prefill batch, verify batch, and the new fill) correctly uses 64 threads — the draft was
+the sole mismatch. Fix: group size 256 → 64 (`tools/decode/runtime_258v.cpp`, draft head
+norms). Verified: spec loop deterministic 3/3 processes, short 160/160 parity holds,
+long acceptance stable. A tree-wide SLM-design-vs-launch audit found no other mismatches.
 

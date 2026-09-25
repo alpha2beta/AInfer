@@ -712,6 +712,11 @@ private:
 
   ze_command_list_handle_t get_or_record_prefill_chunk_list(int B);
   ze_command_list_handle_t get_or_record_prefill_tail_list(int B);
+  // MTP prompt-KV fill: per-chunk MTP QKV + RoPE append into mtp_.k/v_cache
+  // so long-context drafts attend over the prompt (not zeros). Recorded
+  // lazily per B; executed inside prefill() right after each trunk chunk.
+  ze_command_list_handle_t get_or_record_mtp_prefill_chunk_list(int B);
+  ze_command_list_handle_t cmd_mtp_prefill_chunk_[MAX_PREFILL_CHUNK + 1]{};
 
   // MTP Runtime State & Kernels (T10.1)
   MtpBinding mtp_{};

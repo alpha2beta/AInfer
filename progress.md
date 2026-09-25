@@ -600,3 +600,7 @@
   - **Automated Regression Suite (`ctest --preset 258v`):** 6/6 tests passing (100% green).
 
 
+- **2026-09-25 (Long-context MTP: draft determinism fix + prompt-KV fill evaluation — DONE):**
+  - **Determinism fix:** speculative acceptance jittered across identical runs while final tokens matched via verify correction. Bisected to the MTP draft list launching `rmsnorm_head_256` (SLM[64]) with 256 threads — OOB SLM garbage in draft Q/K norms; the sole mismatch tree-wide (all other sites use 64). Fix in `tools/decode/runtime_258v.cpp`; verified spec-loop deterministic 3/3 processes + short 160/160 parity. `ctest --preset 258v` 6/6.
+  - **Fill evaluation:** MTP prompt-KV fill implemented (`get_or_record_mtp_prefill_chunk_list`, hooked in `prefill()`, `reset_state()` added to `generate_speculative()`); numerically faithful but long-context drafts degrade with it (6.7K alpha 60% → 17%), so it ships opt-in (`AINFER_MTP_FILL=1`), default off. Toggles log when non-default.
+  - **Long-context spec status:** deterministic 60.0% acceptance × 2, 14.9 tok/s (1.20× vs greedy); verify-vs-greedy parity still DIFFs (deterministic FP-order divergence at 6.7K, short parity unaffected). Follow-up scoped: unify verify/decode attention reduction order. See `claim_correction.md`.

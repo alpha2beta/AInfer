@@ -947,6 +947,7 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   const char *fa_env = std::getenv("AINFER_FLASH_ATTN");
   bool force_no_flash = (fa_env && fa_env[0] == '0') || std::getenv("AINFER_ATTN_V2") || std::getenv("AINFER_ATTN_V1");
   flash_attn_prefill_ = !force_no_flash;
+  if (force_no_flash) std::fprintf(stderr, "[AInfer 258V] prefill attention fallback active (flash disabled)\n");
   if (flash_attn_prefill_) {
     k_attn_batch_ = get_k("flash_attn_prefill_b8_t16");
     if (!k_attn_batch_) {
@@ -1968,6 +1969,165 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_tail_list(int 
   return list;
 }
 
+// MTP prompt-KV fill (long-context speculative fix). Replays the MTP draft
+// front-end (embed -> norms -> concat -> FC -> QKV -> head norms -> RoPE+append)
+// over each prefill chunk so mtp_.k/v_cache holds the prompt's keys/values
+// instead of zeros. Attention/MoE/LM-head are skipped: only K,V rows matter.
+// Scratch reuses dead post-trunk-chunk buffers; d_x_chunk_ (trunk hidden
+// states, the fill input) is read-only here and the tail list still sees it
+// intact. Positions come from d_ctrl_ (chunk start), matching trunk slots.
+ze_command_list_handle_t AInferRuntime258V::get_or_record_mtp_prefill_chunk_list(int B) {
+  if (B < 1 || B > MAX_PREFILL_CHUNK) return nullptr;
+  if (!mtp_.initialized) return nullptr;
+  if (cmd_mtp_prefill_chunk_[B] != nullptr) return cmd_mtp_prefill_chunk_[B];
+
+  ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+  ze_command_list_handle_t list = nullptr;
+  CHECK_L0_RET_NULL(zeCommandListCreate(ctx_, dev_, &ldesc, &list));
+
+  auto append_gemm = [&](float *Y, void *w, void *s, float *X, int M, int K) {
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 0, sizeof(void *), &Y));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 1, sizeof(void *), &w));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 2, sizeof(void *), &s));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 3, sizeof(void *), &X));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 4, sizeof(int), &M));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 5, sizeof(int), &K));
+    CHECK_L0_VOID(zeKernelSetArgumentValue(k_gemm_prefill_, 6, sizeof(int), &B));
+    CHECK_L0_VOID(zeKernelSetGroupSize(k_gemm_prefill_, 128, 1, 1));
+    ze_group_count_t gc{(uint32_t)((M + gemm_rows_per_group_ - 1) / gemm_rows_per_group_), (uint32_t)((B + 31) / 32), 1};
+    CHECK_L0_VOID(zeCommandListAppendLaunchKernel(list, k_gemm_prefill_, &gc, nullptr, 0, nullptr));
+  };
+
+  // Scratch roles (all [MAX_PREFILL_CHUNK x dim], dead after trunk chunk):
+  float *E = d_x_norm_chunk_;      // [B, 2048] token embeds
+  float *E_NORM = d_x_mid_chunk_;  // [B, 2048] normed embeds
+  float *H_NORM = d_moe_acc_chunk_;// [B, 2048] normed trunk hidden states
+  float *CAT = d_q_full_chunk_;    // [B, 4096] concat (reused for Q below)
+  float *FC = d_gate_full_chunk_;  // [B, 2048] FC out (reused for gate below)
+  float *FCN = d_x_mid_chunk_;     // [B, 2048] normed FC (E_NORM dead past barrier)
+
+  // 1. Embed chunk tokens
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_embed_batch_, 0, sizeof(void *), &E));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_embed_batch_, 1, sizeof(void *), &d_embed_tokens_));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_embed_batch_, 2, sizeof(void *), &d_tokens_chunk_));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_embed_batch_, 3, sizeof(int), &B));
+  CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_embed_batch_, 256, 1, 1));
+  ze_group_count_t gcnt_embed{(uint32_t)((B * HIDDEN_DIM + 255) / 256), 1, 1};
+  CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_embed_batch_, &gcnt_embed, nullptr, 0, nullptr));
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 2. Pre-FC RMSNorms (embed side + trunk-hidden side)
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 0, sizeof(void *), &E_NORM));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 1, sizeof(void *), &E));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 2, sizeof(void *), &mtp_.pre_fc_norm_emb_w));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 3, sizeof(int), &B));
+  CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_norm2048_batch_, 256, 1, 1));
+  ze_group_count_t gcnt_n{(uint32_t)B, 1, 1};
+  CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_norm2048_batch_, &gcnt_n, nullptr, 0, nullptr));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 0, sizeof(void *), &H_NORM));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 1, sizeof(void *), &d_x_chunk_));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 2, sizeof(void *), &mtp_.pre_fc_norm_hid_w));
+  CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_norm2048_batch_, &gcnt_n, nullptr, 0, nullptr));
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 3. Concat [E_NORM, H_NORM] -> CAT (flat 2N elementwise = row-major concat)
+  {
+    int n_hid = HIDDEN_DIM;
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_concat2_, 0, sizeof(void *), &CAT));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_concat2_, 1, sizeof(void *), &E_NORM));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_concat2_, 2, sizeof(void *), &H_NORM));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_concat2_, 3, sizeof(int), &n_hid));
+    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_concat2_, 256, 1, 1));
+    int flat_n = B * HIDDEN_DIM;
+    ze_group_count_t gc{(uint32_t)((2 * flat_n + 255) / 256), 1, 1};
+    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_concat2_, &gc, nullptr, 0, nullptr));
+    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+  }
+
+  // 4. FC GEMV: CAT [B,4096] @ fc [2048,4096] -> FC [B,2048]
+  append_gemm(FC, mtp_.fc_w, mtp_.fc_s, CAT, HIDDEN_DIM, 2 * HIDDEN_DIM);
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 5. MTP input norm: FC -> FCN
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 0, sizeof(void *), &FCN));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 1, sizeof(void *), &FC));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm2048_batch_, 2, sizeof(void *), &mtp_.in_norm_w));
+  CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_norm2048_batch_, &gcnt_n, nullptr, 0, nullptr));
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 6. MTP QKV projections (Q raw discarded downstream except via deinterleave)
+  append_gemm(d_q_proj_raw_chunk_, mtp_.q_proj_w, mtp_.q_proj_s, FCN, 2 * NUM_Q_HEADS * HEAD_DIM, HIDDEN_DIM);
+  append_gemm(d_k_full_chunk_, mtp_.k_proj_w, mtp_.k_proj_s, FCN, NUM_KV_HEADS * HEAD_DIM, HIDDEN_DIM);
+  append_gemm(d_v_full_chunk_, mtp_.v_proj_w, mtp_.v_proj_s, FCN, NUM_KV_HEADS * HEAD_DIM, HIDDEN_DIM);
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 7. Deinterleave Q/Gate (Q needed by rope kernel signature; gate unused)
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 0, sizeof(void *), &CAT));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 1, sizeof(void *), &FC));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 2, sizeof(void *), &d_q_proj_raw_chunk_));
+  CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_deinterleave_qg_batch_, 3, sizeof(int), &B));
+  CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_deinterleave_qg_batch_, 256, 1, 1));
+  ze_group_count_t gcnt_deint{(uint32_t)((B * NUM_Q_HEADS * HEAD_DIM + 255) / 256), 1, 1};
+  CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_deinterleave_qg_batch_, &gcnt_deint, nullptr, 0, nullptr));
+  CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+  // 8. Head RMSNorms on Q and K (MTP weights)
+  {
+    int total_nq = B * NUM_Q_HEADS;
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &CAT));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &CAT));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &mtp_.q_norm_w));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 3, sizeof(int), &total_nq));
+    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_norm256_, 64, 1, 1));
+    ze_group_count_t gcnt_nq{(uint32_t)total_nq, 1, 1};
+    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_norm256_, &gcnt_nq, nullptr, 0, nullptr));
+    int total_nkv = B * NUM_KV_HEADS;
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &d_k_full_chunk_));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &d_k_full_chunk_));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &mtp_.k_norm_w));
+    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_norm256_, 3, sizeof(int), &total_nkv));
+    ze_group_count_t gcnt_nkv{(uint32_t)total_nkv, 1, 1};
+    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_norm256_, &gcnt_nkv, nullptr, 0, nullptr));
+    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+  }
+
+  // 9. RoPE + KV append into MTP's dedicated caches at chunk positions
+  {
+    uint32_t max_c = max_ctx_;
+    ze_group_count_t gcnt_rope{(uint32_t)B, 1, 1};
+    if (kv8_enabled_) {
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 0, sizeof(void *), &CAT));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 1, sizeof(void *), &d_k_full_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 2, sizeof(void *), &d_v_full_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 3, sizeof(void *), &mtp_.k_cache_i8));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 4, sizeof(void *), &mtp_.v_cache_i8));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 5, sizeof(void *), &mtp_.k_scale_i8));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 6, sizeof(void *), &mtp_.v_scale_i8));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 7, sizeof(void *), &d_ctrl_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 8, sizeof(uint32_t), &max_c));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_i8_, 9, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_rope_batch_i8_, 256, 1, 1));
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_rope_batch_i8_, &gcnt_rope, nullptr, 0, nullptr));
+    } else {
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 0, sizeof(void *), &CAT));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 1, sizeof(void *), &d_k_full_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 2, sizeof(void *), &d_v_full_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 3, sizeof(void *), &mtp_.k_cache));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 4, sizeof(void *), &mtp_.v_cache));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 5, sizeof(void *), &d_ctrl_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 6, sizeof(uint32_t), &max_c));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_rope_batch_, 7, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_rope_batch_, 256, 1, 1));
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_rope_batch_, &gcnt_rope, nullptr, 0, nullptr));
+    }
+    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+  }
+
+  CHECK_L0_RET_NULL(zeCommandListClose(list));
+  cmd_mtp_prefill_chunk_[B] = list;
+  return list;
+}
+
 bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_first_token) {
   if (prompt_ids.empty()) return false;
   int P = (int)prompt_ids.size();
@@ -2019,6 +2179,26 @@ bool AInferRuntime258V::prefill(const std::vector<int> &prompt_ids, int *out_fir
     CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_chunk, fence_));
     CHECK_L0(wait_fence());
     CHECK_L0(zeFenceReset(fence_));
+
+    // MTP prompt-KV fill: replay the MTP front-end over this chunk while
+    // d_x_chunk_ still holds its hidden states. Measured 2026-09-25: the
+    // fill is numerically faithful but the MTP layer's long-context attention
+    // degrades drafts (6.7K alpha 60% -> 17%), so the fill is OPT-IN via
+    // AINFER_MTP_FILL=1 (diagnostic/future-alignment work). Default off.
+    // Greedy-only flows never reach here (mtp_.initialized false).
+    static const bool mtp_fill_on = [] {
+      const char *e = std::getenv("AINFER_MTP_FILL");
+      bool on = e && e[0] == '1';
+      if (on) std::fprintf(stderr, "[AInfer 258V] AINFER_MTP_FILL=1: MTP prompt-KV fill enabled\n");
+      return on;
+    }();
+    if (mtp_.initialized && mtp_fill_on) {
+      ze_command_list_handle_t cmd_mtp_fill = get_or_record_mtp_prefill_chunk_list(B);
+      if (!cmd_mtp_fill) return false;
+      CHECK_L0(zeCommandQueueExecuteCommandLists(queue_, 1, &cmd_mtp_fill, fence_));
+      CHECK_L0(wait_fence());
+      CHECK_L0(zeFenceReset(fence_));
+    }
 
     if (is_terminal) {
       // Execute terminal tail list (final norm + LM head + argmax)
@@ -3248,13 +3428,17 @@ bool AInferRuntime258V::init_mtp() {
   CHECK_L0(zeCommandListAppendLaunchKernel(mtp_.cmd_draft, k_deinterleave_qg_, &gcnt_deint, nullptr, 0, nullptr));
   CHECK_L0(zeCommandListAppendBarrier(mtp_.cmd_draft, nullptr, 0, nullptr));
 
-  // Head RMSNorm on Q and K
+  // Head RMSNorm on Q and K (rmsnorm_head_256 uses 64-thread SLM[64]
+  // staging: group size MUST be 64 like every other call site; 256 threads
+  // would read/write local_ss[64..255] out of bounds, harvesting
+  // process-dependent SLM garbage into Q/K norms and making drafts jitter
+  // across runs while usually still passing parity via verify correction).
   for (int h = 0; h < NUM_Q_HEADS; ++h) {
     float *qh = d_q_full_ + h * HEAD_DIM;
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &qh));
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &qh));
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &mtp_.q_norm_w));
-    CHECK_L0(zeKernelSetGroupSize(k_norm256_, 256, 1, 1));
+    CHECK_L0(zeKernelSetGroupSize(k_norm256_, 64, 1, 1));
     ze_group_count_t gc_h{1, 1, 1};
     CHECK_L0(zeCommandListAppendLaunchKernel(mtp_.cmd_draft, k_norm256_, &gc_h, nullptr, 0, nullptr));
   }
@@ -3263,7 +3447,7 @@ bool AInferRuntime258V::init_mtp() {
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 0, sizeof(void *), &kh));
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 1, sizeof(void *), &kh));
     CHECK_L0(zeKernelSetArgumentValue(k_norm256_, 2, sizeof(void *), &mtp_.k_norm_w));
-    CHECK_L0(zeKernelSetGroupSize(k_norm256_, 256, 1, 1));
+    CHECK_L0(zeKernelSetGroupSize(k_norm256_, 64, 1, 1));
     ze_group_count_t gc_h{1, 1, 1};
     CHECK_L0(zeCommandListAppendLaunchKernel(mtp_.cmd_draft, k_norm256_, &gc_h, nullptr, 0, nullptr));
   }
@@ -4062,7 +4246,14 @@ bool AInferRuntime258V::generate_speculative(
     const std::vector<int> &prompt_ids, int max_new_tokens,
     std::vector<int> &generated_ids, double *out_prefill_ms,
     double *out_spec_tok_per_s, double *out_acceptance_rate) {
+  // MTP must initialize BEFORE prefill: the prompt-KV fill hook inside
+  // prefill() replays the MTP front-end per chunk (no-op if not initialized).
   if (!init_speculative_verification()) return false;
+  // Start from clean caches: prefill overwrites trunk 0..P-1 and the MTP fill
+  // overwrites MTP 0..P-1, but slots beyond P may hold stale decode entries
+  // from prior use of this runtime object (verify reads 0..P+1 causally, and
+  // rope appends must land on zeroed MTP rows for exactness).
+  if (!reset_state()) return false;
   generated_ids.clear();
   generated_ids.reserve(max_new_tokens);
 
