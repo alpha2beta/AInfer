@@ -1695,6 +1695,116 @@ __kernel void gqa_attn_combine(
     out[qh * HEAD_DIM + tid] = attn_val * sig_g;
 }
 
+// B=2 verify variant of gqa_attn_decode_split: identical inner math, but the
+// attended range ends at ctrl[1]+pos_off (verify token b attends 0..P+b) and
+// q/gate/partials bases are passed per-token by the caller. Lets the MTP
+// verify list reuse split-T math instead of the batch kernels when
+// AINFER_ATTN_SPLIT is active. Combine is reused unchanged (all base
+// pointers): one gqa_attn_combine launch per token slice.
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void gqa_attn_decode_split_off(
+    __global float * restrict partials,      // token slice base
+    __global const float * restrict q,       // token slice base [16, 256]
+    __global const ushort * restrict k_cache,// [2, max_ctx, 256]
+    __global const ushort * restrict v_cache,// [2, max_ctx, 256]
+    __global const int * restrict ctrl,      // ctrl[1] = base position
+    uint max_ctx,
+    int n_splits,
+    int pos_off
+) {
+    int gid = get_group_id(0);
+    int qh = gid % NUM_Q_HEADS;
+    int sp = gid / NUM_Q_HEADS;
+    if (qh >= NUM_Q_HEADS || sp >= n_splits) return;
+    int tid = get_local_id(0);
+    int lane = get_sub_group_local_id();
+    int sg = get_sub_group_id();
+
+    uint pos = (uint)ctrl[1] + (uint)pos_off;
+    uint total_tokens = pos + 1;
+    int kv_h = qh / GQA_GROUP_SIZE;
+    float qv = q[qh * HEAD_DIM + tid];
+
+    uint chunk = (total_tokens + (uint)n_splits - 1u) / (uint)n_splits;
+    uint t0 = (uint)sp * chunk;
+    uint t1 = t0 + chunk;
+    if (t1 > total_tokens) t1 = total_tokens;
+
+    __local float s_part[2][256];
+
+    float run_max = -1e30f;
+    float run_sum = 0.0f;
+    float run_acc = 0.0f;
+
+    if (t0 < t1) {
+        for (uint tb = t0 & ~15u; tb < t1; tb += 16) {
+            int buf_idx = (int)((tb >> 4) & 1);
+            float part[16];
+
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                uint t = tb + (uint)u;
+                float kval = 0.0f;
+                if (t >= t0 && t < t1) {
+                    __global const ushort * k_slot = k_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                    kval = bf16_to_float(k_slot[tid]);
+                }
+                part[u] = qv * kval;
+            }
+
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                float v = part[u];
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+                part[u] = v;
+            }
+
+            if (lane == 0) {
+                #pragma unroll
+                for (int u = 0; u < 16; ++u) {
+                    s_part[buf_idx][sg * 16 + u] = part[u];
+                }
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                float s = 0.0f;
+                #pragma unroll
+                for (int i = 0; i < 16; ++i) {
+                    s += s_part[buf_idx][i * 16 + u];
+                }
+                uint t = tb + (uint)u;
+                if (t >= t0 && t < t1) {
+                    __global const ushort * v_slot = v_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                    float v_val = bf16_to_float(v_slot[tid]);
+                    float sc = s * ATTN_SCALE;
+                    if (sc > run_max) {
+                        float ed = exp(run_max - sc);
+                        run_max = sc;
+                        run_sum = run_sum * ed + 1.0f;
+                        run_acc = run_acc * ed + v_val;
+                    } else {
+                        float ed = exp(sc - run_max);
+                        run_sum += ed;
+                        run_acc += ed * v_val;
+                    }
+                }
+            }
+        }
+    }
+
+    __global float * dst = partials + ((size_t)qh * ATTN_SPLIT_MAX + sp) * 258;
+    dst[tid] = run_acc;
+    if (tid == 0) {
+        dst[256] = run_max;
+        dst[257] = run_sum;
+    }
+}
+
 __kernel void moe_expert_gemv_ctrl(
     __global float * restrict y,               // [M]
     __global const uchar * restrict w_bank,    // [256, M, K/2]

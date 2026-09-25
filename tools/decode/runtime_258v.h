@@ -565,6 +565,7 @@ private:
   float *d_beta_ = nullptr;
   float *d_attn_out_ = nullptr;
   float *d_attn_split_ = nullptr; // [16, ATTN_SPLIT_MAX, 258] I3.8 partials
+  float *d_attn_split_v_ = nullptr; // [2, 16, ATTN_SPLIT_MAX, 258] I3.8 verify partials
   float *d_attn_norm_ = nullptr;
   float *d_attn_proj_ = nullptr;
   float *d_x_mid_ = nullptr;
@@ -622,9 +623,12 @@ private:
   ze_kernel_handle_t k_attn_ctrl_ = nullptr;
   ze_kernel_handle_t k_attn_split_ = nullptr;   // I3.8 split-T partials
   ze_kernel_handle_t k_attn_combine_ = nullptr; // I3.8 split-T merge
+  ze_kernel_handle_t k_attn_split_off_ = nullptr; // I3.8 split-T verify (pos offset)
   ze_kernel_handle_t k_attn_split_i8_ = nullptr;   // I3.8 KV8 split-T partials
   ze_kernel_handle_t k_attn_combine_i8_ = nullptr; // I3.8 KV8 split-T merge
+  ze_kernel_handle_t k_attn_split_off_i8_ = nullptr; // I3.8 KV8 split-T verify
   int attn_split_s_ = 0; // I3.8: 0/1 = legacy single launch; N = T-splits
+  bool verify_split_ = false; // I3.8: MTP verify via split kernels (default: batch)
   ze_kernel_handle_t k_rope_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_attn_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_deinterleave_qg_ = nullptr;

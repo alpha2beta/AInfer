@@ -412,8 +412,8 @@ Week 4 (P2 finish)
   2. `gqa_attn_combine`: grid 16 workgroups; merges S partials with rescaling,
      applies the sigmoid gate, writes `out[16,256]`.
   3. Runtime selects via `AINFER_ATTN_SPLIT=N` (2/4/8, clamped; unset/0/1 = legacy),
-     fixed at init (lists recorded once). BF16 decode path only; KV8/MTP/draft paths
-     keep legacy kernels.
+     fixed at init (lists recorded once). `AINFER_VERIFY_SPLIT=1` additionally
+     routes MTP verify attention through split kernels (default: batch kernels).
 - **Expected impact:** 16→64+ workgroups/layer; attention ~2× at long context.
 - **Measured (Arc 140V, `bench_attn_split`, 5-run avg):** worst abs diff vs legacy
   2–5e-7 (functional parity); kernel 6.78 → **3.41 ms** at T=6720 (**1.99×**),
@@ -426,6 +426,16 @@ Week 4 (P2 finish)
   kernel ~2× (6.9→3.5 ms at 6.7K, 8.6→4.2 ms at 8K). End-to-end 6.7K:
   12.06 → **18.00 tok/s (1.49×)**, 8/8 tokens identical to legacy; short 8/8
   goldens with int8 arena live.
+- **MTP-verify split (follow-up):** `gqa_attn_decode_split_off` (+ KV8 twin) reuses
+  split math per verify token (pos = P+b); `AINFER_VERIFY_SPLIT=1` routes verify
+  through it (default: batch kernels). Fresh-binary A/B at 6.7K, parity MATCH both:
+  split-decode + flash-verify → spec **12.98**; split-decode + split-verify →
+  spec **14.28** (alpha 60% both). Split-verify wins (flash shares KV once per B=2
+  round but leaves EUs idle; saturation dominates). Recommended pairing:
+  `AINFER_ATTN_SPLIT=4 AINFER_VERIFY_SPLIT=1` (`report_long_context_catchup.json`).
+- **Correction:** `report_bisect_noflash.json` (flash-off run) deleted — its parity flag
+  predates the EOS-harness fix and is LENGTH-artifacted; attention exoneration rests
+  on `test_attn_parity.cpp` (all 3 variants bit-exact) instead.
 - **Done:** Env-gated, default off; legacy numerics untouched (M4/ctest unaffected).
 - **Deps:** None.
 

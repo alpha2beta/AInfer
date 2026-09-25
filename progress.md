@@ -614,3 +614,6 @@
 - **2026-09-25 (I3.8 KV8 split-T follow-up — DONE):**
   - `kv8_attn_decode_split` + `kv8_attn_combine` in `tools/kernels_258v/kv8_primitive.cl` (companion `all_kernels.spv.kv8` rebuilt via script); same `AINFER_ATTN_SPLIT` gate, stale-module fallback to legacy, shared 132 KB partials buffer. MTP/draft/batch paths untouched.
   - `bench_kv8_split` (committed): worst diff vs legacy 2–4e-6; kernel ~2× (6.9→3.5 ms at 6.7K). End-to-end 6.7K KV8: 12.06 → **18.00 tok/s (1.49×)**, tokens identical to legacy; short 8/8 goldens.
+- **2026-09-25 (I3.8 MTP-verify split + config A/B — DONE):**
+  - `gqa_attn_decode_split_off` (+ KV8 twin) reuses split math per verify token; `AINFER_VERIFY_SPLIT=1` routes verify through it (default: batch). Fresh-binary A/B at 6.7K, parity MATCH both: split+flash-verify spec 12.98 vs split+split-verify spec **14.28** (alpha 60% both) — saturation beats KV-sharing. Recommended: `AINFER_ATTN_SPLIT=4 AINFER_VERIFY_SPLIT=1`.
+  - Honest correction: `report_bisect_noflash.json` deleted — its DIFF predates the EOS-harness fix (LENGTH artifact, not kernel divergence); exoneration rests on unit tests.

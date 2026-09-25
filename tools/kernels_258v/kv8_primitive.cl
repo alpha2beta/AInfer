@@ -275,6 +275,109 @@ __kernel void kv8_attn_combine(
   out[qh * D + d] = (acc / l) / (1.0f + exp(-g));
 }
 
+// B=2 verify variant of kv8_attn_decode_split: identical inner math, range
+// ends at ctrl[1]+pos_off, q/partials bases passed per-token by the caller.
+// Combine is reused unchanged (all base pointers).
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void kv8_attn_decode_split_off(
+    __global float *partials,      // token slice base
+    __global const float *q,       // token slice base [16, 256]
+    __global const char *kc,       // [2, max_ctx, 256] int8
+    __global const char *vc,       // [2, max_ctx, 256] int8
+    __global const float *ks,      // [max_ctx, 2] per-token scales
+    __global const float *vs,      // [max_ctx, 2]
+    __global const int *ctrl,      // ctrl[1] = base position
+    uint max_ctx,
+    int n_splits,
+    int pos_off
+) {
+  int gid = get_group_id(0);
+  int qh = gid % NQ;
+  int sp = gid / NQ;
+  if (qh >= NQ || sp >= n_splits) return;
+  int d = get_local_id(0);
+  int lane = get_sub_group_local_id();
+  int sg = get_sub_group_id();
+
+  uint total = (uint)ctrl[1] + (uint)pos_off + 1;
+  if (total > max_ctx) total = max_ctx;
+  int kv = qh / GQA;
+  float qv = q[qh * D + d];
+
+  uint chunk = (total + (uint)n_splits - 1u) / (uint)n_splits;
+  uint t0 = (uint)sp * chunk;
+  uint t1 = t0 + chunk;
+  if (t1 > total) t1 = total;
+
+  __local float s_part[2][256];
+  float mx = -1.0e30f, sum = 0.0f, acc = 0.0f;
+
+  if (t0 < t1) {
+    for (uint tb = t0 & ~15u; tb < t1; tb += 16) {
+      int buf_idx = (int)((tb >> 4) & 1);
+      float part[16];
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        uint t = tb + (uint)u;
+        float kval = 0.0f;
+        if (t >= t0 && t < t1) {
+          kval = (float)kc[((size_t)kv * max_ctx + t) * D + d] * ks[t * NKV + kv];
+        }
+        part[u] = qv * kval;
+      }
+
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        float v = part[u];
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+        part[u] = v;
+      }
+
+      if (lane == 0) {
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+          s_part[buf_idx][sg * 16 + u] = part[u];
+        }
+      }
+      barrier(CLK_LOCAL_MEM_FENCE);
+
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        float s = 0.0f;
+        #pragma unroll
+        for (int i = 0; i < 16; ++i) {
+          s += s_part[buf_idx][i * 16 + u];
+        }
+        uint t = tb + (uint)u;
+        if (t >= t0 && t < t1) {
+          float score = s * SCALE;
+          float vv = (float)vc[((size_t)kv * max_ctx + t) * D + d] * vs[t * NKV + kv];
+          if (score > mx) {
+            float e = exp(mx - score);
+            acc = acc * e + vv;
+            sum = sum * e + 1.0f;
+            mx = score;
+          } else {
+            float e = exp(score - mx);
+            acc += e * vv;
+            sum += e;
+          }
+        }
+      }
+    }
+  }
+
+  __global float *dst = partials + ((size_t)qh * KV8_SPLIT_MAX + sp) * 258;
+  dst[d] = acc;
+  if (d == 0) {
+    dst[256] = mx;
+    dst[257] = sum;
+  }
+}
+
 // B=2 verification variant. Each workgroup owns one token, so local storage
 // and per-token scales are independent while both token rows land in the same
 // cache before the corresponding causal attention groups execute.

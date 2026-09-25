@@ -306,6 +306,7 @@ bool AInferRuntime258V::allocate_static_arenas() {
   d_beta_ = bump_f32(H_V);
   d_attn_out_ = bump_f32(H_V * S_V);
   d_attn_split_ = bump_f32(NUM_Q_HEADS * ATTN_SPLIT_MAX * 258); // I3.8 split-T partials
+  d_attn_split_v_ = bump_f32(2 * NUM_Q_HEADS * ATTN_SPLIT_MAX * 258); // I3.8 verify partials
   d_attn_norm_ = bump_f32(H_V * S_V);
   d_attn_proj_ = bump_f32(HIDDEN_DIM);
   d_x_mid_ = bump_f32(HIDDEN_DIM);
@@ -797,7 +798,11 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   // at long context. New kernels reorder FP ops (merge step), so results are
   // functionally — not bit-identically — equal to legacy. Fixed at init
   // (command lists are recorded once); restart to change. Read here so both
-  // the BF16 and KV8 paths below see it.
+  // the BF16 and KV8 paths below see it. AINFER_VERIFY_SPLIT=1 additionally
+  // routes MTP verify attention through split kernels (wins when
+  // occupancy-bound, i.e. short context; at long context flash-verify reads
+  // KV once per B=2 round while split reads it twice, so verify defaults to
+  // the batch kernels).
   {
     const char *e = std::getenv("AINFER_ATTN_SPLIT");
     int s = e ? std::atoi(e) : 0;
@@ -805,9 +810,13 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
     if (s == 1) s = 0; // 1 split == legacy; skip the extra launch+merge
     if (s > ATTN_SPLIT_MAX) s = ATTN_SPLIT_MAX;
     attn_split_s_ = s;
+    {
+      const char *ve = std::getenv("AINFER_VERIFY_SPLIT");
+      verify_split_ = ve && ve[0] == '1';
+    }
     if (s > 1)
-      std::fprintf(stderr, "[AInfer 258V] split-T decode attention active (S=%d, %d workgroups/layer)\n",
-                   s, 16 * s);
+      std::fprintf(stderr, "[AInfer 258V] split-T decode attention active (S=%d, %d workgroups/layer)%s\n",
+                   s, 16 * s, verify_split_ ? ", verify via split" : "");
   }
 
   auto load_kv8_module = [&]() -> bool {
@@ -838,7 +847,8 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
     k_attn_batch_i8_ = get8("kv8_attn_batch");
     k_attn_split_i8_ = get8("kv8_attn_decode_split");
     k_attn_combine_i8_ = get8("kv8_attn_combine");
-    if ((k_attn_split_i8_ == nullptr || k_attn_combine_i8_ == nullptr) && attn_split_s_ > 1) {
+    k_attn_split_off_i8_ = get8("kv8_attn_decode_split_off");
+    if ((k_attn_split_i8_ == nullptr || k_attn_combine_i8_ == nullptr || k_attn_split_off_i8_ == nullptr) && attn_split_s_ > 1) {
       // Stale companion module without split kernels: fall back to legacy.
       std::fprintf(stderr, "[AInfer 258V] WARNING: KV8 split kernels missing, split-T disabled\n");
       attn_split_s_ = 0;
@@ -885,6 +895,7 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_attn_ctrl_ = get_k("gqa_attn_decode_ctrl");
   k_attn_split_ = get_k("gqa_attn_decode_split");
   k_attn_combine_ = get_k("gqa_attn_combine");
+  k_attn_split_off_ = get_k("gqa_attn_decode_split_off");
   // T-decode-opt (2026-09-22): optional 2-barrier decode-attention override.
   // If `<spv>.attn` exists beside the main bundle, its gqa_attn_decode_ctrl
   // replaces the bundled handle (identical signature/launch shape). Absent ->
@@ -1028,7 +1039,7 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   if (!k_gemv_ || !k_router_ || !k_norm2048_ || !k_norm256_ || !k_silu512_ || !k_resadd_ ||
       !k_conv_ || !k_recr_ || !k_hnorm_ || !k_embed_ || !k_gemv_add_scaled_ ||
       !k_exp_gu_all_ || !k_silu_all_ || !k_exp_dn_accum_all_ || !k_lm_head_argmax1_ ||
-      !k_rope_ctrl_ || !k_attn_ctrl_ || !k_attn_split_ || !k_attn_combine_ || !k_deinterleave_qg_ || !k_argmax2_ctrl_ ||
+      !k_rope_ctrl_ || !k_attn_ctrl_ || !k_attn_split_ || !k_attn_combine_ || !k_attn_split_off_ || !k_deinterleave_qg_ || !k_argmax2_ctrl_ ||
       !k_gemm_prefill_ || !k_embed_batch_ || !k_norm2048_batch_ || !k_conv_batch_ ||
       !k_l2_norm_qk_batch_ || !k_gate_prep_batch_ || !k_recr_batch_ || !k_hnorm_batch_ ||
       !k_deinterleave_qg_batch_ || !k_rope_batch_ || !k_attn_batch_ || !k_router_batch_ ||
@@ -3902,8 +3913,41 @@ bool AInferRuntime258V::init_speculative_verification() {
       CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
       // GQA Attention
-      if (kv8_enabled_) {
-        ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+      ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+      if (kv8_enabled_ && attn_split_s_ > 1 && verify_split_ && k_attn_split_off_i8_) {
+        // I3.8 split-T KV8 verify: per-token split_off + per-token combine.
+        int S = attn_split_s_;
+        ze_group_count_t gcnt_sp8{(uint32_t)(NUM_Q_HEADS * S), 1, 1};
+        ze_group_count_t gcnt_cb8{(uint32_t)NUM_Q_HEADS, 1, 1};
+        for (int bb = 0; bb < B; ++bb) {
+          float *q_b = d_q_full_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *p_b = d_attn_split_v_ + (size_t)bb * (NUM_Q_HEADS * ATTN_SPLIT_MAX * 258);
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 0, sizeof(void *), &p_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 1, sizeof(void *), &q_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 2, sizeof(void *), &lb.k_cache_i8));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 3, sizeof(void *), &lb.v_cache_i8));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 4, sizeof(void *), &lb.k_scale_i8));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 5, sizeof(void *), &lb.v_scale_i8));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 6, sizeof(void *), &d_ctrl_));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 7, sizeof(uint32_t), &max_c));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 8, sizeof(int), &S));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_i8_, 9, sizeof(int), &bb));
+          CHECK_L0(zeKernelSetGroupSize(k_attn_split_off_i8_, 256, 1, 1));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_split_off_i8_, &gcnt_sp8, nullptr, 0, nullptr));
+        }
+        CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
+        for (int bb = 0; bb < B; ++bb) {
+          float *o_b = d_attn_out_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *g_b = d_gate_full_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *p_b = d_attn_split_v_ + (size_t)bb * (NUM_Q_HEADS * ATTN_SPLIT_MAX * 258);
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 0, sizeof(void *), &o_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 1, sizeof(void *), &g_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 2, sizeof(void *), &p_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 3, sizeof(int), &S));
+          CHECK_L0(zeKernelSetGroupSize(k_attn_combine_i8_, 256, 1, 1));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_combine_i8_, &gcnt_cb8, nullptr, 0, nullptr));
+        }
+      } else if (kv8_enabled_) {
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 0, sizeof(void *), &d_attn_out_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 1, sizeof(void *), &d_q_full_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 2, sizeof(void *), &d_gate_full_chunk_));
@@ -3916,6 +3960,39 @@ bool AInferRuntime258V::init_speculative_verification() {
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 9, sizeof(int), &B));
         CHECK_L0(zeKernelSetGroupSize(k_attn_batch_i8_, 256, 1, 1));
         CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_batch_i8_, &gcnt_attn, nullptr, 0, nullptr));
+      } else if (attn_split_s_ > 1 && verify_split_ && k_attn_split_off_) {
+        // I3.8 split-T verify: per-token split_off launches (token b attends
+        // 0..P+b) sharing the decode split math, then per-token combine.
+        // Same inner numerics as the decode-step split path.
+        int S = attn_split_s_;
+        ze_group_count_t gcnt_sp{(uint32_t)(NUM_Q_HEADS * S), 1, 1};
+        ze_group_count_t gcnt_cb{(uint32_t)NUM_Q_HEADS, 1, 1};
+        for (int bb = 0; bb < B; ++bb) {
+          float *q_b = d_q_full_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *p_b = d_attn_split_v_ + (size_t)bb * (NUM_Q_HEADS * ATTN_SPLIT_MAX * 258);
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 0, sizeof(void *), &p_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 1, sizeof(void *), &q_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 2, sizeof(void *), &lb.k_cache));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 3, sizeof(void *), &lb.v_cache));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 4, sizeof(void *), &d_ctrl_));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 5, sizeof(uint32_t), &max_c));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 6, sizeof(int), &S));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_split_off_, 7, sizeof(int), &bb));
+          CHECK_L0(zeKernelSetGroupSize(k_attn_split_off_, 256, 1, 1));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_split_off_, &gcnt_sp, nullptr, 0, nullptr));
+        }
+        CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
+        for (int bb = 0; bb < B; ++bb) {
+          float *o_b = d_attn_out_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *g_b = d_gate_full_chunk_ + (size_t)bb * (NUM_Q_HEADS * HEAD_DIM);
+          float *p_b = d_attn_split_v_ + (size_t)bb * (NUM_Q_HEADS * ATTN_SPLIT_MAX * 258);
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_, 0, sizeof(void *), &o_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_, 1, sizeof(void *), &g_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_, 2, sizeof(void *), &p_b));
+          CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_, 3, sizeof(int), &S));
+          CHECK_L0(zeKernelSetGroupSize(k_attn_combine_, 256, 1, 1));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_combine_, &gcnt_cb, nullptr, 0, nullptr));
+        }
       } else {
         ze_group_count_t gcnt_attn;
         if (flash_attn_prefill_) {
