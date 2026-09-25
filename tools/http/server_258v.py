@@ -927,13 +927,6 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 message = {"role": "assistant", "content": content_text}
             if reasoning:
                 message["reasoning_content"] = reasoning
-            if tool_calls:
-                message = {"role": "assistant", "content": prefix or None, "tool_calls": tool_calls}
-                finish_reason = "tool_calls"
-            else:
-                message = {"role": "assistant", "content": content_text}
-            if reasoning:
-                message["reasoning_content"] = reasoning
             resp = {
                 "id": req_id,
                 "object": "chat.completion",
