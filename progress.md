@@ -617,3 +617,5 @@
 - **2026-09-25 (I3.8 MTP-verify split + config A/B — DONE):**
   - `gqa_attn_decode_split_off` (+ KV8 twin) reuses split math per verify token; `AINFER_VERIFY_SPLIT=1` routes verify through it (default: batch). Fresh-binary A/B at 6.7K, parity MATCH both: split+flash-verify spec 12.98 vs split+split-verify spec **14.28** (alpha 60% both) — saturation beats KV-sharing. Recommended: `AINFER_ATTN_SPLIT=4 AINFER_VERIFY_SPLIT=1`.
   - Honest correction: `report_bisect_noflash.json` deleted — its DIFF predates the EOS-harness fix (LENGTH artifact, not kernel divergence); exoneration rests on unit tests.
+- **2026-09-25 (Auto-KV8 boundary 16K → 4K — DONE):**
+  - `max_ctx >= 4096` now auto-engages KV8 (`tools/decode/runtime_258v.cpp`; `serve_lan.sh` messages/preflight synced). Validated on device: 4352/unset → 42.50 MiB KV8 arena, 4352/`=0` → 85.00 MiB BF16, 2048/unset → 40.00 MiB BF16; 8/8 goldens identical all arms. Justification: 4K tier carries full KV8 evidence (4/4 needle, 186/200 corpus parity, 160/160 MTP). Note: default `serve_lan.sh --max-ctx 4096` now serves KV8.

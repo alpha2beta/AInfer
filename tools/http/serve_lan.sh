@@ -19,7 +19,7 @@
 # - Single-flight execution: one generation at a time, queue-size waiting slots.
 # - max_tokens is capped at 2048 per request by the server.
 # - Decode is slow at long context (~2 tok/s at 32K); set --timeout generously.
-# - KV policy: unset env -> auto-KV8 at max-ctx >= 16384; --kv8 forces INT8 KV
+# - KV policy: unset env -> auto-KV8 at max-ctx >= 4096; --kv8 forces INT8 KV
 #   (halves KV traffic); --bf16 forces BF16 KV.
 set -euo pipefail
 
@@ -72,7 +72,7 @@ note() { echo "serve_lan: $1"; }
 [ -f "$ROOT/tools/kernels_258v/all_kernels.spv.attn" ] \
   && note "decode-attention override present (auto-loaded, ~1.2x long-context decode)" \
   || note "WARNING: all_kernels.spv.attn absent — bundled (slower) decode attention will be used"
-if [ "$KV_MODE" = "kv8" ] || [ "$MAX_CTX" -ge 16384 ]; then
+if [ "$KV_MODE" = "kv8" ] || [ "$MAX_CTX" -ge 4096 ]; then
   [ -f "$SPV.kv8" ] || fail "KV8 companion missing ($SPV.kv8); rebuild via tools/kernels_258v/build_kv8_runtime_companion.sh"
 fi
 if ! lspci -nn 2>/dev/null | grep -qi "8086.*[Vv]GA\|Intel.*[Gg]raphics"; then
@@ -105,8 +105,8 @@ case "$KV_MODE" in
   bf16) export AINFER_KV8=0; note "KV mode: forced BF16 (AINFER_KV8=0)";;
   auto)
     unset AINFER_KV8 || true
-    if [ "$MAX_CTX" -ge 16384 ]; then note "KV mode: auto-INT8 (max-ctx >= 16384)";
-    else note "KV mode: auto-BF16 (max-ctx < 16384)"; fi;;
+    if [ "$MAX_CTX" -ge 4096 ]; then note "KV mode: auto-INT8 (max-ctx >= 4096)";
+    else note "KV mode: auto-BF16 (max-ctx < 4096)"; fi;;
 esac
 
 # ---- LAN address for the other PC ----

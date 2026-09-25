@@ -242,13 +242,14 @@ bool AInferRuntime258V::allocate_static_arenas() {
   // 3. Static KV Cache Arena. T-decode-halve (2026-09-23): auto-KV8 policy.
   // KV8 halves the per-token KV read (int8+per-token-head scale vs bf16) and
   // is retrieval-qualified 4K -> 16K -> 32K (4/4 needle each tier, corpus
-  // 186/200 equals BF16, MTP 160/160). Qualified boundary is 16K, so:
-  //   AINFER_KV8 unset -> KV8 on when max_ctx_ >= 16384 (auto tier policy)
+  // 186/200 equals BF16, MTP 160/160). Qualified boundary is 4K (lowered from
+  // 16K on 2026-09-25; 4K tier carries the same 4/4 + corpus + MTP evidence), so:
+  //   AINFER_KV8 unset -> KV8 on when max_ctx_ >= 4096 (auto tier policy)
   //   AINFER_KV8=0     -> force BF16 everywhere (legacy default)
   //   AINFER_KV8=1     -> force KV8 everywhere (explicit, unchanged)
   const char *kv8_env = std::getenv("AINFER_KV8");
   kv8_enabled_ = kv8_env && kv8_env[0] == '1';
-  if (!kv8_env) kv8_enabled_ = max_ctx_ >= 16384; // auto tier policy
+  if (!kv8_env) kv8_enabled_ = max_ctx_ >= 4096; // auto tier policy
   size_t kv_elem_bytes = kv8_enabled_ ? sizeof(int8_t) : sizeof(uint16_t);
   size_t layer_kv_bytes = (size_t)NUM_KV_HEADS * max_ctx_ * HEAD_DIM * kv_elem_bytes;
   kv_cache_bytes_ = (size_t)NUM_FULL_ATTN_LAYERS * 2 * layer_kv_bytes;
