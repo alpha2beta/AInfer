@@ -608,11 +608,17 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             t_start = time.perf_counter()
             # 1. Prefill step (blocking; ~8 s per 1K prompt tokens, so a big
             # agentic tools+history prompt can prefill for minutes). In stream
-            # mode the SSE headers are sent first and a keepalive thread emits
-            # `: ping` comments during prefill so client/proxy idle-read
-            # timeouts don't kill the connection before the first token.
+            # mode the SSE headers + role delta are sent first and a keepalive
+            # thread emits `: keep-alive` comments during prefill so
+            # client/proxy idle-read timeouts don't kill the connection
+            # before the first token (I4.2).
             prefill_done = threading.Event()
             if stream:
+                # I4.2: headers + role delta go out BEFORE the blocking
+                # prefill, so the client sees an immediate TTFT
+                # acknowledgment; a daemon thread then emits SSE comment
+                # keepalives every 2.5 s during prefill to reset client
+                # socket read timeouts (OpenCode/fetch/axios ~30 s).
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Cache-Control", "no-cache")
@@ -620,11 +626,18 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.close_connection = True
+                if is_chat:
+                    try:
+                        self.wfile.write(
+                            f"data: {json.dumps({'id': req_id, 'object': 'chat.completion.chunk', 'created': created_time, 'model': MODEL_ID, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n".encode("utf-8"))
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        return
 
                 def _prefill_keepalive():
-                    while not prefill_done.wait(15.0):
+                    while not prefill_done.wait(2.5):
                         try:
-                            self.wfile.write(b": ping\n\n")
+                            self.wfile.write(b": keep-alive\n\n")
                             self.wfile.flush()
                         except (BrokenPipeError, ConnectionResetError, OSError):
                             break
@@ -829,7 +842,9 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             self.wfile.write(payload)
             self.wfile.flush()
 
-        if is_chat:
+        # I4.2: when headers were sent pre-prefill, the role delta went out
+        # with them — don't emit it twice.
+        if is_chat and not headers_sent:
             send_sse_chunk({
                 "id": req_id,
                 "object": "chat.completion.chunk",

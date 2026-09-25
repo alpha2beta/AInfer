@@ -469,7 +469,7 @@ missing Chain-of-Thought (CoT) reasoning, and full ~7K re-prefill on every conve
 
 ### I4.2 Immediate SSE Headers & Background Keep-Alive Heartbeats
 
-- Status: `[ ]`
+- Status: `[x]` DONE 2026-09-25 (verified live on :8080; commit `6ae019f` seeded early-headers + 15 s `: ping`; this change completes the spec: immediate role delta, 2.5 s `: keep-alive` cadence, no duplicate role chunk)
 - Complexity: **Low-Medium** (~1 day)
 - Files: `tools/http/server_258v.py`
 - **Problem:**
