@@ -134,6 +134,16 @@ inline bool checked_mul_add(size_t a, size_t b, size_t c, size_t *out) {
   return true;
 }
 
+// Unified end-of-sequence test. The pinned checkpoint is Qwen3.5-MoE-based;
+// it emits 151643 (<|endoftext|>) / 151645 (<|im_end|>). 248044/248046 are the
+// Qwen3.8-era ids kept so old prompts/harnesses still terminate. Every
+// generation loop (generate, generate_speculative) and the HTTP server must
+// use this set — a loop that only knows one pair runs past the other's EOS
+// (long-context verify-vs-greedy LENGTH-DIFF of 2026-09-25).
+inline bool is_eos_token(int id) {
+  return id == 151643 || id == 151645 || id == 248044 || id == 248046;
+}
+
 // Bump allocator with per-allocation ledger and fail-fast overflow.
 // Replaces ad-hoc w_ptr arithmetic: every sub-allocation is range-checked
 // at allocate time (not just totaled at the end) and recorded for audits.
@@ -704,6 +714,7 @@ private:
   ze_kernel_handle_t k_exp_dn_accum_all_batch_ = nullptr;
   ze_kernel_handle_t k_silu_mul_batch_ = nullptr;
   ze_kernel_handle_t k_block_resadd_moe_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_add_shared_batch_ = nullptr; // verify-vs-decode parity (decode order)
   ze_kernel_handle_t k_resadd_batch_ = nullptr;
 
   // Cached chunk command lists: cmd_prefill_chunk_[B] and cmd_prefill_tail_[B] for B in 1..32

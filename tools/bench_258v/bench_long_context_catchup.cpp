@@ -110,10 +110,15 @@ int main(int argc, char **argv) {
         return 1;
       }
       tokens_this_run.push_back(next_tok);
+      // Stop-after-EOS, same convention as generate()/generate_speculative():
+      // without this the greedy stream runs past EOS while spec stops,
+      // producing a LENGTH-DIFF parity artifact (2026-09-25).
+      if (is_eos_token(next_tok)) break;
     }
     auto t_dec1 = std::chrono::steady_clock::now();
     double dec_ms = std::chrono::duration<double, std::milli>(t_dec1 - t_dec0).count();
-    double dec_tps = (double)(DECODE_TOKENS - 1) / (dec_ms * 1e-3);
+    int dec_gen = (int)tokens_this_run.size() - 1;
+    double dec_tps = (double)dec_gen / (dec_ms * 1e-3);
     decode_tok_per_s.push_back(dec_tps);
 
     if (r == 0) {
@@ -121,7 +126,7 @@ int main(int argc, char **argv) {
     }
 
     std::printf("  Run %d: Prefill %.2f ms (%.2f tok/s) | Decode %d tok in %.2f ms (%.2f tok/s)\n",
-                r + 1, pref_ms, pref_tps, DECODE_TOKENS - 1, dec_ms, dec_tps);
+                r + 1, pref_ms, pref_tps, dec_gen, dec_ms, dec_tps);
   }
 
   double avg_prefill_ms = std::accumulate(prefill_latencies_ms.begin(), prefill_latencies_ms.end(), 0.0) / MEASURED_RUNS;

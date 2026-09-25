@@ -114,7 +114,11 @@ def _parse_hermes_tool_calls(text, req_id):
     return prefix, calls
 
 
-EOS_TOKEN_IDS = {248044, 248046}
+# Unified EOS set — must match is_eos_token() in tools/decode/runtime_258v.h:
+# 151643/151645 are the pinned Qwen3.5-MoE checkpoint's true EOS ids;
+# 248044/248046 are Qwen3.8-era ids kept for old prompts. A set with only one
+# pair runs past the other's EOS (2026-09-25 LENGTH-DIFF).
+EOS_TOKEN_IDS = {248044, 248046, 151643, 151645}
 FIM_STOP_TOKENS = ["<|fim_middle|>", "<|fim_suffix|>", "<|fim_prefix|>", "<|fim_pad|>", "<|file_sep|>"]
 FIM_STOP_TOKEN_IDS = {248060, 248061, 248062, 248063, 248065}
 

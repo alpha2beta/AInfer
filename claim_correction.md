@@ -98,16 +98,30 @@ conducted on Intel Arc 140V at $P=6,720$ prompt tokens (`report_long_context_cat
      streaming (which consumes only ~16 ms at ~80 GB/s achieved bandwidth), the decode step is dominated
      by the **10 full-attention layers**, which take ~6.5 ms per layer (~65 ms total per step, or ~80% of
      step latency) due to sequential KV cache scanning across the 6.7K context length.
-3. **Speculative Decode at Long Context (2026-09-25 update):** with the MTP draft
-   determinism fix (see below), long-context speculative decoding is now **deterministic
-   and stable** across runs (60.0% acceptance × 2 runs, 14.9 tok/s, **1.20× vs greedy**),
-   but verify-vs-greedy parity still DIFFs (deterministic FP-order divergence between the
-   B=2 verify kernels and the decode kernels at 6.7K attention mass — short-context
-   160/160 parity is unaffected). The MTP prompt-KV fill was also evaluated: it is
-   numerically faithful but the MTP layer's long-context attention degrades drafts
-   (alpha 60% → 17%), so the fill ships **opt-in** (`AINFER_MTP_FILL=1`) and defaults off.
-   Remaining work: unify verify/decode attention reduction order for long-context parity,
-   then re-tune MTP alignment.
+3. **Speculative Decode at Long Context (2026-09-25, CLOSED):** long-context
+   verify-vs-greedy parity is now **TRUE** at P=6,720 (60.0% acceptance, 12.9 tok/s
+   spec vs 12.2 tok/s greedy). Root cause of the earlier DIFF was **not** kernel
+   FP-order divergence but two stacked issues, both fixed:
+   - **EOS inconsistency:** `generate()` stopped on stale Qwen3.8-era ids
+     (248044/248046, never emitted) while `generate_speculative()` stopped on the
+     true 151643/151645 — plus the catchup harness hand-rolled its greedy loop
+     with no EOS check at all (and hardcoded 31 into tok/s). Unified via
+     `is_eos_token()` (`tools/decode/runtime_258v.h`) covering all four ids in
+     both loops, the harness, and the server's `EOS_TOKEN_IDS`; spec adopts
+     stop-after-EOS semantics identical to greedy (EOS included, nothing past it).
+   - **Two real ulp divergences** (kept as hardening; short parity 160/160 holds
+     throughout): verify MoE tail `(mid+E)+S` vs decode `mid+(E+S)` → verify now
+     uses new `moe_add_shared_expert_batch` + `resadd_batch` (decode order;
+     prefill/decode/goldens untouched); verify l2-norm `rsqrt(ss+EPS)` vs decode
+     `1/fmax(sqrt(ss),EPS)` → verify now launches the single `head_l2_norm_128`
+     per (token, q/k) slice (no SPV impact beyond the added kernel).
+   - The MTP prompt-KV fill was evaluated and ships **opt-in** (`AINFER_MTP_FILL=1`,
+     defaults off): numerically faithful, but the MTP layer's long-context
+     attention degrades drafts (alpha 60% → 17%).
+   - Exonerated by unit test: all 3 attention variants bit-exact
+     (`tools/kernels_258v/test_attn_parity.cpp`), GEMV m1-vs-m2 bit-exact
+     (`tools/kernels_258v/test_gemv_m1m2_parity.cpp`); MoE/router/norm/rope/
+     argmax pairs textually identical incl. tie-breaks.
 
 ### MTP Draft Determinism Fix (2026-09-25)
 

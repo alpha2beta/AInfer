@@ -15,10 +15,10 @@
     "rss_growth_kb": 0
   },
   "performance": {
-    "prefill_latency_ms": 133.443,
-    "prefill_ms_per_tok": 16.6804,
-    "decode_latency_ms": 415.94,
-    "decode_tok_per_s": 36.0629
+    "prefill_latency_ms": 124.935,
+    "prefill_ms_per_tok": 15.6169,
+    "decode_latency_ms": 426.237,
+    "decode_tok_per_s": 35.1917
   },
   "tasks": {
     "T5.1": "PASS",

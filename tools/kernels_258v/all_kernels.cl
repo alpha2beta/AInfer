@@ -4846,6 +4846,25 @@ __kernel void block_resadd_moe_batch(
     x_out[gid] = x_mid[gid] + moe_acc[gid] + sh_down[gid] * sh_gate[b];
 }
 
+// Per-token shared-expert scaled accumulation (verify-vs-decode parity).
+// Decode order is two roundings: moe_acc = E + (sh*gate) here, then
+// x = mid + moe_acc via resadd_batch — bit-identical to int4_gemv_m1_add_scaled
+// (y[m] += total_sum*factor) + residual_add_2048. The fused
+// block_resadd_moe_batch above computes (mid+E)+S instead and diverges by
+// ~1 ulp per MoE layer, flipping near-tie argmaxes at long context.
+__kernel void moe_add_shared_expert_batch(
+    __global float * restrict acc,            // [B, M] inout (d_moe_acc_chunk_)
+    __global const float * restrict sh_down,  // [B, M]
+    __global const float * restrict sh_gate,  // [B]
+    int B,
+    int M
+) {
+    int gid = get_global_id(0);
+    if (gid >= B * M) return;
+    int b = gid / M;
+    acc[gid] += sh_down[gid] * sh_gate[b];
+}
+
 __kernel void resadd_batch(
     __global float * restrict out,
     __global const float * restrict a,

@@ -980,6 +980,7 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_exp_dn_accum_all_batch_ = get_k("moe_down_accum_all8_batch");
   k_silu_mul_batch_ = get_k("silu_mul_batch");
   k_block_resadd_moe_batch_ = get_k("block_resadd_moe_batch");
+  k_moe_add_shared_batch_ = get_k("moe_add_shared_expert_batch");
   k_resadd_batch_ = get_k("resadd_batch");
 
   // Speculative verification kernels (T10.1 / I3.1)
@@ -1007,7 +1008,7 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
       !k_moe_gateup_grouped_batch_ || !k_moe_gateup_compact_batch_ ||
       !k_moe_down_grouped_batch_ || !k_moe_down_compact_batch_ || !k_moe_accum_down_batch_ ||
       !k_exp_gu_all_batch_ || !k_silu_all_batch_ || !k_exp_dn_accum_all_batch_ ||
-      !k_silu_mul_batch_ || !k_block_resadd_moe_batch_ || !k_resadd_batch_ ||
+      !k_silu_mul_batch_ || !k_block_resadd_moe_batch_ || !k_moe_add_shared_batch_ || !k_resadd_batch_ ||
       !k_conv_m2_spec_ || !k_recr_m2_spec_ || !k_lm_head_m2_argmax1_ || !k_gemv_m2_) {
     std::fprintf(stderr, "One or more required kernels could not be created\n");
     return false;
@@ -2307,8 +2308,8 @@ bool AInferRuntime258V::generate(const std::vector<int> &prompt_ids, int max_new
     int next_tok = 0;
     if (!decode_step(&next_tok)) break;
     generated_ids.push_back(next_tok);
-    // Break on standard EOS (248044 / 248046)
-    if (next_tok == 248044 || next_tok == 248046) break;
+    // Break on unified EOS (is_eos_token: 151643/151645 + 248044/248046).
+    if (is_eos_token(next_tok)) break;
   }
   auto t_dec1 = std::chrono::steady_clock::now();
   double dec_s = std::chrono::duration<double>(t_dec1 - t_dec0).count();
@@ -3893,15 +3894,33 @@ bool AInferRuntime258V::init_speculative_verification() {
       CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_conv_m2_spec_, &gcnt_conv, nullptr, 0, nullptr));
       CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
-      // Head L2 Norm on Q and K Batch
-      CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_qk_batch_, 0, sizeof(void *), &d_q_chunk_));
-      CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_qk_batch_, 1, sizeof(void *), &d_k_chunk_));
-      CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_qk_batch_, 2, sizeof(void *), &d_qkv_conv_chunk_));
-      CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_qk_batch_, 3, sizeof(int), &B));
-      CHECK_L0(zeKernelSetGroupSize(k_l2_norm_qk_batch_, 128, 1, 1));
-      ze_group_count_t gcnt_l2{(uint32_t)(B * H_K), 1, 1};
-      CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_l2_norm_qk_batch_, &gcnt_l2, nullptr, 0, nullptr));
-      CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
+      // Head L2 Norm on Q and K (decode-order parity): the batch kernel
+      // (head_l2_norm_qk_batch) computes rsqrt(ss+EPS) while the decode kernel
+      // (head_l2_norm_128) computes 1/fmax(sqrt(ss),EPS) — different rounding
+      // in every DeltaNet layer, flipping near-tie argmaxes at long context.
+      // Run the single kernel per (token, q/k) slice instead (4 launches,
+      // disjoint slices, one trailing barrier). Prefill keeps the batch
+      // kernel (committed goldens); only verify conforms to decode.
+      {
+        int num_heads_16 = H_K;
+        ze_group_count_t gcnt_l2s{(uint32_t)H_K, 1, 1};
+        for (int bb = 0; bb < B; ++bb) {
+          float *y_q = d_q_chunk_ + (size_t)bb * (H_K * S_V);
+          float *x_q = d_qkv_conv_chunk_ + (size_t)bb * C_QKV;
+          float *y_k = d_k_chunk_ + (size_t)bb * (H_K * S_V);
+          float *x_k = d_qkv_conv_chunk_ + (size_t)bb * C_QKV + (H_K * S_V);
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 0, sizeof(void *), &y_q));
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 1, sizeof(void *), &x_q));
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 2, sizeof(int), &num_heads_16));
+          CHECK_L0(zeKernelSetGroupSize(k_l2_norm_, 128, 1, 1));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_l2_norm_, &gcnt_l2s, nullptr, 0, nullptr));
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 0, sizeof(void *), &y_k));
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 1, sizeof(void *), &x_k));
+          CHECK_L0(zeKernelSetArgumentValue(k_l2_norm_, 2, sizeof(int), &num_heads_16));
+          CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_l2_norm_, &gcnt_l2s, nullptr, 0, nullptr));
+        }
+        CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
+      }
 
       // Gate Prep Batch
       CHECK_L0(zeKernelSetArgumentValue(k_gate_prep_batch_, 0, sizeof(void *), &d_g_chunk_));
@@ -4040,18 +4059,29 @@ bool AInferRuntime258V::init_speculative_verification() {
     append_gemm(d_sh_down_chunk_, lb.sh_down_w, lb.sh_down_s, d_sh_act_chunk_, HIDDEN_DIM, EXP_INTER_DIM);
     CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
-    // Block Residual Add
+    // Block Residual Add (decode-order parity): decode computes moe_acc = E+S
+    // via int4_gemv_m1_add_scaled then x = mid+moe_acc via residual_add_2048,
+    // i.e. x = mid+(E+S). The fused block_resadd_moe_batch computes
+    // (mid+E)+S and diverges ~1 ulp/layer. Mirror decode exactly:
     int M_res = HIDDEN_DIM;
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 0, sizeof(void *), &d_x_chunk_));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 1, sizeof(void *), &d_x_mid_chunk_));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 2, sizeof(void *), &d_moe_acc_chunk_));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 3, sizeof(void *), &d_sh_down_chunk_));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 4, sizeof(void *), &d_sh_gate_chunk_));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 5, sizeof(int), &B));
-    CHECK_L0(zeKernelSetArgumentValue(k_block_resadd_moe_batch_, 6, sizeof(int), &M_res));
-    CHECK_L0(zeKernelSetGroupSize(k_block_resadd_moe_batch_, 256, 1, 1));
-    ze_group_count_t gc_block_res{(uint32_t)((B * M_res + 255) / 256), 1, 1};
-    CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_block_resadd_moe_batch_, &gc_block_res, nullptr, 0, nullptr));
+    CHECK_L0(zeKernelSetArgumentValue(k_moe_add_shared_batch_, 0, sizeof(void *), &d_moe_acc_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_moe_add_shared_batch_, 1, sizeof(void *), &d_sh_down_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_moe_add_shared_batch_, 2, sizeof(void *), &d_sh_gate_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_moe_add_shared_batch_, 3, sizeof(int), &B));
+    CHECK_L0(zeKernelSetArgumentValue(k_moe_add_shared_batch_, 4, sizeof(int), &M_res));
+    CHECK_L0(zeKernelSetGroupSize(k_moe_add_shared_batch_, 256, 1, 1));
+    ze_group_count_t gc_sh_add{(uint32_t)((B * M_res + 255) / 256), 1, 1};
+    CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_moe_add_shared_batch_, &gc_sh_add, nullptr, 0, nullptr));
+    CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
+
+    int total_res = B * HIDDEN_DIM;
+    CHECK_L0(zeKernelSetArgumentValue(k_resadd_batch_, 0, sizeof(void *), &d_x_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_resadd_batch_, 1, sizeof(void *), &d_x_mid_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_resadd_batch_, 2, sizeof(void *), &d_moe_acc_chunk_));
+    CHECK_L0(zeKernelSetArgumentValue(k_resadd_batch_, 3, sizeof(int), &total_res));
+    CHECK_L0(zeKernelSetGroupSize(k_resadd_batch_, 256, 1, 1));
+    ze_group_count_t gc_block_res{(uint32_t)((total_res + 255) / 256), 1, 1};
+    CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_resadd_batch_, &gc_block_res, nullptr, 0, nullptr));
     CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
   }
 
@@ -4286,11 +4316,13 @@ bool AInferRuntime258V::generate_speculative(
     if (accepted) accepted_rounds++;
 
     generated_ids.push_back(tok1);
+    // Stop-after-EOS, same convention as generate(): the EOS token is
+    // included, nothing is emitted past it. (A tok1-EOS round must not emit
+    // tok2, or spec streams run one token longer than greedy streams.)
+    if (is_eos_token(tok1)) break;
     if ((int)generated_ids.size() < max_new_tokens && n_emitted == 2) {
       generated_ids.push_back(tok2);
-    }
-    if (tok1 == 151645 || tok1 == 151643 || (n_emitted == 2 && (tok2 == 151645 || tok2 == 151643))) {
-      break;
+      if (is_eos_token(tok2)) break;
     }
   }
   auto t_gen1 = std::chrono::steady_clock::now();
