@@ -606,8 +606,37 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         try:
             t_start = time.perf_counter()
-            # 1. Prefill step
-            first_tok = STATE.binding.prefill(prompt_ids)
+            # 1. Prefill step (blocking; ~8 s per 1K prompt tokens, so a big
+            # agentic tools+history prompt can prefill for minutes). In stream
+            # mode the SSE headers are sent first and a keepalive thread emits
+            # `: ping` comments during prefill so client/proxy idle-read
+            # timeouts don't kill the connection before the first token.
+            prefill_done = threading.Event()
+            if stream:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "close")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.close_connection = True
+
+                def _prefill_keepalive():
+                    while not prefill_done.wait(15.0):
+                        try:
+                            self.wfile.write(b": ping\n\n")
+                            self.wfile.flush()
+                        except (BrokenPipeError, ConnectionResetError, OSError):
+                            break
+
+                ka_thread = threading.Thread(target=_prefill_keepalive, daemon=True)
+                ka_thread.start()
+            try:
+                first_tok = STATE.binding.prefill(prompt_ids)
+            finally:
+                if stream:
+                    prefill_done.set()
+                    ka_thread.join(timeout=20.0)
             t_prefill = time.perf_counter()
 
             if self.is_client_disconnected():
@@ -615,7 +644,7 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
                 return
 
             if stream:
-                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, len(prompt_ids), stop_sequences, stop_token_ids, parse_tools)
+                self._stream_response(req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, len(prompt_ids), stop_sequences, stop_token_ids, parse_tools, headers_sent=True)
             else:
                 self._complete_response(req_id, created_time, prompt_ids, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, stop_sequences, stop_token_ids, parse_tools)
 
@@ -627,6 +656,12 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
             sys.stderr.write(f"[Server] Error during generation: {e}\n")
             if not stream:
                 self._send_json(500, {"error": {"message": str(e), "type": "internal_error"}})
+            else:
+                try:
+                    self.wfile.write(f"data: {json.dumps({'error': {'message': str(e), 'type': 'internal_error'}})}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError, OSError):
+                    pass
         finally:
             # T8.2: Always reset state on finish or abort so GPU memory/SSM buffers are clean
             STATE.binding.reset_state()
@@ -772,20 +807,22 @@ class AInferHTTPHandler(BaseHTTPRequestHandler):
 
         self._send_json(200, resp)
 
-    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, prompt_len=0, stop_sequences=None, stop_token_ids=None, parse_tools=False):
+    def _stream_response(self, req_id, created_time, first_tok, max_tokens, t_start, t_prefill, timeout_s, is_chat, prompt_len=0, stop_sequences=None, stop_token_ids=None, parse_tools=False, headers_sent=False):
         stop_token_ids = stop_token_ids or EOS_TOKEN_IDS
         stop_sequences = [s for s in (stop_sequences or []) if s]
         decoder = IncrementalDecoder(STATE.tokenizer)
         stop_buffer = StreamStopBuffer(stop_sequences)
 
-        # Establish Server-Sent Events stream
-        self.send_response(200)
-        self.send_header("Content-Type", "text/event-stream")
-        self.send_header("Cache-Control", "no-cache")
-        self.send_header("Connection", "close")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.close_connection = True
+        # Establish Server-Sent Events stream (headers may already be sent when
+        # the caller emitted prefill keepalives — see _execute_generation).
+        if not headers_sent:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.close_connection = True
 
         def send_sse_chunk(chunk_dict):
             payload = f"data: {json.dumps(chunk_dict)}\n\n".encode("utf-8")

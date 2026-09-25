@@ -18,7 +18,11 @@
 # - Model stays resident in-process (~19 GB); first start takes ~1 min to load.
 # - Single-flight execution: one generation at a time, queue-size waiting slots.
 # - max_tokens is capped at 2048 per request by the server.
-# - Decode is slow at long context (~2 tok/s at 32K); set --timeout generously.
+# - Agentic clients (many tools + long history): prefill costs ~8 s per 1K
+#   prompt tokens, so big turns take minutes. Such clients MUST use
+#   streaming (stream:true — server sends SSE prefill keepalives) and a
+#   client-side timeout >= 600 s; keep max_tokens modest per turn.
+#   Launch with --max-ctx large enough for tools+history (e.g. 16384).
 # - KV policy: unset env -> auto-KV8 at max-ctx >= 4096; --kv8 forces INT8 KV
 #   (halves KV traffic); --bf16 forces BF16 KV.
 set -euo pipefail
