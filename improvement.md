@@ -420,6 +420,12 @@ Week 4 (P2 finish)
   ~2–3× at T=128–4096. End-to-end 35B at 6.7K (S=4, 64 groups/layer): decode
   12.2 → **17.7/17.2 tok/s (1.42×)**, tokens deterministic across runs and
   matching the greedy prefix; short prompt 8/8 golden tokens, no regression.
+- **KV8 path (follow-up):** `kv8_attn_decode_split` + `kv8_attn_combine` in
+  `kv8_primitive.cl` (companion rebuilt), same `AINFER_ATTN_SPLIT` gate with
+  stale-module fallback to legacy. `bench_kv8_split`: worst diff 2–4e-6,
+  kernel ~2× (6.9→3.5 ms at 6.7K, 8.6→4.2 ms at 8K). End-to-end 6.7K:
+  12.06 → **18.00 tok/s (1.49×)**, 8/8 tokens identical to legacy; short 8/8
+  goldens with int8 arena live.
 - **Done:** Env-gated, default off; legacy numerics untouched (M4/ctest unaffected).
 - **Deps:** None.
 

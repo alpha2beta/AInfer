@@ -792,6 +792,24 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
                             spv_size, spv.data(), nullptr, nullptr};
   CHECK_L0(zeModuleCreate(ctx_, dev_, &mdesc, &mod_, nullptr));
 
+  // I3.8 split-T decode attention (env-gated, default off): AINFER_ATTN_SPLIT=N
+  // launches 16*N workgroups per full-attention layer to saturate the 64 EUs
+  // at long context. New kernels reorder FP ops (merge step), so results are
+  // functionally — not bit-identically — equal to legacy. Fixed at init
+  // (command lists are recorded once); restart to change. Read here so both
+  // the BF16 and KV8 paths below see it.
+  {
+    const char *e = std::getenv("AINFER_ATTN_SPLIT");
+    int s = e ? std::atoi(e) : 0;
+    if (s < 0) s = 0;
+    if (s == 1) s = 0; // 1 split == legacy; skip the extra launch+merge
+    if (s > ATTN_SPLIT_MAX) s = ATTN_SPLIT_MAX;
+    attn_split_s_ = s;
+    if (s > 1)
+      std::fprintf(stderr, "[AInfer 258V] split-T decode attention active (S=%d, %d workgroups/layer)\n",
+                   s, 16 * s);
+  }
+
   auto load_kv8_module = [&]() -> bool {
     std::string path = spv_path + ".kv8";
     std::ifstream f(path, std::ios::binary);
@@ -818,6 +836,13 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
     k_attn_ctrl_i8_ = get8("kv8_attn_ctrl");
     k_rope_batch_i8_ = get8("kv8_append_batch");
     k_attn_batch_i8_ = get8("kv8_attn_batch");
+    k_attn_split_i8_ = get8("kv8_attn_decode_split");
+    k_attn_combine_i8_ = get8("kv8_attn_combine");
+    if ((k_attn_split_i8_ == nullptr || k_attn_combine_i8_ == nullptr) && attn_split_s_ > 1) {
+      // Stale companion module without split kernels: fall back to legacy.
+      std::fprintf(stderr, "[AInfer 258V] WARNING: KV8 split kernels missing, split-T disabled\n");
+      attn_split_s_ = 0;
+    }
     return k_rope_ctrl_i8_ && k_attn_ctrl_i8_ && k_rope_batch_i8_ && k_attn_batch_i8_;
   };
   if (kv8_enabled_ && !load_kv8_module()) {
@@ -860,22 +885,6 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_attn_ctrl_ = get_k("gqa_attn_decode_ctrl");
   k_attn_split_ = get_k("gqa_attn_decode_split");
   k_attn_combine_ = get_k("gqa_attn_combine");
-  // I3.8 split-T decode attention (env-gated, default off): AINFER_ATTN_SPLIT=N
-  // launches 16*N workgroups per full-attention layer to saturate the 64 EUs
-  // at long context. New kernels reorder FP ops (merge step), so results are
-  // functionally — not bit-identically — equal to legacy. Fixed at init
-  // (command lists are recorded once); restart to change.
-  {
-    const char *e = std::getenv("AINFER_ATTN_SPLIT");
-    int s = e ? std::atoi(e) : 0;
-    if (s < 0) s = 0;
-    if (s == 1) s = 0; // 1 split == legacy; skip the extra launch+merge
-    if (s > ATTN_SPLIT_MAX) s = ATTN_SPLIT_MAX;
-    attn_split_s_ = s;
-    if (s > 1)
-      std::fprintf(stderr, "[AInfer 258V] split-T decode attention active (S=%d, %d workgroups/layer)\n",
-                   s, 16 * s);
-  }
   // T-decode-opt (2026-09-22): optional 2-barrier decode-attention override.
   // If `<spv>.attn` exists beside the main bundle, its gqa_attn_decode_ctrl
   // replaces the bundled handle (identical signature/launch shape). Absent ->
@@ -1166,7 +1175,29 @@ bool AInferRuntime258V::record_command_lists() {
 
       // GQA Attention Decode (Device control block drives position) (T5.4)
       ze_group_count_t gcnt_attn{(uint32_t)NUM_Q_HEADS, 1, 1};
-      if (kv8_enabled_) {
+      if (kv8_enabled_ && attn_split_s_ > 1 && k_attn_split_i8_ && k_attn_combine_i8_) {
+        // I3.8 split-T KV8 decode: 16*S partial groups + 16-group merge.
+        int S = attn_split_s_;
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 0, sizeof(void *), &d_attn_split_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 1, sizeof(void *), &d_q_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 2, sizeof(void *), &lb.k_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 3, sizeof(void *), &lb.v_cache_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 4, sizeof(void *), &lb.k_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 5, sizeof(void *), &lb.v_scale_i8));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 6, sizeof(void *), &d_ctrl_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 7, sizeof(uint32_t), &max_c));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_split_i8_, 8, sizeof(int), &S));
+        CHECK_L0(zeKernelSetGroupSize(k_attn_split_i8_, 256, 1, 1));
+        ze_group_count_t gcnt_split8{(uint32_t)(NUM_Q_HEADS * S), 1, 1};
+        APPEND_L0_K(list, k_attn_split_i8_, &gcnt_split8);
+        APPEND_L0_B(list);
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 0, sizeof(void *), &d_attn_out_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 1, sizeof(void *), &d_gate_full_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 2, sizeof(void *), &d_attn_split_));
+        CHECK_L0(zeKernelSetArgumentValue(k_attn_combine_i8_, 3, sizeof(int), &S));
+        CHECK_L0(zeKernelSetGroupSize(k_attn_combine_i8_, 256, 1, 1));
+        APPEND_L0_K(list, k_attn_combine_i8_, &gcnt_attn);
+      } else if (kv8_enabled_) {
         CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 0, sizeof(void *), &d_attn_out_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 1, sizeof(void *), &d_q_full_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_ctrl_i8_, 2, sizeof(void *), &d_gate_full_));

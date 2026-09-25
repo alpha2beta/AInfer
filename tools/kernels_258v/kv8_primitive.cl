@@ -143,6 +143,138 @@ __kernel void kv8_attn_ctrl(
   out[qh * D + d] = (acc / sum) / (1.0f + exp(-g));
 }
 
+// Split-T KV8 decode attention (I3.8 follow-up, env-gated via AINFER_ATTN_SPLIT).
+// Same structure as the BF16 gqa_attn_decode_split/combine pair with int8 KV
+// loads + per-token scales. Partials layout: [16 heads][SMAX splits][258].
+// Merge reorders FP ops (functional parity only) — hence env-gated.
+#define KV8_SPLIT_MAX 8
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void kv8_attn_decode_split(
+    __global float *partials,      // [16, KV8_SPLIT_MAX, 258]
+    __global const float *q,       // [16, 256]
+    __global const char *kc,       // [2, max_ctx, 256] int8
+    __global const char *vc,       // [2, max_ctx, 256] int8
+    __global const float *ks,      // [max_ctx, 2] per-token scales
+    __global const float *vs,      // [max_ctx, 2]
+    __global const int *ctrl,      // ctrl[1] = position
+    uint max_ctx,
+    int n_splits
+) {
+  int gid = get_group_id(0);
+  int qh = gid % NQ;
+  int sp = gid / NQ;
+  if (qh >= NQ || sp >= n_splits) return;
+  int d = get_local_id(0);
+  int lane = get_sub_group_local_id();
+  int sg = get_sub_group_id();
+
+  uint total = (uint)ctrl[1] + 1;
+  if (total > max_ctx) total = max_ctx;
+  int kv = qh / GQA;
+  float qv = q[qh * D + d];
+
+  uint chunk = (total + (uint)n_splits - 1u) / (uint)n_splits;
+  uint t0 = (uint)sp * chunk;
+  uint t1 = t0 + chunk;
+  if (t1 > total) t1 = total;
+
+  __local float s_part[2][256];
+  float mx = -1.0e30f, sum = 0.0f, acc = 0.0f;
+
+  if (t0 < t1) {
+    for (uint tb = t0 & ~15u; tb < t1; tb += 16) {
+      int buf_idx = (int)((tb >> 4) & 1);
+      float part[16];
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        uint t = tb + (uint)u;
+        float kval = 0.0f;
+        if (t >= t0 && t < t1) {
+          kval = (float)kc[((size_t)kv * max_ctx + t) * D + d] * ks[t * NKV + kv];
+        }
+        part[u] = qv * kval;
+      }
+
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        float v = part[u];
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+        v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+        part[u] = v;
+      }
+
+      if (lane == 0) {
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+          s_part[buf_idx][sg * 16 + u] = part[u];
+        }
+      }
+      barrier(CLK_LOCAL_MEM_FENCE);
+
+      #pragma unroll
+      for (int u = 0; u < 16; ++u) {
+        float s = 0.0f;
+        #pragma unroll
+        for (int i = 0; i < 16; ++i) {
+          s += s_part[buf_idx][i * 16 + u];
+        }
+        uint t = tb + (uint)u;
+        if (t >= t0 && t < t1) {
+          float score = s * SCALE;
+          float vv = (float)vc[((size_t)kv * max_ctx + t) * D + d] * vs[t * NKV + kv];
+          if (score > mx) {
+            float e = exp(mx - score);
+            acc = acc * e + vv;
+            sum = sum * e + 1.0f;
+            mx = score;
+          } else {
+            float e = exp(score - mx);
+            acc += e * vv;
+            sum += e;
+          }
+        }
+      }
+    }
+  }
+
+  __global float *dst = partials + ((size_t)qh * KV8_SPLIT_MAX + sp) * 258;
+  dst[d] = acc;
+  if (d == 0) {
+    dst[256] = mx;
+    dst[257] = sum;
+  }
+}
+
+__kernel void kv8_attn_combine(
+    __global float *out,           // [16, 256]
+    __global const float *gate,    // [16, 256]
+    __global const float *partials,// [16, KV8_SPLIT_MAX, 258]
+    int n_splits
+) {
+  int qh = get_group_id(0);
+  if (qh >= NQ) return;
+  int d = get_local_id(0);
+
+  float m = -1.0e30f;
+  for (int s = 0; s < n_splits; ++s) {
+    float ms = partials[((size_t)qh * KV8_SPLIT_MAX + s) * 258 + 256];
+    if (ms > m) m = ms;
+  }
+  float l = 0.0f, acc = 0.0f;
+  for (int s = 0; s < n_splits; ++s) {
+    __global const float *ps = partials + ((size_t)qh * KV8_SPLIT_MAX + s) * 258;
+    float e = exp(ps[256] - m);
+    l += ps[257] * e;
+    acc += ps[d] * e;
+  }
+
+  float g = gate[qh * D + d];
+  out[qh * D + d] = (acc / l) / (1.0f + exp(-g));
+}
+
 // B=2 verification variant. Each workgroup owns one token, so local storage
 // and per-token scales are independent while both token rows land in the same
 // cache before the corresponding causal attention groups execute.

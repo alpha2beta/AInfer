@@ -611,3 +611,6 @@
 - **2026-09-25 (I3.8 split-T decode attention — DONE):**
   - Legacy decode attention ran 16 workgroups/layer on 64 EUs. New `gqa_attn_decode_split` (grid 16×S partial online-softmax states, same butterfly inner math) + `gqa_attn_combine` (grid 16, rescale-merge + gate) in `tools/kernels_258v/all_kernels.cl`; 132 KB partials buffer in workspace arena; `AINFER_ATTN_SPLIT=N` (2/4/8, default off → legacy). BF16 decode path only.
   - `bench_attn_split`: max abs diff vs legacy 2–5e-7; kernel 1.99× at T=6720 (6.78→3.41 ms). End-to-end S=4: 6.7K decode 12.2 → **17.7/17.2 tok/s (1.42×)**, deterministic; short 8/8 goldens. `ctest --preset 258v` 6/6 (defaults unaffected).
+- **2026-09-25 (I3.8 KV8 split-T follow-up — DONE):**
+  - `kv8_attn_decode_split` + `kv8_attn_combine` in `tools/kernels_258v/kv8_primitive.cl` (companion `all_kernels.spv.kv8` rebuilt via script); same `AINFER_ATTN_SPLIT` gate, stale-module fallback to legacy, shared 132 KB partials buffer. MTP/draft/batch paths untouched.
+  - `bench_kv8_split` (committed): worst diff vs legacy 2–4e-6; kernel ~2× (6.9→3.5 ms at 6.7K). End-to-end 6.7K KV8: 12.06 → **18.00 tok/s (1.49×)**, tokens identical to legacy; short 8/8 goldens.

@@ -622,6 +622,8 @@ private:
   ze_kernel_handle_t k_attn_ctrl_ = nullptr;
   ze_kernel_handle_t k_attn_split_ = nullptr;   // I3.8 split-T partials
   ze_kernel_handle_t k_attn_combine_ = nullptr; // I3.8 split-T merge
+  ze_kernel_handle_t k_attn_split_i8_ = nullptr;   // I3.8 KV8 split-T partials
+  ze_kernel_handle_t k_attn_combine_i8_ = nullptr; // I3.8 KV8 split-T merge
   int attn_split_s_ = 0; // I3.8: 0/1 = legacy single launch; N = T-splits
   ze_kernel_handle_t k_rope_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_attn_ctrl_i8_ = nullptr;
