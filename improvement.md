@@ -1,7 +1,7 @@
 # AInfer Improvement Plan — IDE Integration & Performance Optimization
 
 > Structured plan for daily IDE copilot readiness and prefill performance parity.
-> Task IDs use `I` prefix (`I1.1`…`I3.5`) to avoid collision with the existing `T`/`X` namespace.
+> Task IDs use `I` prefix (`I1.1`…`I4.4`) to avoid collision with the existing `T`/`X` namespace.
 > Status: `[ ]` pending · `[~]` in progress · `[x]` done · `[-]` dropped
 
 ---
@@ -30,6 +30,10 @@ running on **Intel Core Ultra 7 258V** (Arc 140V iGPU, 32 GB unified LPDDR5X).
 2. **IDE usability:** `server_258v.py` lacks `stop` sequence parsing, FIM suffix handling,
    and instant disconnect abort — these break autocomplete in Continue.dev / Cursor / Cline.
 3. **Startup latency:** 48 s CRC check is unacceptable for interactive use.
+4. **Agent usability & multi-turn latency:** OpenCode sends ~7K tokens (system prompt + tools) on
+   every turn, triggering ~38s prefill due to zero KV prefix caching. Hardcoded 60s timeout truncates
+   responses after 100~200 tokens, hardcoded `enable_thinking=False` suppresses CoT, and delayed
+   HTTP headers cause client socket timeouts.
 
 ---
 
@@ -438,4 +442,78 @@ Week 4 (P2 finish)
   on `test_attn_parity.cpp` (all 3 variants bit-exact) instead.
 - **Done:** Env-gated, default off; legacy numerics untouched (M4/ctest unaffected).
 - **Deps:** None.
+
+---
+
+## 4. Priority 1 — Sprint 3 (Server Stability, CoT & Long-Context Agent Usability)
+
+These items resolve real-world failures observed with interactive agent clients (such as OpenCode):
+early decode termination at 100~200 tokens, 30s client socket read timeouts during long-context prefill,
+missing Chain-of-Thought (CoT) reasoning, and full ~7K re-prefill on every conversational turn.
+
+### I4.1 Server Timeout Decoupling, `max_completion_tokens`, and EOS Scrubbing
+
+- Status: `[ ]`
+- Complexity: **Low** (~1 day)
+- Files: `tools/http/server_258v.py`, `tools/decode/runtime_258v.h`
+- **Problem:**
+  1. `timeout_s` (default 60.0s) is measured from `t_start` (before prefill). For a 6.7K prompt, prefill consumes 38–48s, leaving only 12–22s for decode. At 12 tok/s, generation terminates after only 100–200 tokens with `finish_reason: "length"`.
+  2. OpenAI API clients (like OpenCode) send `max_completion_tokens` instead of `max_tokens`. `server_258v.py` misses this key, falling back to `max_tokens_default = 64`.
+  3. `EOS_TOKEN_IDS` contains stale tokens `151643` (Korean ` 내용`) and `151645` (Thai `หนัก`) erroneously inherited from Qwen2.5 (vocab 152K). True EOS tokens for this model (vocab 248K) are `248044` (`<|endoftext|>`) and `248046` (`<|im_end|>`).
+- **Action:**
+  1. Decouple timeouts: measure `decode_timeout_s` exclusively during the decode phase (starting after `t_prefill`), or implement an inter-token idle timeout (e.g. 15s without a new token), and raise the default timeout to 600s.
+  2. Parse `body.get("max_completion_tokens") or body.get("max_tokens", 4096)`, raising default to 4096.
+  3. Cleanse `EOS_TOKEN_IDS` in `server_258v.py` and `is_eos_token()` in `runtime_258v.h` to only contain true EOS tokens (`248044`, `248046`).
+- **Expected impact:** Responses run to natural completion up to the requested token limit without 60s prefill-eating cutoffs.
+- **Deps:** None.
+
+### I4.2 Immediate SSE Headers & Background Keep-Alive Heartbeats
+
+- Status: `[ ]`
+- Complexity: **Low-Medium** (~1 day)
+- Files: `tools/http/server_258v.py`
+- **Problem:**
+  In streaming mode, `server_258v.py` does not write HTTP response headers (`HTTP/1.1 200 OK`, `Content-Type: text/event-stream`) until *after* `prefill()` returns. At 6.7K context, prefill takes 38.5s during which 0 bytes are transmitted. Standard client HTTP agents (e.g. OpenCode / fetch / axios) have a 30s socket read timeout and disconnect, triggering an abort in AInfer.
+- **Action:**
+  1. For streaming requests, immediately write the HTTP 200 headers and `choices[0].delta = {"role": "assistant"}` upon request validation.
+  2. Launch a background daemon thread that writes SSE keep-alive comments (`: keep-alive\n\n`) every 2–3 seconds while `prefill()` runs in Level Zero (which releases the Python GIL during C execution).
+  3. Flush each heartbeat to reset the client socket's read timeout. Stop the heartbeat as soon as prefill finishes and decode streaming begins.
+- **Expected impact:** Zero client socket read timeouts during long-context prefill; immediate TTFT acknowledgment.
+- **Deps:** None.
+
+### I4.3 Native CoT / Reasoning Streaming (`enable_thinking`, `delta.reasoning_content`)
+
+- Status: `[ ]`
+- Complexity: **Medium** (~1-2 days)
+- Files: `tools/http/server_258v.py`, `tools/tokenizer/tok.py`
+- **Problem:**
+  1. `server_258v.py` hardcodes `enable_thinking=False` in `render_chat()`, which renders `<think>\n\n</think>\n\n` into the prompt, explicitly instructing the model that thinking has already concluded.
+  2. The server has no mechanism to stream reasoning tokens into the OpenAI standard `delta: {"reasoning_content": "..."}` format expected by OpenCode, DeepSeek, and modern coding agents.
+  3. `_THINK_RE` actively strips `<think>...</think>` whenever tool calls are present.
+- **Action:**
+  1. Support `enable_thinking` requested by the client (via `body.get("thinking")` or `body.get("reasoning_effort")`, defaulting to enabled for chat models).
+  2. When `enable_thinking=True`, the prompt ends with `<|im_start|>assistant\n<think>\n`.
+  3. In the streaming loop, detect `<think>` and `</think>` boundaries: stream tokens inside the thinking block as `delta: {"reasoning_content": token}`, and tokens after `</think>` as `delta: {"content": token}`.
+  4. In non-streaming mode, populate `message["reasoning_content"]` alongside `message["content"]`.
+- **Expected impact:** OpenCode and IDE clients display live collapsible Chain-of-Thought / reasoning blocks during generation.
+- **Deps:** None.
+
+### I4.4 In-Memory KV Prefix Caching for Multi-Turn Agent Sessions
+
+- Status: `[ ]`
+- Complexity: **High** (~2-3 days)
+- Files: `tools/decode/runtime_258v.h`, `tools/decode/runtime_258v.cpp`, `tools/decode/c_api_258v.cpp`, `tools/http/server_258v.py`
+- **Problem:**
+  OpenCode transmits the full system prompt and tool definitions (~6.7K tokens) on every conversational interaction. Because `server_258v.py` unconditionally executes `STATE.binding.reset_state()` on every request, AInfer re-prefills all 6.7K tokens from position 0 every turn (~38.5s latency).
+- **Action:**
+  1. In `server_258v.py`, maintain `cached_prompt_ids` representing the token sequence currently resident in the GPU KV cache and DeltaNet SSM state.
+  2. For each incoming request, compute the longest common prefix length $L$ between `cached_prompt_ids` and `new_prompt_ids`.
+  3. If $L \ge \text{PREFIX_THRESHOLD}$ (e.g. 512 tokens) and matches from index 0:
+     - Retain device KV cache and DeltaNet SSM states up to position $L$.
+     - Call an incremental prefill C API `ainfer_prefill_incremental(ids + L, count - L, start_pos = L)`.
+     - Only compute new tokens ($P_{\text{new}} = \text{len} - L$).
+  4. If prefix does not match, fall back to `reset_state()` and full prefill.
+- **Expected impact:** Multi-turn chat / agent turns reuse the 6.7K system prompt and tool KV cache. Prefill latency for subsequent turns drops from **~38.5s to < 200 ms** (>190× speedup).
+- **Deps:** I4.1.
+
 
