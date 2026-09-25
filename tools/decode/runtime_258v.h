@@ -59,6 +59,9 @@ constexpr int C_QKV = 8192;
 constexpr int HEAD_DIM = 256;
 constexpr int NUM_Q_HEADS = 16;
 constexpr int NUM_KV_HEADS = 2;
+// I3.8 split-T decode attention: max T-splits/head (partials [16][SMAX][258]).
+// Must match ATTN_SPLIT_MAX in tools/kernels_258v/all_kernels.cl.
+constexpr int ATTN_SPLIT_MAX = 8;
 constexpr int GQA_GROUP_SIZE = 8;
 constexpr int VOCAB_SIZE = 248320;
 
@@ -561,6 +564,7 @@ private:
   float *d_g_ = nullptr;
   float *d_beta_ = nullptr;
   float *d_attn_out_ = nullptr;
+  float *d_attn_split_ = nullptr; // [16, ATTN_SPLIT_MAX, 258] I3.8 partials
   float *d_attn_norm_ = nullptr;
   float *d_attn_proj_ = nullptr;
   float *d_x_mid_ = nullptr;
@@ -616,6 +620,9 @@ private:
   ze_kernel_handle_t k_add_shared_ctrl_ = nullptr;
   ze_kernel_handle_t k_rope_ctrl_ = nullptr;
   ze_kernel_handle_t k_attn_ctrl_ = nullptr;
+  ze_kernel_handle_t k_attn_split_ = nullptr;   // I3.8 split-T partials
+  ze_kernel_handle_t k_attn_combine_ = nullptr; // I3.8 split-T merge
+  int attn_split_s_ = 0; // I3.8: 0/1 = legacy single launch; N = T-splits
   ze_kernel_handle_t k_rope_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_attn_ctrl_i8_ = nullptr;
   ze_kernel_handle_t k_deinterleave_qg_ = nullptr;

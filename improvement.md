@@ -394,3 +394,32 @@ Week 4 (P2 finish)
 - **Done:** Blocked FlashAttention kernel compiled into `all_kernels.spv` and active by default across prefill chunks and speculative verification.
 - **Deps:** None.
 
+### I3.8 Split-T Decode Attention (Multi-Head Parallelism, EU Saturation)
+
+- Status: `[x]`
+- Complexity: **Medium** (~1-2 days)
+- Files: `tools/kernels_258v/all_kernels.cl` (`gqa_attn_decode_split`, `gqa_attn_combine`),
+  `tools/decode/runtime_258v.h`, `tools/decode/runtime_258v.cpp`,
+  `tools/kernels_258v/bench_attn_split.cpp`
+- **Current state:** Legacy decode attention launches 16 workgroups/layer (1 per Q head).
+  Device topology (`tools/l0probe/report_258v.json`): 2 slices × 4 subslices × 8 EUs =
+  **64 EUs** × 8 threads — most EUs idle during long-context decode attention (~65 ms
+  of the ~81 ms step at T=6.7K).
+- **Action:**
+  1. `gqa_attn_decode_split`: grid 16×S workgroups; each computes partial online-softmax
+     state (max/sum/acc[256]) over its T-chunk with the same subgroup-butterfly inner
+     math; partials spill to a 132 KB workspace buffer `[16][8][258]`.
+  2. `gqa_attn_combine`: grid 16 workgroups; merges S partials with rescaling,
+     applies the sigmoid gate, writes `out[16,256]`.
+  3. Runtime selects via `AINFER_ATTN_SPLIT=N` (2/4/8, clamped; unset/0/1 = legacy),
+     fixed at init (lists recorded once). BF16 decode path only; KV8/MTP/draft paths
+     keep legacy kernels.
+- **Expected impact:** 16→64+ workgroups/layer; attention ~2× at long context.
+- **Measured (Arc 140V, `bench_attn_split`, 5-run avg):** worst abs diff vs legacy
+  2–5e-7 (functional parity); kernel 6.78 → **3.41 ms** at T=6720 (**1.99×**),
+  ~2–3× at T=128–4096. End-to-end 35B at 6.7K (S=4, 64 groups/layer): decode
+  12.2 → **17.7/17.2 tok/s (1.42×)**, tokens deterministic across runs and
+  matching the greedy prefix; short prompt 8/8 golden tokens, no regression.
+- **Done:** Env-gated, default off; legacy numerics untouched (M4/ctest unaffected).
+- **Deps:** None.
+
