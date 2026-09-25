@@ -87,11 +87,17 @@ conducted on Intel Arc 140V at $P=6,720$ prompt tokens (`report_long_context_cat
    (warmup reaching **180.1 tok/s**), cutting prefill latency by more than half (from ~80 s to 38.5 s).
    AInfer is now within 5% of llama.cpp prefill at ~6.7K context, fully resolving the HTTP client
    timeout issue.
-2. **Greedy Decode Bandwidth Saturation (12.3 tok/s):** The subgroup butterfly shuffle kernel
+2. **Greedy Decode Bottleneck Analysis (12.3 tok/s):** The subgroup butterfly shuffle kernel
    eliminated over 200,000 serial barrier synchronizations per token, elevating greedy decode from
-   9.4 tok/s to **12.3 tok/s**. On Intel Arc 140V (85 GB/s LPDDR5X), reading 7.0 GB of active
-   weights per token has a theoretical hardware ceiling of $\sim 12.1\text{ tok/s}$. At 12.3 tok/s,
-   AInfer is operating at **100% of physical memory bandwidth saturation**.
+   9.4 tok/s to **12.3 tok/s** (+30.5% speedup).
+   - On Intel Core Ultra 7 258V, the theoretical peak memory bandwidth of the 128-bit LPDDR5X-8533
+     unified bus is **136.53 GB/s** (with isolated stream read reaching **103.03 GB/s** in T1.6).
+   - The INT4 quantized model requires streaming ~1.17 GB of static active weights (~1.30–1.40 GB total
+     traffic including DeltaNet SSM state and KV cache) per decode step.
+   - At $T=6,720$, the decode step time is ~81.5 ms (12.27 tok/s). Rather than being capped by weight
+     streaming (which consumes only ~16 ms at ~80 GB/s achieved bandwidth), the decode step is dominated
+     by the **10 full-attention layers**, which take ~6.5 ms per layer (~65 ms total per step, or ~80% of
+     step latency) due to sequential KV cache scanning across the 6.7K context length.
 3. **Speculative Decode Opportunity:** llama.cpp's 23.0 tok/s was achieved via speculative drafting.
    At long context, AInfer's MTP draft layer currently does not prefill its prompt KV cache during
    `prefill()`, leading to draft divergence on long prompts. Implementing prompt KV cache prefill

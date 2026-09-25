@@ -145,9 +145,9 @@ prerequisites for daily IDE use.
   `tools/decode/runtime_258v.cpp` (verify command list & kernel binding)
 - **Current state:** Implemented both pure-FP32 coalesced vector GEMV and Intel Xe2 hardware DPAS systolic GEMV (`intel_sub_group_f16_f16_matrix_mad_k16`).
 - **Empirical Findings & Architecture:**
-  1. **Memory-Bandwidth Bound at $B=2$:** With arithmetic intensity $\sim 4\text{ FLOP/Byte}$ on 85 GB/s LPDDR5X, ALU compute is not the bottleneck during $B=2$ verification. SLM staging (`int4_gemm_prefill`) incurs prohibitive local memory barrier overhead (~130–200 µs), whereas direct coalesced 16B loads complete in 28–82 µs.
+  1. **Memory-Bandwidth Bound at $B=2$:** With arithmetic intensity $\sim 4\text{ FLOP/Byte}$ on 128-bit LPDDR5X-8533 (136.53 GB/s theoretical peak, ~85–103 GB/s measured stream bandwidth), ALU compute is not the bottleneck during $B=2$ verification. SLM staging (`int4_gemm_prefill`) incurs prohibitive local memory barrier overhead (~130–200 µs), whereas direct coalesced 16B loads complete in 28–82 µs.
   2. **Numerical Parity vs Systolic Precision:** DPAS instructions require FP16 inputs (`short2`), truncating 13 mantissa bits of activation precision. Over 40 hybrid layers, this accumulates slight rounding drift that can flip marginal token decisions (e.g. digit tokens with logit differences $<0.001$). The pure-FP32 coalesced vector kernel (`int4_gemv_m2`) operates in full FP32, executing faster (34.0 ms verify vs 35.5 ms verify) while guaranteeing **100% bit-exact mathematical parity** with single-token decode.
-  3. **LM Head Argmax:** Full vocabulary ($M=248,320, K=2048$, 254 MB weights) evaluates in **2.99 ms** via coalesced memory streaming (84.76 GB/s LPDDR5X read saturation).
+  3. **LM Head Argmax:** Full vocabulary ($M=248,320, K=2048$, 254 MB weights) evaluates in **2.99 ms** via coalesced memory streaming (84.76 GB/s sustained read rate).
 - **Verification & Benchmarks (`bench_speculative_258v` on 35B model):**
   1. **Bit-Exact Parity:** 5 / 5 test prompts 100% bit-exact identical to autoregressive greedy decode (160 / 160 tokens matched).
   2. **Speculative Throughput:**
