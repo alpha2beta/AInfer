@@ -83,3 +83,10 @@ tools/kernels_258v/bench_gemv_m2
 tools/kernels_258v/bench_lm_head_m2
 tools/kernels_258v/asm_dump/
 tools/mtp/profile_verify_components
+tools/kernels_258v/bench_decode_attn_sg
+tools/kernels_258v/test_kv8_primitive
+tools/kernels_258v/test_kv8_batch_primitive
+tools/kernels_258v/bench_attn_prefill
+tools/kernels_258v/bench_flash_attn_prefill
+tools/bench_258v/bench_long_context_catchup
+tools/bench_258v/bench_moe_micro

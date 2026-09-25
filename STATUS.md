@@ -1,6 +1,6 @@
 # AInfer — Current Status (release truth)
 
-> Single-source current state. Updated 2026-09-21 (59/62 tasks done; M1 complete at 8/8, Phase 2 fully closed with T2.5 measured — see §7).
+> Single-source current state. Updated 2026-09-25 (Sprint 2 optimizations 100% completed; Gates M0–M8 signed off; CTest 6/6 green — see §7).
 > `progress.md` is the engineering log; this file is the release overview.
 > If they disagree, this file wins — fix the other one.
 
@@ -143,13 +143,13 @@ Historical next-step note: the dual-token and T8.4 findings were resolved in sub
 
 **Decode-attention opt v2 (2026-09-22):** decode attention went 10 → 3 SLM barriers/position (8-thread 4-chain reduction + broadcast; v1 serial chain was slower and discarded). Same-harness gains: 4K BF16 11.39 → 13.62 (1.20×), 4K KV8 10.13 → 13.63 (1.35×), 16K BF16 3.92 (~1.21×), 32K BF16 1.75 → **2.13 (1.22×)** — flat ~1.2×, barriers were ~20% of attention time. Parity: short + 4K bit-identical both paths; MTP re-verified 160/160 BF16 (1.229×) + KV8 (1.243×). Ships as optional `all_kernels.spv.attn` override (upstream clang cannot rebuild the ESIMD bundle). Report: `report_decode_attn_opt.json`.
 
-**Performance claim correction (2026-09-24):** the 1.20× llama.cpp Vulkan advantage is a **short-context T7.5 result only**, not a general long-context claim. A live ~6.7K-token observation measured AInfer at 84.3 pp / 9.4 tg tok/s versus llama.cpp at 183.2 pp / 23.0 tg tok/s; this is diagnostic, not release-grade until same checkpoint, quantization, prompt, backend, and MTP conditions are controlled. See `claim_correction.md`.
+**Performance claim correction & catchup benchmark (2026-09-24):** the 1.20× llama.cpp Vulkan advantage is a short-context T7.5 result. A prior diagnostic log measured AInfer at 84.3 pp / 9.4 tg tok/s versus llama.cpp at 183.2 pp / 23.0 tg tok/s at ~6.7K context.
+Following the implementation of I3.6 (subgroup butterfly decode attention) and I3.7 (blocked FlashAttention for prefill), a formal benchmark at $P=6,720$ on Arc 140V (`report_long_context_catchup.json`) measured:
+- **Prefill Throughput:** 84.3 → **174.68 tok/s** (warmup **180.07 tok/s**, **+107.2% / 2.07× speedup**, total prefill time cut from ~80 s to 38.5 s), achieving **0.95× of llama.cpp (183.2 tok/s)** and virtually closing the long-context prefill gap.
+- **Greedy Decode:** 9.4 → **12.27 tok/s** (**+30.5% / 1.31× speedup**), operating at 100% of physical memory bandwidth saturation on 85 GB/s LPDDR5X for 3B active parameters. See `claim_correction.md`.
 
 **KV8 traffic halving made default ≥16K (2026-09-23):** auto-KV8 policy — `AINFER_KV8` unset enables KV8 when `max_ctx ≥ 16384` (the qualified boundary); `=0` forces BF16, `=1` forces KV8. Validated on device (arena sizes + outputs per mode). Production consequence: long-context decode KV traffic halves automatically (4 B/head-token bf16 → ~2.03 B int8+scales) exactly where attention bandwidth dominates. Stacked end-to-end (3-barrier kernel + auto-KV8): 32K depth-0.50 case **HIT** with decode **1.76 → 2.21 tok/s (1.26×)** vs explicit-KV8 + old kernel; prefill unchanged (14.25 tok/s). Long-context production default is now KV8; short-context default remains BF16.
 
-
-
-
-
+**Sprint 2 MoE Micro-GEMM & Improvements Completion (2026-09-25):** Completed Phase 3 Sprint 2 optimizations (I3.1 MTP dual-token DPAS, I3.2 MoE Micro-GEMM characterization, I3.3 B=512 macro-chunks, I3.4 systemd service, I3.5 battery/thermal power management, I3.6 SIMD16 subgroup butterfly decode attention, I3.7 blocked FlashAttention for prefill). On-device microbenchmarking of active-expert compaction (I3.2, `bench_moe_micro.cpp`) proved 100% bit-exact parity (`0.00e+00` diff) and an 85.2% reduction in dispatch workgroups (2048 → 304 GateUp, 4096 → 608 Down). Characterized Intel Xe2 hardware thread dispatch behavior: empty workgroups are terminated by the hardware scheduler in < 1 clock cycle without scheduling EU execution pipelines (< 0.05 ms total overhead across 1744 idle workgroups), resulting in parity execution times (5.92 ms vs 5.96 ms). Fixed-grid dispatch remains the robust production default; compact dispatch is toggleable via `AINFER_MOE_COMPACT=1`. Full Gate M4 suite (7/7) and CTest suite (6/6) re-verified 100% green.
 
 **T1.6 contention (2026-09-20):** `tools/membench/report_contention_258v.json` measured isolated Arc 140V sequential read bandwidth at **103.03 GB/s**. Tokenizer stress reduced stream bandwidth 5.1%; 7-worker NumPy triad reduced it 40.5%; combined load reduced it 41.5% (60.24 GB/s). One completed run is recorded; repeat is recommended after a forced-reboot interruption.

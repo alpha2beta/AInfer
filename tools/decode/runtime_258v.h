@@ -364,6 +364,7 @@ public:
   bool profile_step_breakdown(double &embed_ms, double &layers_ms, double &tail_ms,
                               double &step_ms, std::vector<double> &layer_times_ms);
   bool profile_prefill_breakdown(int B);
+  bool profile_moe_shootout(int B);
 
   // T5.5: Save / restore offline diagnostic cache
   bool export_diagnostic_cache(const std::string &cache_file, uint32_t pos);
@@ -668,6 +669,10 @@ private:
   int *d_expert_offsets_ = nullptr;      // [256]
   int *d_sorted_tokens_ = nullptr;       // [MAX_PREFILL_CHUNK * 8]
   int *d_sorted_slots_ = nullptr;        // [MAX_PREFILL_CHUNK * 8]
+  int *d_active_expert_ids_ = nullptr;   // [256]
+  int *d_num_active_experts_ = nullptr;  // [4] int + pad
+  uint32_t *d_launch_args_gu_ = nullptr; // [3] groupCountX, Y, Z
+  uint32_t *d_launch_args_dn_ = nullptr; // [3] groupCountX, Y, Z
 
   // Batch Kernel Handles
   ze_kernel_handle_t k_gemm_prefill_ = nullptr;
@@ -684,10 +689,15 @@ private:
   ze_kernel_handle_t k_attn_batch_ = nullptr;
   ze_kernel_handle_t k_rope_batch_i8_ = nullptr;
   ze_kernel_handle_t k_attn_batch_i8_ = nullptr;
+  bool flash_attn_prefill_ = true;
   ze_kernel_handle_t k_router_batch_ = nullptr;
   ze_kernel_handle_t k_moe_build_expert_bins_ = nullptr;
+  ze_kernel_handle_t k_moe_build_expert_bins_compact_ = nullptr;
   ze_kernel_handle_t k_moe_gateup_grouped_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_gateup_compact_batch_ = nullptr;
   ze_kernel_handle_t k_moe_down_grouped_batch_ = nullptr;
+  ze_kernel_handle_t k_moe_down_compact_batch_ = nullptr;
+  bool moe_compact_ = false;
   ze_kernel_handle_t k_moe_accum_down_batch_ = nullptr;
   ze_kernel_handle_t k_exp_gu_all_batch_ = nullptr;
   ze_kernel_handle_t k_silu_all_batch_ = nullptr;

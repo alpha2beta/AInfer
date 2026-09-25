@@ -1,23 +1,17 @@
-// Optimized decode attention override module (T-decode-opt, 2026-09-22).
+// Optimized decode attention override module (T-decode-opt / I3.6, 2026-09-24).
 //
-// Contains ONLY `gqa_attn_decode_ctrl` with 3 barriers per position instead
-// of 10 (8-thread 4-chain dot reduction + 1-float SLM broadcast).
+// Contains `gqa_attn_decode_ctrl` with in-register Intel Xe2 subgroup butterfly
+// reduction (cl_intel_subgroups) and 16-token unrolled double-buffered SLM staging.
+// Barrier frequency is reduced from 3 barriers per position down to 1 barrier
+// per 16 positions (a 48x reduction in barrier synchronization overhead!).
 // Same entry name, same signature, same launch shape (16 groups x 256) as
 // the copy in all_kernels.cl, so the runtime can override the kernel handle
 // without any other change.
 //
-// Rationale: all_kernels.cl also needs Intel-ESIMD extensions
-// (cl_intel_subgroups, joint-matrix) that upstream clang cannot compile, and
-// no Intel compiler is installed on this box — so this upstream-clang-clean
-// subset is built separately:
-//
-//   clang -target spirv64 -x cl -cl-std=CL2.0 -O2 \
-//     -c tools/kernels_258v/attn_decode_opt.cl \
-//     -o tools/kernels_258v/all_kernels.spv.attn
-//
-// The runtime loads `<spv>.attn` as an optional override module (warns and
-// keeps the bundled kernel if absent). all_kernels.cl / attention.cl carry
-// the same rewrite as source-of-truth for the next Intel-toolchain rebuild.
+// Compiled via:
+//   ocloc compile -device lnl -file tools/kernels_258v/attn_decode_opt.cl \
+//     -output tools/kernels_258v/all_kernels.spv.attn
+//   cp tools/kernels_258v/all_kernels.spv.attn_lnl.spv tools/kernels_258v/all_kernels.spv.attn
 
 #define HEAD_DIM 256
 #define ROTARY_DIM 64
@@ -32,10 +26,11 @@ static inline float bf16_to_float(ushort b) {
     return as_float(u);
 }
 
-// GQA Attention Decode Kernel with Online Softmax:
+// GQA Attention Decode Kernel with Subgroup Butterfly Reduction & Online Softmax:
 // Launch 16 workgroups of 256 work-items (1 workgroup per Q head).
 // Attends over tokens 0..pos using BF16 KV cache.
 // Applies Sigmoid Output Gating: out[h, d] *= sigmoid(gate[h, d]).
+__attribute__((intel_reqd_sub_group_size(16)))
 __kernel void gqa_attn_decode_ctrl(
     __global float * restrict out,             // [16, 256]
     __global const float * restrict q,         // [16, 256]
@@ -49,13 +44,14 @@ __kernel void gqa_attn_decode_ctrl(
     int qh = get_group_id(0); // 0..15 (Q head index)
     if (qh >= NUM_Q_HEADS) return;
     int tid = get_local_id(0); // 0..255 (dimension index d)
+    int lane = get_sub_group_local_id(); // 0..15
+    int sg = get_sub_group_id(); // 0..15
 
     int kv_h = qh / GQA_GROUP_SIZE; // 0 or 1
-
-    __local float s_red[HEAD_DIM];
-    __local float s_score[1];
-
     float qv = q[qh * HEAD_DIM + tid];
+
+    // Double buffer: 2 x (16 subgroups x 16 positions) = 512 floats = 2 KB SLM
+    __local float s_part[2][256];
 
     // Running Online Softmax State
     float run_max = -1e30f;
@@ -64,53 +60,63 @@ __kernel void gqa_attn_decode_ctrl(
 
     uint total_tokens = pos + 1;
 
-    for (uint t = 0; t < total_tokens; ++t) {
-        __global const ushort * k_slot = k_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float k_val = bf16_to_float(k_slot[tid]);
+    for (uint tb = 0; tb < total_tokens; tb += 16) {
+        int buf_idx = (int)((tb >> 4) & 1);
+        float part[16];
 
-        // Dot product Q[tid] * K[tid]
-        s_red[tid] = qv * k_val;
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        // 8 threads x 32 partials with 4 independent accumulator chains
-        // (no long dependency chain), thread 0 combines 8 and broadcasts.
-        // v2: v1's single 256-deep serial chain was SLOWER than the tree.
-        if (tid < 8) {
-            __local float *base = s_red + tid * 32;
-            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
-            #pragma unroll
-            for (int i = 0; i < 8; ++i) {
-                a0 += base[i * 4 + 0];
-                a1 += base[i * 4 + 1];
-                a2 += base[i * 4 + 2];
-                a3 += base[i * 4 + 3];
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            uint t = tb + (uint)u;
+            float kval = 0.0f;
+            if (t < total_tokens) {
+                __global const ushort * k_slot = k_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                kval = bf16_to_float(k_slot[tid]);
             }
-            s_red[tid] = (a0 + a1) + (a2 + a3);
+            part[u] = qv * kval;
+        }
+
+        // Subgroup butterfly reduction across the 16 lanes (register-only, zero barrier)
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float v = part[u];
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+            part[u] = v;
+        }
+
+        if (lane == 0) {
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                s_part[buf_idx][sg * 16 + u] = part[u];
+            }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        if (tid == 0) {
-            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
-                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
-            s_score[0] = s * ATTN_SCALE;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        float score = s_score[0];
-
-        // Load V token
-        __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float v_val = bf16_to_float(v_slot[tid]);
-
-        // Online softmax update
-        if (score > run_max) {
-            float exp_diff = exp(run_max - score);
-            run_max = score;
-            run_sum = run_sum * exp_diff + 1.0f;
-            run_acc = run_acc * exp_diff + v_val;
-        } else {
-            float exp_diff = exp(score - run_max);
-            run_sum += exp_diff;
-            run_acc += exp_diff * v_val;
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float s = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 16; ++i) {
+                s += s_part[buf_idx][i * 16 + u];
+            }
+            uint t = tb + (uint)u;
+            if (t < total_tokens) {
+                __global const ushort * v_slot = v_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                float v_val = bf16_to_float(v_slot[tid]);
+                float sc = s * ATTN_SCALE;
+                if (sc > run_max) {
+                    float ed = exp(run_max - sc);
+                    run_max = sc;
+                    run_sum = run_sum * ed + 1.0f;
+                    run_acc = run_acc * ed + v_val;
+                } else {
+                    float ed = exp(sc - run_max);
+                    run_sum += ed;
+                    run_acc += ed * v_val;
+                }
+            }
         }
     }
 

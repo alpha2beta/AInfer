@@ -1248,6 +1248,7 @@ __kernel void rope_and_kv_append_bf16(
     }
 }
 
+__attribute__((intel_reqd_sub_group_size(16)))
 __kernel void gqa_attn_decode_bf16(
     __global float * restrict out,
     __global const float * restrict q,
@@ -1260,15 +1261,13 @@ __kernel void gqa_attn_decode_bf16(
     int qh = get_group_id(0);
     if (qh >= NUM_Q_HEADS) return;
     int tid = get_local_id(0);
+    int lane = get_sub_group_local_id();
+    int sg = get_sub_group_id();
 
     int kv_h = qh / GQA_GROUP_SIZE;
-
-    // T-decode-opt (2026-09-22): 3 barriers per position instead of 10;
-    // see gqa_attn_decode_ctrl for rationale.
-    __local float s_red[HEAD_DIM];
-    __local float s_score[1];
-
     float qv = q[qh * HEAD_DIM + tid];
+
+    __local float s_part[2][256];
 
     float run_max = -1e30f;
     float run_sum = 0.0f;
@@ -1276,47 +1275,62 @@ __kernel void gqa_attn_decode_bf16(
 
     uint total_tokens = pos + 1;
 
-    for (uint t = 0; t < total_tokens; ++t) {
-        __global const ushort * k_slot = k_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float k_val = bf16_to_float(k_slot[tid]);
-
-        s_red[tid] = qv * k_val;
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        if (tid < 8) {
-            __local float *base = s_red + tid * 32;
-            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
-            #pragma unroll
-            for (int i = 0; i < 8; ++i) {
-                a0 += base[i * 4 + 0];
-                a1 += base[i * 4 + 1];
-                a2 += base[i * 4 + 2];
-                a3 += base[i * 4 + 3];
+    for (uint tb = 0; tb < total_tokens; tb += 16) {
+        int buf_idx = (int)((tb >> 4) & 1);
+        float part[16];
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            uint t = tb + (uint)u;
+            float kval = 0.0f;
+            if (t < total_tokens) {
+                __global const ushort * k_slot = k_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                kval = bf16_to_float(k_slot[tid]);
             }
-            s_red[tid] = (a0 + a1) + (a2 + a3);
+            part[u] = qv * kval;
+        }
+
+        // Subgroup butterfly reduction across the 16 lanes (register-only)
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float v = part[u];
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+            part[u] = v;
+        }
+
+        if (lane == 0) {
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                s_part[buf_idx][sg * 16 + u] = part[u];
+            }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        if (tid == 0) {
-            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
-                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
-            s_score[0] = s * ATTN_SCALE;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        float score = s_score[0];
-
-        __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float v_val = bf16_to_float(v_slot[tid]);
-
-        if (score > run_max) {
-            float exp_diff = exp(run_max - score);
-            run_max = score;
-            run_sum = run_sum * exp_diff + 1.0f;
-            run_acc = run_acc * exp_diff + v_val;
-        } else {
-            float exp_diff = exp(score - run_max);
-            run_sum += exp_diff;
-            run_acc += exp_diff * v_val;
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float s = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 16; ++i) {
+                s += s_part[buf_idx][i * 16 + u];
+            }
+            uint t = tb + (uint)u;
+            if (t < total_tokens) {
+                __global const ushort * v_slot = v_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                float v_val = bf16_to_float(v_slot[tid]);
+                float sc = s * ATTN_SCALE;
+                if (sc > run_max) {
+                    float ed = exp(run_max - sc);
+                    run_max = sc;
+                    run_sum = run_sum * ed + 1.0f;
+                    run_acc = run_acc * ed + v_val;
+                } else {
+                    float ed = exp(sc - run_max);
+                    run_sum += ed;
+                    run_acc += ed * v_val;
+                }
+            }
         }
     }
 
@@ -1439,6 +1453,7 @@ __kernel void deinterleave_q_gate(
     gate_out[gid] = q_proj_in[in_base + HEAD_DIM + d];
 }
 
+__attribute__((intel_reqd_sub_group_size(16)))
 __kernel void gqa_attn_decode_ctrl(
     __global float * restrict out,
     __global const float * restrict q,
@@ -1452,19 +1467,13 @@ __kernel void gqa_attn_decode_ctrl(
     int qh = get_group_id(0);
     if (qh >= NUM_Q_HEADS) return;
     int tid = get_local_id(0);
+    int lane = get_sub_group_local_id();
+    int sg = get_sub_group_id();
 
     int kv_h = qh / GQA_GROUP_SIZE;
-
-    // T-decode-opt (2026-09-22): 3 barriers per position instead of 10.
-    // The old SLM tree reduction (8 barriers) + broadcast (1) + store (1)
-    // dominated long-context decode. 8 threads x 32 partials with 4
-    // independent accumulator chains (no long dependency chain); thread 0
-    // combines 8 and broadcasts via a 1-float SLM slot. All barriers uniform.
-    // v2: v1's single 256-deep serial chain was SLOWER than the tree.
-    __local float s_red[HEAD_DIM];
-    __local float s_score[1];
-
     float qv = q[qh * HEAD_DIM + tid];
+
+    __local float s_part[2][256];
 
     float run_max = -1e30f;
     float run_sum = 0.0f;
@@ -1472,47 +1481,62 @@ __kernel void gqa_attn_decode_ctrl(
 
     uint total_tokens = pos + 1;
 
-    for (uint t = 0; t < total_tokens; ++t) {
-        __global const ushort * k_slot = k_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float k_val = bf16_to_float(k_slot[tid]);
-
-        s_red[tid] = qv * k_val;
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        if (tid < 8) {
-            __local float *base = s_red + tid * 32;
-            float a0 = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;
-            #pragma unroll
-            for (int i = 0; i < 8; ++i) {
-                a0 += base[i * 4 + 0];
-                a1 += base[i * 4 + 1];
-                a2 += base[i * 4 + 2];
-                a3 += base[i * 4 + 3];
+    for (uint tb = 0; tb < total_tokens; tb += 16) {
+        int buf_idx = (int)((tb >> 4) & 1);
+        float part[16];
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            uint t = tb + (uint)u;
+            float kval = 0.0f;
+            if (t < total_tokens) {
+                __global const ushort * k_slot = k_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                kval = bf16_to_float(k_slot[tid]);
             }
-            s_red[tid] = (a0 + a1) + (a2 + a3);
+            part[u] = qv * kval;
+        }
+
+        // Subgroup butterfly reduction across the 16 lanes (register-only)
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float v = part[u];
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+            v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+            part[u] = v;
+        }
+
+        if (lane == 0) {
+            #pragma unroll
+            for (int u = 0; u < 16; ++u) {
+                s_part[buf_idx][sg * 16 + u] = part[u];
+            }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        if (tid == 0) {
-            float s = s_red[0] + s_red[1] + s_red[2] + s_red[3]
-                    + s_red[4] + s_red[5] + s_red[6] + s_red[7];
-            s_score[0] = s * ATTN_SCALE;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        float score = s_score[0];
-
-        __global const ushort * v_slot = v_cache + (kv_h * max_ctx + t) * HEAD_DIM;
-        float v_val = bf16_to_float(v_slot[tid]);
-
-        if (score > run_max) {
-            float exp_diff = exp(run_max - score);
-            run_max = score;
-            run_sum = run_sum * exp_diff + 1.0f;
-            run_acc = run_acc * exp_diff + v_val;
-        } else {
-            float exp_diff = exp(score - run_max);
-            run_sum += exp_diff;
-            run_acc += exp_diff * v_val;
+        #pragma unroll
+        for (int u = 0; u < 16; ++u) {
+            float s = 0.0f;
+            #pragma unroll
+            for (int i = 0; i < 16; ++i) {
+                s += s_part[buf_idx][i * 16 + u];
+            }
+            uint t = tb + (uint)u;
+            if (t < total_tokens) {
+                __global const ushort * v_slot = v_cache + ((size_t)kv_h * max_ctx + t) * HEAD_DIM;
+                float v_val = bf16_to_float(v_slot[tid]);
+                float sc = s * ATTN_SCALE;
+                if (sc > run_max) {
+                    float ed = exp(run_max - sc);
+                    run_max = sc;
+                    run_sum = run_sum * ed + 1.0f;
+                    run_acc = run_acc * ed + v_val;
+                } else {
+                    float ed = exp(sc - run_max);
+                    run_sum += ed;
+                    run_acc += ed * v_val;
+                }
+            }
         }
     }
 
@@ -3167,6 +3191,182 @@ __kernel void gqa_attn_prefill_batch_v2(
 }
 
 // =========================================================================
+// GQA Blocked FlashAttention Prefill (I3.7):
+// Tiles K and V in SLM (T_TILE = 16 tokens) and shares each KV load across
+// B_TILE = 8 queries. Reduces DRAM KV cache traffic by 8x during long-context
+// prefill, eliminating memory bus saturation when context > L2 cache (8 MB).
+// =========================================================================
+#define FLASH_PREFILL_B_TILE 8
+#define FLASH_PREFILL_T_TILE 16
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void flash_attn_prefill_b8_t16(
+    __global float * restrict out,
+    __global const float * restrict q,
+    __global const float * restrict gate,
+    __global const ushort * restrict k_cache,
+    __global const ushort * restrict v_cache,
+    __global const int * restrict ctrl,
+    uint max_ctx,
+    int B
+) {
+    int qh = get_group_id(0);
+    if (qh >= NUM_Q_HEADS) return;
+    int b_blk = get_group_id(1);
+    int b_base = b_blk * FLASH_PREFILL_B_TILE;
+    if (b_base >= B) return;
+
+    int tid = get_local_id(0); // 0..255
+    int lane = get_sub_group_local_id(); // 0..15
+    int sg = get_sub_group_id(); // 0..15
+
+    int kv_h = qh / GQA_GROUP_SIZE;
+    uint base_pos = (uint)ctrl[1];
+
+    // SLM allocations:
+    // s_k: 16 tokens x 256 dims = 4096 ushorts = 8 KB
+    // s_v: 16 tokens x 256 dims = 4096 ushorts = 8 KB
+    // s_part: 16 tokens x 16 subgroups x 8 queries = 2048 floats = 8 KB
+    // s_score: 16 tokens x 8 queries = 128 floats = 512 B
+    __local ushort s_k[FLASH_PREFILL_T_TILE][HEAD_DIM];
+    __local ushort s_v[FLASH_PREFILL_T_TILE][HEAD_DIM];
+    __local float s_part[FLASH_PREFILL_T_TILE][16][FLASH_PREFILL_B_TILE];
+    __local float s_score[FLASH_PREFILL_T_TILE][FLASH_PREFILL_B_TILE];
+
+    // Private registers for queries Q, running softmax state, and accumulators
+    float q_vec[FLASH_PREFILL_B_TILE];
+    float sig_g[FLASH_PREFILL_B_TILE];
+    float run_max[FLASH_PREFILL_B_TILE];
+    float run_sum[FLASH_PREFILL_B_TILE];
+    float run_acc[FLASH_PREFILL_B_TILE];
+    uint total_tokens[FLASH_PREFILL_B_TILE];
+
+    #pragma unroll
+    for (int i = 0; i < FLASH_PREFILL_B_TILE; ++i) {
+        int b = b_base + i;
+        if (b < B) {
+            size_t q_idx = (size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid;
+            q_vec[i] = q[q_idx];
+            float g_val = gate[q_idx];
+            sig_g[i] = 1.0f / (1.0f + exp(-g_val));
+            total_tokens[i] = base_pos + (uint)b + 1;
+        } else {
+            q_vec[i] = 0.0f;
+            sig_g[i] = 0.0f;
+            total_tokens[i] = 0;
+        }
+        run_max[i] = -1e30f;
+        run_sum[i] = 0.0f;
+        run_acc[i] = 0.0f;
+    }
+
+    int last_b = min(b_base + FLASH_PREFILL_B_TILE - 1, B - 1);
+    uint max_seq_len = base_pos + (uint)last_b + 1;
+
+    int tau0 = tid / 32;          // 0..7
+    int d0   = (tid % 32) * 8;    // 0, 8, 16, .. 248
+    int tau1 = 8 + tid / 32;      // 8..15
+    int d1   = d0;
+
+    for (uint t_block = 0; t_block < max_seq_len; t_block += FLASH_PREFILL_T_TILE) {
+        // 1. Cooperative SLM load of K and V blocks (aligned 16-byte vector loads)
+        uint t0 = t_block + (uint)tau0;
+        if (t0 < max_seq_len && t0 < max_ctx) {
+            __global const ushort8 *k_ptr0 = (__global const ushort8 *)(k_cache + ((size_t)kv_h * max_ctx + t0) * HEAD_DIM + d0);
+            __global const ushort8 *v_ptr0 = (__global const ushort8 *)(v_cache + ((size_t)kv_h * max_ctx + t0) * HEAD_DIM + d0);
+            *(__local ushort8 *)&s_k[tau0][d0] = *k_ptr0;
+            *(__local ushort8 *)&s_v[tau0][d0] = *v_ptr0;
+        } else {
+            *(__local ushort8 *)&s_k[tau0][d0] = (ushort8)(0);
+            *(__local ushort8 *)&s_v[tau0][d0] = (ushort8)(0);
+        }
+
+        uint t1 = t_block + (uint)tau1;
+        if (t1 < max_seq_len && t1 < max_ctx) {
+            __global const ushort8 *k_ptr1 = (__global const ushort8 *)(k_cache + ((size_t)kv_h * max_ctx + t1) * HEAD_DIM + d1);
+            __global const ushort8 *v_ptr1 = (__global const ushort8 *)(v_cache + ((size_t)kv_h * max_ctx + t1) * HEAD_DIM + d1);
+            *(__local ushort8 *)&s_k[tau1][d1] = *k_ptr1;
+            *(__local ushort8 *)&s_v[tau1][d1] = *v_ptr1;
+        } else {
+            *(__local ushort8 *)&s_k[tau1][d1] = (ushort8)(0);
+            *(__local ushort8 *)&s_v[tau1][d1] = (ushort8)(0);
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 2. Compute dot products Q[i] * K[tau]
+        #pragma unroll
+        for (int tau = 0; tau < FLASH_PREFILL_T_TILE; ++tau) {
+            float kval = bf16_to_float(s_k[tau][tid]);
+            #pragma unroll
+            for (int i = 0; i < FLASH_PREFILL_B_TILE; ++i) {
+                float v = q_vec[i] * kval;
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 8));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 4));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 2));
+                v += intel_sub_group_shuffle(v, (uint)(lane ^ 1));
+                if (lane == 0) {
+                    s_part[tau][sg][i] = v;
+                }
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 3. Parallel reduction of subgroup partial sums:
+        // Each of the 16 subgroups sg handles token tau = sg
+        // Each lane i = 0..7 handles query i
+        if (lane < FLASH_PREFILL_B_TILE) {
+            float sum = 0.0f;
+            #pragma unroll
+            for (int s = 0; s < 16; ++s) {
+                sum += s_part[sg][s][lane];
+            }
+            s_score[sg][lane] = sum * ATTN_SCALE;
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // 4. Online Softmax update with Value cache block
+        #pragma unroll
+        for (int tau = 0; tau < FLASH_PREFILL_T_TILE; ++tau) {
+            uint t = t_block + (uint)tau;
+            float v_val = bf16_to_float(s_v[tau][tid]);
+
+            #pragma unroll
+            for (int i = 0; i < FLASH_PREFILL_B_TILE; ++i) {
+                int b = b_base + i;
+                if (b < B && t < total_tokens[i]) {
+                    float sc = s_score[tau][i];
+                    if (sc > run_max[i]) {
+                        float ed = exp(run_max[i] - sc);
+                        run_max[i] = sc;
+                        run_sum[i] = run_sum[i] * ed + 1.0f;
+                        run_acc[i] = run_acc[i] * ed + v_val;
+                    } else {
+                        float ed = exp(sc - run_max[i]);
+                        run_sum[i] += ed;
+                        run_acc[i] += ed * v_val;
+                    }
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    // 5. Write final gated attention output for all valid queries
+    #pragma unroll
+    for (int i = 0; i < FLASH_PREFILL_B_TILE; ++i) {
+        int b = b_base + i;
+        if (b < B) {
+            float attn_val = (run_sum[i] > 0.0f) ? (run_acc[i] / run_sum[i]) : 0.0f;
+            size_t out_idx = (size_t)b * (NUM_Q_HEADS * HEAD_DIM) + qh * HEAD_DIM + tid;
+            out[out_idx] = attn_val * sig_g[i];
+        }
+    }
+}
+
+// =========================================================================
 // =========================================================================
 // 1e. INT4 Group-128 Batched Prefill GEMM v4: identical numerics to v2,
 // but M_tile=32 rows per subgroup (each lane handles 2 rows) instead of
@@ -4053,6 +4253,453 @@ __kernel void moe_accum_down_batch(
     }
     moe_acc[gid] = sum;
 }
+
+// =========================================================================
+// MoE Active Experts Compact Micro-GEMM (Task I3.2 / OpenVINO Parity)
+// =========================================================================
+
+__kernel void moe_build_expert_bins_compact(
+    __global int * restrict expert_counts,       // [256]
+    __global int * restrict expert_offsets,      // [256]
+    __global int * restrict sorted_tokens,       // [B * 8]
+    __global int * restrict sorted_slots,        // [B * 8]
+    __global int * restrict active_expert_ids,   // [256]
+    __global int * restrict num_active_experts,  // [1]
+    __global uint * restrict launch_args_gu,     // [3] groupCountX, groupCountY, groupCountZ
+    __global uint * restrict launch_args_dn,     // [3] groupCountX, groupCountY, groupCountZ
+    __global const uint * restrict top_idx,      // [B * 8]
+    int B
+) {
+    int lid = get_local_id(0); // 0..255 (1 workgroup of 256 threads)
+    if (get_group_id(0) > 0) return;
+
+    __local int local_counts[256];
+    __local int local_offsets[256];
+    __local int local_active_offsets[256];
+
+    // 1. Thread lid counts how many times expert lid appears across all (b, k)
+    int total_items = B * 8;
+    int count = 0;
+    for (int idx = 0; idx < total_items; ++idx) {
+        if (top_idx[idx] == (uint)lid) {
+            count++;
+        }
+    }
+    local_counts[lid] = count;
+    expert_counts[lid] = count;
+    local_offsets[lid] = count;
+    int is_act = (count > 0) ? 1 : 0;
+    local_active_offsets[lid] = is_act;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // 2. Parallel prefix sums (both token offsets and active expert compaction)
+    for (int offset = 1; offset < 256; offset <<= 1) {
+        int temp_cnt = 0;
+        int temp_act = 0;
+        if (lid >= offset) {
+            temp_cnt = local_offsets[lid - offset];
+            temp_act = local_active_offsets[lid - offset];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        local_offsets[lid] += temp_cnt;
+        local_active_offsets[lid] += temp_act;
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    int exclusive_offset = (lid == 0) ? 0 : local_offsets[lid - 1];
+    expert_offsets[lid] = exclusive_offset;
+
+    int exclusive_act = (lid == 0) ? 0 : local_active_offsets[lid - 1];
+    if (is_act) {
+        active_expert_ids[exclusive_act] = lid;
+    }
+
+    if (lid == 255) {
+        int total_active = local_active_offsets[255];
+        *num_active_experts = total_active;
+        if (launch_args_gu != NULL) {
+            launch_args_gu[0] = (uint)(total_active * 8);
+            launch_args_gu[1] = 1;
+            launch_args_gu[2] = 1;
+        }
+        if (launch_args_dn != NULL) {
+            launch_args_dn[0] = (uint)(total_active * 16);
+            launch_args_dn[1] = 1;
+            launch_args_dn[2] = 1;
+        }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    // 3. Scatter token and slot indices into sorted order
+    int cur = exclusive_offset;
+    for (int idx = 0; idx < total_items; ++idx) {
+        if (top_idx[idx] == (uint)lid) {
+            sorted_tokens[cur] = idx / 8;
+            sorted_slots[cur] = idx % 8;
+            cur++;
+        }
+    }
+}
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void moe_gateup_compact_batch(
+    __global float * restrict all_gu,
+    __global const uchar * restrict w_bank,
+    __global const ushort * restrict s_bank,
+    __global const float * restrict x,
+    __global const int * restrict expert_counts,
+    __global const int * restrict expert_offsets,
+    __global const int * restrict sorted_tokens,
+    __global const int * restrict sorted_slots,
+    __global const int * restrict active_expert_ids,
+    __global const int * restrict num_active_experts,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_id = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    __local half s_x[2][32][16];
+    __local int s_tok[32];
+    __local int s_slot[32];
+
+    int num_active = *num_active_experts;
+    int active_idx = grp_id / 8;
+    if (active_idx >= num_active) return;
+
+    int expert_id = active_expert_ids[active_idx];
+    if (expert_id < 0 || expert_id >= NUM_EXPERTS) return;
+
+    int num_tokens = expert_counts[expert_id];
+    if (num_tokens <= 0) return;
+
+    int chunk_m = grp_id % 8;
+    int m_tile_idx = chunk_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (m_base >= 1024) return;
+
+    int m = m_base + lid;
+    size_t row_idx = (size_t)expert_id * 1024 + m;
+    int num_groups = K / GROUP_SIZE; // 16 for K=2048
+
+    __global const uchar *row_w = w_bank + row_idx * (K / 2);
+    __global const ushort *row_s = s_bank + row_idx * num_groups;
+    int start_idx = expert_offsets[expert_id];
+
+    // Loop over tokens routed to this expert in macro-tiles of 32 (4 systolic DPAS tiles of 8)
+    for (int t_base = 0; t_base < num_tokens; t_base += 32) {
+        int cur_T0 = (num_tokens - t_base > 0) ? min(8, num_tokens - t_base) : 0;
+        int cur_T1 = (num_tokens - (t_base + 8) > 0) ? min(8, num_tokens - (t_base + 8)) : 0;
+        int cur_T2 = (num_tokens - (t_base + 16) > 0) ? min(8, num_tokens - (t_base + 16)) : 0;
+        int cur_T3 = (num_tokens - (t_base + 24) > 0) ? min(8, num_tokens - (t_base + 24)) : 0;
+        int total_cur_T = cur_T0 + cur_T1 + cur_T2 + cur_T3;
+
+        float8 acc0 = (float8)(0.0f);
+        float8 acc1 = (float8)(0.0f);
+        float8 acc2 = (float8)(0.0f);
+        float8 acc3 = (float8)(0.0f);
+
+        int tid = get_local_id(0); // 0..127
+        int tok_idx = tid / 4;      // 0..31
+        int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+        bool valid_tok = (tok_idx < total_cur_T);
+
+        int b_tok = valid_tok ? sorted_tokens[start_idx + t_base + tok_idx] : 0;
+
+        if (tid < 32) {
+            s_tok[tid]  = (tid < total_cur_T) ? sorted_tokens[start_idx + t_base + tid] : 0;
+            s_slot[tid] = (tid < total_cur_T) ? sorted_slots[start_idx + t_base + tid] : 0;
+        }
+
+        int total_steps = num_groups * 8; // (K / 128) * 8
+
+        // Prefetch step 0 into s_x[0] using 128-bit aligned float4 vector loads
+        float4 xv0 = valid_tok ? vload4(0, x + (size_t)b_tok * K + k_sub) : (float4)(0.0f);
+        s_x[0][tok_idx][k_sub + 0] = (half)xv0.x;
+        s_x[0][tok_idx][k_sub + 1] = (half)xv0.y;
+        s_x[0][tok_idx][k_sub + 2] = (half)xv0.z;
+        s_x[0][tok_idx][k_sub + 3] = (half)xv0.w;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int s = 0; s < total_steps; ++s) {
+            int cur_buf = s & 1;
+            int next_buf = (s + 1) & 1;
+            int g = s / 8;
+
+            // Asynchronously prefetch step s + 1
+            if (s + 1 < total_steps) {
+                int next_k = (s + 1) * 16;
+                float4 xv_next = valid_tok ? vload4(0, x + (size_t)b_tok * K + next_k + k_sub) : (float4)(0.0f);
+                s_x[next_buf][tok_idx][k_sub + 0] = (half)xv_next.x;
+                s_x[next_buf][tok_idx][k_sub + 1] = (half)xv_next.y;
+                s_x[next_buf][tok_idx][k_sub + 2] = (half)xv_next.z;
+                s_x[next_buf][tok_idx][k_sub + 3] = (half)xv_next.w;
+            }
+
+            // 1. Thread lid loads 16 weights (8 bytes) for row m ONCE
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
+
+            __global const uchar *w_ptr = row_w + (size_t)s * 8;
+            uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+            // Unpack 16 nibbles to 16 halves and scale ONCE
+            half w_deq[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq[2 * i]     = (half)((float)n0) * s_half;
+                w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+            }
+
+            // Pack dequantized weights as int8 (16 x fp16 = 32 bytes) for DPAS B matrix
+            int8 b_mat;
+            __builtin_memcpy(&b_mat, w_deq, 32);
+
+            // 2. Load activation slice from SLM and issue DPAS for up to 4 systolic tiles (32 tokens)
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) ((short *)&a_mat0)[ti] = as_short(s_x[cur_buf][ti][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+            if (cur_T1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T1) ((short *)&a_mat1)[ti] = as_short(s_x[cur_buf][8 + ti][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+            }
+
+            if (cur_T2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T2) ((short *)&a_mat2)[ti] = as_short(s_x[cur_buf][16 + ti][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+            }
+
+            if (cur_T3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T3) ((short *)&a_mat3)[ti] = as_short(s_x[cur_buf][24 + ti][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+            }
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        // Store outputs directly into all_gu for each token and slot
+        if (m < 1024) {
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) {
+                    all_gu[(size_t)s_tok[ti] * (8 * 1024) + s_slot[ti] * 1024 + m] = ((float *)&acc0)[ti];
+                }
+                if (ti < cur_T1) {
+                    all_gu[(size_t)s_tok[8 + ti] * (8 * 1024) + s_slot[8 + ti] * 1024 + m] = ((float *)&acc1)[ti];
+                }
+                if (ti < cur_T2) {
+                    all_gu[(size_t)s_tok[16 + ti] * (8 * 1024) + s_slot[16 + ti] * 1024 + m] = ((float *)&acc2)[ti];
+                }
+                if (ti < cur_T3) {
+                    all_gu[(size_t)s_tok[24 + ti] * (8 * 1024) + s_slot[24 + ti] * 1024 + m] = ((float *)&acc3)[ti];
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+}
+
+__attribute__((intel_reqd_sub_group_size(16)))
+__kernel void moe_down_compact_batch(
+    __global float * restrict down_out,
+    __global const uchar * restrict w_bank,
+    __global const ushort * restrict s_bank,
+    __global const float * restrict all_act,
+    __global const int * restrict expert_counts,
+    __global const int * restrict expert_offsets,
+    __global const int * restrict sorted_tokens,
+    __global const int * restrict sorted_slots,
+    __global const int * restrict active_expert_ids,
+    __global const int * restrict num_active_experts,
+    int K,
+    int B
+) {
+    int sg_id = get_sub_group_id();
+    int num_sg = get_num_sub_groups();
+    int grp_id = get_group_id(0);
+    int lid = get_sub_group_local_id(); // 0..15
+
+    __local half s_act[2][32][16];
+    __local int s_tok[32];
+    __local int s_slot[32];
+
+    int num_active = *num_active_experts;
+    int active_idx = grp_id / 16;
+    if (active_idx >= num_active) return;
+
+    int expert_id = active_expert_ids[active_idx];
+    if (expert_id < 0 || expert_id >= NUM_EXPERTS) return;
+
+    int num_tokens = expert_counts[expert_id];
+    if (num_tokens <= 0) return;
+
+    int chunk_m = grp_id % 16; // covers 128 rows
+    int m_tile_idx = chunk_m * num_sg + sg_id;
+    int m_base = m_tile_idx * 16;
+    if (m_base >= 2048) return;
+
+    int m = m_base + lid;
+    size_t row_idx = (size_t)expert_id * 2048 + m;
+    int num_groups = K / GROUP_SIZE; // 4 for K=512
+
+    __global const uchar *row_w = w_bank + row_idx * (K / 2);
+    __global const ushort *row_s = s_bank + row_idx * num_groups;
+    int start_idx = expert_offsets[expert_id];
+
+    // Loop over tokens routed to this expert in macro-tiles of 32 (4 systolic DPAS tiles of 8)
+    for (int t_base = 0; t_base < num_tokens; t_base += 32) {
+        int cur_T0 = (num_tokens - t_base > 0) ? min(8, num_tokens - t_base) : 0;
+        int cur_T1 = (num_tokens - (t_base + 8) > 0) ? min(8, num_tokens - (t_base + 8)) : 0;
+        int cur_T2 = (num_tokens - (t_base + 16) > 0) ? min(8, num_tokens - (t_base + 16)) : 0;
+        int cur_T3 = (num_tokens - (t_base + 24) > 0) ? min(8, num_tokens - (t_base + 24)) : 0;
+        int total_cur_T = cur_T0 + cur_T1 + cur_T2 + cur_T3;
+
+        float8 acc0 = (float8)(0.0f);
+        float8 acc1 = (float8)(0.0f);
+        float8 acc2 = (float8)(0.0f);
+        float8 acc3 = (float8)(0.0f);
+
+        int tid = get_local_id(0); // 0..127
+        int tok_idx = tid / 4;      // 0..31
+        int k_sub = (tid % 4) * 4;  // 0, 4, 8, 12
+        bool valid_tok = (tok_idx < total_cur_T);
+
+        int b_tok = valid_tok ? sorted_tokens[start_idx + t_base + tok_idx] : 0;
+        int slot  = valid_tok ? sorted_slots[start_idx + t_base + tok_idx] : 0;
+
+        if (tid < 32) {
+            s_tok[tid]  = (tid < total_cur_T) ? sorted_tokens[start_idx + t_base + tid] : 0;
+            s_slot[tid] = (tid < total_cur_T) ? sorted_slots[start_idx + t_base + tid] : 0;
+        }
+
+        int total_steps = num_groups * 8; // (K / 128) * 8
+
+        // Prefetch step 0 into s_act[0] using 128-bit aligned float4 vector loads
+        float4 av0 = valid_tok ? vload4(0, all_act + (size_t)b_tok * (8 * 512) + slot * 512 + k_sub) : (float4)(0.0f);
+        s_act[0][tok_idx][k_sub + 0] = (half)av0.x;
+        s_act[0][tok_idx][k_sub + 1] = (half)av0.y;
+        s_act[0][tok_idx][k_sub + 2] = (half)av0.z;
+        s_act[0][tok_idx][k_sub + 3] = (half)av0.w;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int s = 0; s < total_steps; ++s) {
+            int cur_buf = s & 1;
+            int next_buf = (s + 1) & 1;
+            int g = s / 8;
+
+            // Asynchronously prefetch step s + 1
+            if (s + 1 < total_steps) {
+                int next_k = (s + 1) * 16;
+                float4 av_next = valid_tok ? vload4(0, all_act + (size_t)b_tok * (8 * 512) + slot * 512 + next_k + k_sub) : (float4)(0.0f);
+                s_act[next_buf][tok_idx][k_sub + 0] = (half)av_next.x;
+                s_act[next_buf][tok_idx][k_sub + 1] = (half)av_next.y;
+                s_act[next_buf][tok_idx][k_sub + 2] = (half)av_next.z;
+                s_act[next_buf][tok_idx][k_sub + 3] = (half)av_next.w;
+            }
+
+            // 1. Thread lid loads 16 weights (8 bytes) for row m ONCE
+            float s_val = bf16_to_fp32(row_s[g]);
+            half s_half = (half)s_val;
+
+            __global const uchar *w_ptr = row_w + (size_t)s * 8;
+            uchar8 raw_w = *((__global const uchar8 *)w_ptr);
+
+            // Unpack 16 nibbles to 16 halves and scale ONCE
+            half w_deq[16];
+            #pragma unroll
+            for (int i = 0; i < 8; ++i) {
+                uchar byte_val = ((uchar *)&raw_w)[i];
+                int n0 = (int)((char)(byte_val << 4)) >> 4;
+                int n1 = (int)((char)byte_val) >> 4;
+                w_deq[2 * i]     = (half)((float)n0) * s_half;
+                w_deq[2 * i + 1] = (half)((float)n1) * s_half;
+            }
+
+            // Pack dequantized weights as int8 (16 x fp16 = 32 bytes) for DPAS B matrix
+            int8 b_mat;
+            __builtin_memcpy(&b_mat, w_deq, 32);
+
+            // 2. Load activation slice from SLM and issue DPAS for up to 4 systolic tiles (32 tokens)
+            short8 a_mat0 = (short8)(0);
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) ((short *)&a_mat0)[ti] = as_short(s_act[cur_buf][ti][lid]);
+            }
+            acc0 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat0, b_mat, acc0);
+
+            if (cur_T1 > 0) {
+                short8 a_mat1 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T1) ((short *)&a_mat1)[ti] = as_short(s_act[cur_buf][8 + ti][lid]);
+                }
+                acc1 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat1, b_mat, acc1);
+            }
+
+            if (cur_T2 > 0) {
+                short8 a_mat2 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T2) ((short *)&a_mat2)[ti] = as_short(s_act[cur_buf][16 + ti][lid]);
+                }
+                acc2 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat2, b_mat, acc2);
+            }
+
+            if (cur_T3 > 0) {
+                short8 a_mat3 = (short8)(0);
+                #pragma unroll
+                for (int ti = 0; ti < 8; ++ti) {
+                    if (ti < cur_T3) ((short *)&a_mat3)[ti] = as_short(s_act[cur_buf][24 + ti][lid]);
+                }
+                acc3 = intel_sub_group_f16_f16_matrix_mad_k16(a_mat3, b_mat, acc3);
+            }
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
+        // Store outputs directly into down_out for each token and slot
+        if (m < 2048) {
+            #pragma unroll
+            for (int ti = 0; ti < 8; ++ti) {
+                if (ti < cur_T0) {
+                    down_out[(size_t)s_tok[ti] * (8 * 2048) + s_slot[ti] * 2048 + m] = ((float *)&acc0)[ti];
+                }
+                if (ti < cur_T1) {
+                    down_out[(size_t)s_tok[8 + ti] * (8 * 2048) + s_slot[8 + ti] * 2048 + m] = ((float *)&acc1)[ti];
+                }
+                if (ti < cur_T2) {
+                    down_out[(size_t)s_tok[16 + ti] * (8 * 2048) + s_slot[16 + ti] * 2048 + m] = ((float *)&acc2)[ti];
+                }
+                if (ti < cur_T3) {
+                    down_out[(size_t)s_tok[24 + ti] * (8 * 2048) + s_slot[24 + ti] * 2048 + m] = ((float *)&acc3)[ti];
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+}
+
 
 __kernel void moe_down_accum_all8_batch(
     __global float * restrict acc,

@@ -28,22 +28,22 @@
   },
   "baseline": {
     "returncode": 0,
-    "seconds": 0.108,
+    "seconds": 0.045,
     "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
   },
   "private_baseline": {
     "returncode": 0,
-    "seconds": 0.069,
+    "seconds": 0.053,
     "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
   },
   "rollback_failure": {
     "returncode": 127,
-    "seconds": 0.002,
+    "seconds": 0.001,
     "output": "/home/yanchun/Projects/AInfer/build-258v/tools/l0probe/l0_timestamp_smoke: error while loading shared libraries: <private-sysroot>/usr/lib/libze_loader.so.1: file too short"
   },
   "restored": {
     "returncode": 0,
-    "seconds": 0.099,
+    "seconds": 0.042,
     "output": "timestamp_smoke: pattern=0x2580 start=<device> end=<device>"
   },
   "checks": {

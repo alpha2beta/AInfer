@@ -374,6 +374,10 @@ bool AInferRuntime258V::allocate_static_arenas() {
   d_expert_offsets_ = (int *)bump_f32(256);
   d_sorted_tokens_ = (int *)bump_f32(MAX_PREFILL_CHUNK * TOP_K);
   d_sorted_slots_ = (int *)bump_f32(MAX_PREFILL_CHUNK * TOP_K);
+  d_active_expert_ids_ = (int *)bump_f32(256);
+  d_num_active_experts_ = (int *)bump_f32(16);
+  d_launch_args_gu_ = (uint32_t *)bump_f32(16);
+  d_launch_args_dn_ = (uint32_t *)bump_f32(16);
 
   // Final ledger consistency check (per-allocation overflow already fails
   // fast inside CheckedArena::bump; this guards ledger/total drift).
@@ -937,15 +941,38 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
   k_hnorm_batch_ = get_k("deltanet_head_norm_silu_z_batch");
   k_deinterleave_qg_batch_ = get_k("deinterleave_q_gate_batch");
   k_rope_batch_ = get_k("rope_and_kv_append_batch");
-  // v2 uses in-register subgroup-shuffle reduction (0.25 barriers/position
-  // vs ~10 in v1); AINFER_ATTN_V1=1 restores the v1 SLM-tree kernel.
-  k_attn_batch_ = std::getenv("AINFER_ATTN_V1")
-                      ? get_k("gqa_attn_prefill_batch")
-                      : get_k("gqa_attn_prefill_batch_v2");
+  // I3.7: Blocked FlashAttention (T_tile=16, B_tile=8) shares KV loads in SLM across 8 queries.
+  // Reduces DRAM KV cache traffic by 8x during long-context prefill.
+  // Fallbacks: AINFER_FLASH_ATTN=0 or AINFER_ATTN_V2=1 (v2 shuffle), AINFER_ATTN_V1=1 (v1 tree).
+  const char *fa_env = std::getenv("AINFER_FLASH_ATTN");
+  bool force_no_flash = (fa_env && fa_env[0] == '0') || std::getenv("AINFER_ATTN_V2") || std::getenv("AINFER_ATTN_V1");
+  flash_attn_prefill_ = !force_no_flash;
+  if (flash_attn_prefill_) {
+    k_attn_batch_ = get_k("flash_attn_prefill_b8_t16");
+    if (!k_attn_batch_) {
+      std::fprintf(stderr, "[Runtime258V] Warning: flash_attn_prefill_b8_t16 not found, falling back to v2\n");
+      flash_attn_prefill_ = false;
+    }
+  }
+  if (!flash_attn_prefill_) {
+    k_attn_batch_ = std::getenv("AINFER_ATTN_V1")
+                        ? get_k("gqa_attn_prefill_batch")
+                        : get_k("gqa_attn_prefill_batch_v2");
+  }
   k_router_batch_ = get_k("moe_topk_router_batch");
   k_moe_build_expert_bins_ = get_k("moe_build_expert_bins");
+  k_moe_build_expert_bins_compact_ = get_k("moe_build_expert_bins_compact");
   k_moe_gateup_grouped_batch_ = get_k("moe_gateup_grouped_batch");
+  k_moe_gateup_compact_batch_ = get_k("moe_gateup_compact_batch");
   k_moe_down_grouped_batch_ = get_k("moe_down_grouped_batch");
+  k_moe_down_compact_batch_ = get_k("moe_down_compact_batch");
+  const char *moe_compact_env = std::getenv("AINFER_MOE_COMPACT");
+  moe_compact_ = (moe_compact_env && moe_compact_env[0] == '1');
+  if (moe_compact_) {
+    std::printf("[AInfer 258V] MoE Compact Micro-GEMM active (I3.2 experimental)\n");
+  } else {
+    std::printf("[AInfer 258V] MoE Grouped Micro-GEMM baseline active (production)\n");
+  }
   k_moe_accum_down_batch_ = get_k("moe_accum_down_batch");
   k_exp_gu_all_batch_ = get_k("moe_gateup_all8_batch");
   k_silu_all_batch_ = get_k("silu_mul_all8_batch");
@@ -975,8 +1002,9 @@ bool AInferRuntime258V::compile_kernels(const std::string &spv_path) {
       !k_gemm_prefill_ || !k_embed_batch_ || !k_norm2048_batch_ || !k_conv_batch_ ||
       !k_l2_norm_qk_batch_ || !k_gate_prep_batch_ || !k_recr_batch_ || !k_hnorm_batch_ ||
       !k_deinterleave_qg_batch_ || !k_rope_batch_ || !k_attn_batch_ || !k_router_batch_ ||
-      !k_moe_build_expert_bins_ || !k_moe_gateup_grouped_batch_ ||
-      !k_moe_down_grouped_batch_ || !k_moe_accum_down_batch_ ||
+      !k_moe_build_expert_bins_ || !k_moe_build_expert_bins_compact_ ||
+      !k_moe_gateup_grouped_batch_ || !k_moe_gateup_compact_batch_ ||
+      !k_moe_down_grouped_batch_ || !k_moe_down_compact_batch_ || !k_moe_accum_down_batch_ ||
       !k_exp_gu_all_batch_ || !k_silu_all_batch_ || !k_exp_dn_accum_all_batch_ ||
       !k_silu_mul_batch_ || !k_block_resadd_moe_batch_ || !k_resadd_batch_ ||
       !k_conv_m2_spec_ || !k_recr_m2_spec_ || !k_lm_head_m2_argmax1_ || !k_gemv_m2_) {
@@ -1564,8 +1592,8 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_chunk_list(int
       CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
       // GQA Attention Prefill
-      ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
       if (kv8_enabled_) {
+        ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 0, sizeof(void *), &d_attn_out_chunk_));
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 1, sizeof(void *), &d_q_full_chunk_));
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_i8_, 2, sizeof(void *), &d_gate_full_chunk_));
@@ -1579,6 +1607,13 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_chunk_list(int
         CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_attn_batch_i8_, 256, 1, 1));
         CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_attn_batch_i8_, &gcnt_attn, nullptr, 0, nullptr));
       } else {
+        ze_group_count_t gcnt_attn;
+        if (flash_attn_prefill_) {
+          uint32_t num_b_blks = (uint32_t)((B + 7) / 8);
+          gcnt_attn = {(uint32_t)NUM_Q_HEADS, num_b_blks, 1};
+        } else {
+          gcnt_attn = {(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+        }
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 0, sizeof(void *), &d_attn_out_chunk_));
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 1, sizeof(void *), &d_q_full_chunk_));
         CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_attn_batch_, 2, sizeof(void *), &d_gate_full_chunk_));
@@ -1701,59 +1736,121 @@ ze_command_list_handle_t AInferRuntime258V::get_or_record_prefill_chunk_list(int
     CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_router_batch_, &gcnt_router, nullptr, 0, nullptr));
     CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
-    // D2. MoE Build Expert Bins
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 0, sizeof(void *), &d_expert_counts_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 1, sizeof(void *), &d_expert_offsets_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 2, sizeof(void *), &d_sorted_tokens_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 3, sizeof(void *), &d_sorted_slots_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 4, sizeof(void *), &d_top_idx_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 5, sizeof(int), &B));
-    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_build_expert_bins_, 256, 1, 1));
-    ze_group_count_t gc_bins{1, 1, 1};
-    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_build_expert_bins_, &gc_bins, nullptr, 0, nullptr));
-    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+    if (moe_compact_) {
+      // D2. Compact MoE Build Expert Bins
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 0, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 1, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 2, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 3, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 4, sizeof(void *), &d_active_expert_ids_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 5, sizeof(void *), &d_num_active_experts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 6, sizeof(void *), &d_launch_args_gu_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 7, sizeof(void *), &d_launch_args_dn_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 8, sizeof(void *), &d_top_idx_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 9, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_build_expert_bins_compact_, 256, 1, 1));
+      ze_group_count_t gc_bins{1, 1, 1};
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_build_expert_bins_compact_, &gc_bins, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
-    // E. MoE Active Experts Grouped Micro-GEMM (DPAS systolic acceleration)
-    int K_gu = HIDDEN_DIM;
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 0, sizeof(void *), &d_exp_gu_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 1, sizeof(void *), &lb.exp_gu_w));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 2, sizeof(void *), &lb.exp_gu_s));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 3, sizeof(void *), &d_x_post_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 4, sizeof(void *), &d_expert_counts_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 8, sizeof(int), &K_gu));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 9, sizeof(int), &B));
-    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_gateup_grouped_batch_, 128, 1, 1));
-    ze_group_count_t gc_gu_grouped{2048, 1, 1}; // 256 experts * 8 workgroups = 2048 workgroups
-    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_gateup_grouped_batch_, &gc_gu_grouped, nullptr, 0, nullptr));
-    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+      // E. Compact MoE GateUp Grouped Micro-GEMM (DPAS systolic acceleration + indirect launch)
+      int K_gu = HIDDEN_DIM;
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 0, sizeof(void *), &d_exp_gu_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 1, sizeof(void *), &lb.exp_gu_w));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 2, sizeof(void *), &lb.exp_gu_s));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 3, sizeof(void *), &d_x_post_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 4, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 5, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 6, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 7, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 8, sizeof(void *), &d_active_expert_ids_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 9, sizeof(void *), &d_num_active_experts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 10, sizeof(int), &K_gu));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 11, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_gateup_compact_batch_, 128, 1, 1));
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernelIndirect(list, k_moe_gateup_compact_batch_, (const ze_group_count_t *)d_launch_args_gu_, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 0, sizeof(void *), &d_exp_act_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 1, sizeof(void *), &d_exp_gu_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 2, sizeof(int), &B));
-    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_silu_all_batch_, 256, 1, 1));
-    ze_group_count_t gc_silu_all{(uint32_t)((B * TOP_K * EXP_INTER_DIM + 255) / 256), 1, 1};
-    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_silu_all_batch_, &gc_silu_all, nullptr, 0, nullptr));
-    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 0, sizeof(void *), &d_exp_act_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 1, sizeof(void *), &d_exp_gu_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 2, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_silu_all_batch_, 256, 1, 1));
+      ze_group_count_t gc_silu_all{(uint32_t)((B * TOP_K * EXP_INTER_DIM + 255) / 256), 1, 1};
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_silu_all_batch_, &gc_silu_all, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
 
-    // F. MoE Active Experts Down Grouped Micro-GEMM (DPAS systolic acceleration)
-    int K_dn = EXP_INTER_DIM; // 512
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 0, sizeof(void *), &d_exp_down_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 1, sizeof(void *), &lb.exp_dn_w));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 2, sizeof(void *), &lb.exp_dn_s));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 3, sizeof(void *), &d_exp_act_chunk_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 4, sizeof(void *), &d_expert_counts_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 8, sizeof(int), &K_dn));
-    CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 9, sizeof(int), &B));
-    CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_down_grouped_batch_, 128, 1, 1));
-    ze_group_count_t gc_dn_grouped{4096, 1, 1}; // 256 experts * 16 workgroups = 4096 workgroups
-    CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_down_grouped_batch_, &gc_dn_grouped, nullptr, 0, nullptr));
-    CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+      // F. Compact MoE Down Grouped Micro-GEMM (DPAS systolic acceleration + indirect launch)
+      int K_dn = EXP_INTER_DIM; // 512
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 0, sizeof(void *), &d_exp_down_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 1, sizeof(void *), &lb.exp_dn_w));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 2, sizeof(void *), &lb.exp_dn_s));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 3, sizeof(void *), &d_exp_act_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 4, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 5, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 6, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 7, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 8, sizeof(void *), &d_active_expert_ids_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 9, sizeof(void *), &d_num_active_experts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 10, sizeof(int), &K_dn));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_compact_batch_, 11, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_down_compact_batch_, 128, 1, 1));
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernelIndirect(list, k_moe_down_compact_batch_, (const ze_group_count_t *)d_launch_args_dn_, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+    } else {
+      // D2. MoE Build Expert Bins
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 0, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 1, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 2, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 3, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 4, sizeof(void *), &d_top_idx_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_build_expert_bins_, 5, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_build_expert_bins_, 256, 1, 1));
+      ze_group_count_t gc_bins{1, 1, 1};
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_build_expert_bins_, &gc_bins, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+      // E. MoE Active Experts Grouped Micro-GEMM (DPAS systolic acceleration)
+      int K_gu = HIDDEN_DIM;
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 0, sizeof(void *), &d_exp_gu_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 1, sizeof(void *), &lb.exp_gu_w));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 2, sizeof(void *), &lb.exp_gu_s));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 3, sizeof(void *), &d_x_post_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 4, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 8, sizeof(int), &K_gu));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 9, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_gateup_grouped_batch_, 128, 1, 1));
+      ze_group_count_t gc_gu_grouped{2048, 1, 1}; // 256 experts * 8 workgroups = 2048 workgroups
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_gateup_grouped_batch_, &gc_gu_grouped, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 0, sizeof(void *), &d_exp_act_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 1, sizeof(void *), &d_exp_gu_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_silu_all_batch_, 2, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_silu_all_batch_, 256, 1, 1));
+      ze_group_count_t gc_silu_all{(uint32_t)((B * TOP_K * EXP_INTER_DIM + 255) / 256), 1, 1};
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_silu_all_batch_, &gc_silu_all, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+
+      // F. MoE Active Experts Down Grouped Micro-GEMM (DPAS systolic acceleration)
+      int K_dn = EXP_INTER_DIM; // 512
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 0, sizeof(void *), &d_exp_down_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 1, sizeof(void *), &lb.exp_dn_w));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 2, sizeof(void *), &lb.exp_dn_s));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 3, sizeof(void *), &d_exp_act_chunk_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 4, sizeof(void *), &d_expert_counts_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 8, sizeof(int), &K_dn));
+      CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 9, sizeof(int), &B));
+      CHECK_L0_RET_NULL(zeKernelSetGroupSize(k_moe_down_grouped_batch_, 128, 1, 1));
+      ze_group_count_t gc_dn_grouped{4096, 1, 1}; // 256 experts * 16 workgroups = 4096 workgroups
+      CHECK_L0_RET_NULL(zeCommandListAppendLaunchKernel(list, k_moe_down_grouped_batch_, &gc_dn_grouped, nullptr, 0, nullptr));
+      CHECK_L0_RET_NULL(zeCommandListAppendBarrier(list, nullptr, 0, nullptr));
+    }
 
     // F2. MoE Down Accumulation across active experts
     CHECK_L0_RET_NULL(zeKernelSetArgumentValue(k_moe_accum_down_batch_, 0, sizeof(void *), &d_moe_acc_chunk_));
@@ -2243,7 +2340,7 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
   std::printf("[DeltaNet] Out Proj (2048x2048):            %6.3f ms\n", t_dn_out);
 
   // 4. MoE Pipeline (Layer 0)
-  double t_router = time_cmd([&](ze_command_list_handle_t list) {
+  double t_post_norm = time_cmd([&](ze_command_list_handle_t list) {
     zeKernelSetArgumentValue(k_norm2048_batch_, 0, sizeof(void *), &d_x_post_chunk_);
     zeKernelSetArgumentValue(k_norm2048_batch_, 1, sizeof(void *), &d_x_mid_chunk_);
     zeKernelSetArgumentValue(k_norm2048_batch_, 2, sizeof(void *), &l0.post_norm_w);
@@ -2251,8 +2348,9 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
     zeKernelSetGroupSize(k_norm2048_batch_, 256, 1, 1);
     ze_group_count_t gcnt_norm{(uint32_t)B, 1, 1};
     zeCommandListAppendLaunchKernel(list, k_norm2048_batch_, &gcnt_norm, nullptr, 0, nullptr);
-    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+  });
 
+  double t_router = time_cmd([&](ze_command_list_handle_t list) {
     zeKernelSetArgumentValue(k_router_batch_, 0, sizeof(void *), &d_x_post_chunk_);
     zeKernelSetArgumentValue(k_router_batch_, 1, sizeof(void *), &l0.router_w);
     zeKernelSetArgumentValue(k_router_batch_, 2, sizeof(void *), &l0.shared_gate_w);
@@ -2263,8 +2361,9 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
     zeKernelSetGroupSize(k_router_batch_, 256, 1, 1);
     ze_group_count_t gc_router{(uint32_t)B, 1, 1};
     zeCommandListAppendLaunchKernel(list, k_router_batch_, &gc_router, nullptr, 0, nullptr);
-    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+  });
 
+  double t_moe_bins = time_cmd([&](ze_command_list_handle_t list) {
     zeKernelSetArgumentValue(k_moe_build_expert_bins_, 0, sizeof(void *), &d_expert_counts_);
     zeKernelSetArgumentValue(k_moe_build_expert_bins_, 1, sizeof(void *), &d_expert_offsets_);
     zeKernelSetArgumentValue(k_moe_build_expert_bins_, 2, sizeof(void *), &d_sorted_tokens_);
@@ -2347,14 +2446,16 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
     append_gemm_to_list(list, d_sh_down_chunk_, l0.sh_down_w, l0.sh_down_s, d_sh_act_chunk_, HIDDEN_DIM, EXP_INTER_DIM);
   });
 
-  std::printf("[MoE]     Router + Binning:               %6.3f ms\n", t_router);
+  std::printf("[MoE]     Post-Norm:                      %6.3f ms\n", t_post_norm);
+  std::printf("[MoE]     Router Top-K:                   %6.3f ms\n", t_router);
+  std::printf("[MoE]     Build Expert Bins:              %6.3f ms\n", t_moe_bins);
   std::printf("[MoE]     GateUp Grouped (DPAS):          %6.3f ms\n", t_moe_gu);
   std::printf("[MoE]     SiLU Activation:                %6.3f ms\n", t_moe_silu);
   std::printf("[MoE]     Down Grouped (DPAS):            %6.3f ms\n", t_moe_dn);
   std::printf("[MoE]     Down Accumulation:              %6.3f ms\n", t_moe_accum);
   std::printf("[MoE]     Shared Expert (3 GEMMs):        %6.3f ms\n", t_sh_exp);
 
-  double per_dn_layer = t_qkv + t_z_ba + t_conv + t_l2 + t_gate + t_recr_loop + t_hnorm + t_dn_out + t_router + t_moe_gu + t_moe_silu + t_moe_dn + t_moe_accum + t_sh_exp;
+  double per_dn_layer = t_qkv + t_z_ba + t_conv + t_l2 + t_gate + t_recr_loop + t_hnorm + t_dn_out + t_post_norm + t_router + t_moe_bins + t_moe_gu + t_moe_silu + t_moe_dn + t_moe_accum + t_sh_exp;
   std::printf("-----------------------------------------------------------------\n");
   std::printf("  1 DeltaNet Layer Total:                 %6.3f ms\n", per_dn_layer);
   std::printf("  Extrapolated 30 DeltaNet Layers:        %6.3f ms\n", per_dn_layer * 30.0);
@@ -2420,7 +2521,13 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
     zeKernelSetArgumentValue(k_attn_batch_, 6, sizeof(uint32_t), &max_c);
     zeKernelSetArgumentValue(k_attn_batch_, 7, sizeof(int), &B);
     zeKernelSetGroupSize(k_attn_batch_, 256, 1, 1);
-    ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+    ze_group_count_t gcnt_attn;
+    if (flash_attn_prefill_) {
+      uint32_t num_b_blks = (uint32_t)((B + 7) / 8);
+      gcnt_attn = {(uint32_t)NUM_Q_HEADS, num_b_blks, 1};
+    } else {
+      gcnt_attn = {(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+    }
     zeCommandListAppendLaunchKernel(list, k_attn_batch_, &gcnt_attn, nullptr, 0, nullptr);
   });
   double t_fa_out = time_cmd([&](ze_command_list_handle_t list) {
@@ -2441,6 +2548,332 @@ bool AInferRuntime258V::profile_prefill_breakdown(int B) {
   std::printf("=================================================================\n\n");
 
   return true;
+}
+
+bool AInferRuntime258V::profile_moe_shootout(int B) {
+  if (B < 1 || B > MAX_PREFILL_CHUNK) return false;
+
+  auto time_cmd = [&](auto record_fn, const char *name = "cmd") -> double {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    if (zeCommandListCreate(ctx_, dev_, &ldesc, &list) != ZE_RESULT_SUCCESS) return 0.0;
+    record_fn(list);
+    zeCommandListClose(list);
+
+    // Warmup
+    std::printf("  [time_cmd: %s] warmup...\n", name); std::fflush(stdout);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    ze_result_t wres = zeFenceHostSynchronize(fence_, 2000000000ULL);
+    if (wres != ZE_RESULT_SUCCESS) {
+      std::fprintf(stderr, "FATAL: Timeout in warmup for %s (0x%x)\n", name, wres);
+      zeCommandListDestroy(list);
+      return -1.0;
+    }
+    zeFenceReset(fence_);
+
+    const int RUNS = 5;
+    auto t0 = std::chrono::high_resolution_clock::now();
+    for (int r = 0; r < RUNS; ++r) {
+      zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+      ze_result_t res = zeFenceHostSynchronize(fence_, 2000000000ULL);
+      if (res != ZE_RESULT_SUCCESS) {
+        std::fprintf(stderr, "FATAL: Timeout in run %d for %s (0x%x)\n", r, name, res);
+        zeCommandListDestroy(list);
+        return -1.0;
+      }
+      zeFenceReset(fence_);
+    }
+    auto t1 = std::chrono::high_resolution_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count() / RUNS;
+    zeCommandListDestroy(list);
+    std::printf("  [time_cmd: %s] done: %.3f ms\n", name, ms); std::fflush(stdout);
+    return ms;
+  };
+
+  const LayerBinding &l0 = layers_[0];
+
+  std::printf("[Shootout 1] Preparing activations...\n"); std::fflush(stdout);
+  // 1. Prepare activations and router output
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+
+    zeKernelSetArgumentValue(k_norm2048_batch_, 0, sizeof(void *), &d_x_post_chunk_);
+    zeKernelSetArgumentValue(k_norm2048_batch_, 1, sizeof(void *), &d_x_mid_chunk_);
+    zeKernelSetArgumentValue(k_norm2048_batch_, 2, sizeof(void *), &l0.post_norm_w);
+    zeKernelSetArgumentValue(k_norm2048_batch_, 3, sizeof(int), &B);
+    zeKernelSetGroupSize(k_norm2048_batch_, 256, 1, 1);
+    ze_group_count_t gcnt_norm{(uint32_t)B, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_norm2048_batch_, &gcnt_norm, nullptr, 0, nullptr);
+    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+
+    zeKernelSetArgumentValue(k_router_batch_, 0, sizeof(void *), &d_x_post_chunk_);
+    zeKernelSetArgumentValue(k_router_batch_, 1, sizeof(void *), &l0.router_w);
+    zeKernelSetArgumentValue(k_router_batch_, 2, sizeof(void *), &l0.shared_gate_w);
+    zeKernelSetArgumentValue(k_router_batch_, 3, sizeof(void *), &d_top_idx_chunk_);
+    zeKernelSetArgumentValue(k_router_batch_, 4, sizeof(void *), &d_top_wt_chunk_);
+    zeKernelSetArgumentValue(k_router_batch_, 5, sizeof(void *), &d_sh_gate_chunk_);
+    zeKernelSetArgumentValue(k_router_batch_, 6, sizeof(int), &B);
+    zeKernelSetGroupSize(k_router_batch_, 256, 1, 1);
+    ze_group_count_t gc_router{(uint32_t)B, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_router_batch_, &gc_router, nullptr, 0, nullptr);
+    zeCommandListAppendBarrier(list, nullptr, 0, nullptr);
+
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, UINT64_MAX);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+
+  std::printf("[Shootout 2] Timing baseline bins...\n"); std::fflush(stdout);
+  // 2. Measure Binning: Baseline vs Compact
+  double t_bins_baseline = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 0, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 1, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 2, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 3, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 4, sizeof(void *), &d_top_idx_chunk_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_, 5, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_build_expert_bins_, 256, 1, 1);
+    ze_group_count_t gc_bins{1, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_build_expert_bins_, &gc_bins, nullptr, 0, nullptr);
+  }, "bins_baseline");
+
+  std::printf("[Shootout 3] Timing compact bins...\n"); std::fflush(stdout);
+  double t_bins_compact = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 0, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 1, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 2, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 3, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 4, sizeof(void *), &d_active_expert_ids_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 5, sizeof(void *), &d_num_active_experts_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 6, sizeof(void *), &d_launch_args_gu_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 7, sizeof(void *), &d_launch_args_dn_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 8, sizeof(void *), &d_top_idx_chunk_);
+    zeKernelSetArgumentValue(k_moe_build_expert_bins_compact_, 9, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_build_expert_bins_compact_, 256, 1, 1);
+    ze_group_count_t gc_bins{1, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_build_expert_bins_compact_, &gc_bins, nullptr, 0, nullptr);
+  }, "bins_compact");
+
+  // Read back active counts & stats
+  int h_num_active = 0;
+  std::vector<int> h_counts(256, 0);
+  std::vector<int> h_active_ids(256, 0);
+  std::vector<uint32_t> h_args_gu(3, 0);
+  std::vector<uint32_t> h_args_dn(3, 0);
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    std::printf("[Shootout 4] Reading back active counts & stats...\n"); std::fflush(stdout);
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeCommandListAppendMemoryCopy(list, &h_num_active, d_num_active_experts_, sizeof(int), nullptr, 0, nullptr);
+    zeCommandListAppendMemoryCopy(list, h_counts.data(), d_expert_counts_, 256 * sizeof(int), nullptr, 0, nullptr);
+    zeCommandListAppendMemoryCopy(list, h_active_ids.data(), d_active_expert_ids_, 256 * sizeof(int), nullptr, 0, nullptr);
+    zeCommandListAppendMemoryCopy(list, h_args_gu.data(), d_launch_args_gu_, 3 * sizeof(uint32_t), nullptr, 0, nullptr);
+    zeCommandListAppendMemoryCopy(list, h_args_dn.data(), d_launch_args_dn_, 3 * sizeof(uint32_t), nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+    std::printf("  [Shootout 4] Active: %d, args_gu: %u, args_dn: %u\n", h_num_active, h_args_gu[0], h_args_dn[0]); std::fflush(stdout);
+  }
+
+  std::printf("[Shootout 5] Timing baseline GU...\n"); std::fflush(stdout);
+  // 3. Measure GateUp GEMM: Baseline vs Compact
+  int K_gu = HIDDEN_DIM;
+  double t_gu_baseline = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 0, sizeof(void *), &d_exp_gu_chunk_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 1, sizeof(void *), &l0.exp_gu_w);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 2, sizeof(void *), &l0.exp_gu_s);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 3, sizeof(void *), &d_x_post_chunk_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 4, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 8, sizeof(int), &K_gu);
+    zeKernelSetArgumentValue(k_moe_gateup_grouped_batch_, 9, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_gateup_grouped_batch_, 128, 1, 1);
+    ze_group_count_t gc_gu_grouped{2048, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_gateup_grouped_batch_, &gc_gu_grouped, nullptr, 0, nullptr);
+  }, "gu_baseline");
+
+  // Save baseline GateUp output to host buffer
+  size_t gu_size = (size_t)B * TOP_K * 2 * EXP_INTER_DIM;
+  std::vector<float> h_gu_baseline(gu_size, 0.0f);
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeCommandListAppendMemoryCopy(list, h_gu_baseline.data(), d_exp_gu_chunk_, gu_size * sizeof(float), nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+
+  std::printf("[Shootout 6] Timing compact GU...\n"); std::fflush(stdout);
+  // Run Compact GateUp GEMM (indirect launch)
+  double t_gu_compact = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 0, sizeof(void *), &d_exp_gu_chunk_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 1, sizeof(void *), &l0.exp_gu_w);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 2, sizeof(void *), &l0.exp_gu_s);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 3, sizeof(void *), &d_x_post_chunk_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 4, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 5, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 6, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 7, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 8, sizeof(void *), &d_active_expert_ids_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 9, sizeof(void *), &d_num_active_experts_);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 10, sizeof(int), &K_gu);
+    zeKernelSetArgumentValue(k_moe_gateup_compact_batch_, 11, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_gateup_compact_batch_, 128, 1, 1);
+    ze_group_count_t gc_gu_comp{h_args_gu[0], 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_gateup_compact_batch_, &gc_gu_comp, nullptr, 0, nullptr);
+  }, "gu_compact");
+
+  // Verify numerical parity of GateUp
+  std::vector<float> h_gu_compact(gu_size, 0.0f);
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeCommandListAppendMemoryCopy(list, h_gu_compact.data(), d_exp_gu_chunk_, gu_size * sizeof(float), nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+  float max_gu_diff = 0.0f;
+  for (size_t i = 0; i < gu_size; ++i) {
+    float diff = std::abs(h_gu_baseline[i] - h_gu_compact[i]);
+    if (diff > max_gu_diff) max_gu_diff = diff;
+  }
+  std::printf("  [Shootout 6] GateUp max diff: %.2e\n", max_gu_diff); std::fflush(stdout);
+
+  // 4. SiLU Activation
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeKernelSetArgumentValue(k_silu_all_batch_, 0, sizeof(void *), &d_exp_act_chunk_);
+    zeKernelSetArgumentValue(k_silu_all_batch_, 1, sizeof(void *), &d_exp_gu_chunk_);
+    zeKernelSetArgumentValue(k_silu_all_batch_, 2, sizeof(int), &B);
+    zeKernelSetGroupSize(k_silu_all_batch_, 256, 1, 1);
+    ze_group_count_t gc_silu_all{(uint32_t)((B * TOP_K * EXP_INTER_DIM + 255) / 256), 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_silu_all_batch_, &gc_silu_all, nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+
+  std::printf("[Shootout 7] Timing baseline DN...\n"); std::fflush(stdout);
+  // 5. Measure Down GEMM: Baseline vs Compact
+  int K_dn = EXP_INTER_DIM;
+  double t_dn_baseline = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 0, sizeof(void *), &d_exp_down_chunk_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 1, sizeof(void *), &l0.exp_dn_w);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 2, sizeof(void *), &l0.exp_dn_s);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 3, sizeof(void *), &d_exp_act_chunk_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 4, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 5, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 6, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 7, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 8, sizeof(int), &K_dn);
+    zeKernelSetArgumentValue(k_moe_down_grouped_batch_, 9, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_down_grouped_batch_, 128, 1, 1);
+    ze_group_count_t gc_dn_grouped{4096, 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_down_grouped_batch_, &gc_dn_grouped, nullptr, 0, nullptr);
+  }, "dn_baseline");
+
+  size_t dn_size = (size_t)B * TOP_K * HIDDEN_DIM;
+  std::vector<float> h_dn_baseline(dn_size, 0.0f);
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeCommandListAppendMemoryCopy(list, h_dn_baseline.data(), d_exp_down_chunk_, dn_size * sizeof(float), nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+
+  std::printf("[Shootout 8] Timing compact DN...\n"); std::fflush(stdout);
+  // Run Compact Down GEMM (indirect launch)
+  double t_dn_compact = time_cmd([&](ze_command_list_handle_t list) {
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 0, sizeof(void *), &d_exp_down_chunk_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 1, sizeof(void *), &l0.exp_dn_w);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 2, sizeof(void *), &l0.exp_dn_s);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 3, sizeof(void *), &d_exp_act_chunk_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 4, sizeof(void *), &d_expert_counts_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 5, sizeof(void *), &d_expert_offsets_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 6, sizeof(void *), &d_sorted_tokens_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 7, sizeof(void *), &d_sorted_slots_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 8, sizeof(void *), &d_active_expert_ids_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 9, sizeof(void *), &d_num_active_experts_);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 10, sizeof(int), &K_dn);
+    zeKernelSetArgumentValue(k_moe_down_compact_batch_, 11, sizeof(int), &B);
+    zeKernelSetGroupSize(k_moe_down_compact_batch_, 128, 1, 1);
+    ze_group_count_t gc_dn_comp{h_args_dn[0], 1, 1};
+    zeCommandListAppendLaunchKernel(list, k_moe_down_compact_batch_, &gc_dn_comp, nullptr, 0, nullptr);
+  }, "dn_compact");
+
+  std::vector<float> h_dn_compact(dn_size, 0.0f);
+  {
+    ze_command_list_desc_t ldesc = {ZE_STRUCTURE_TYPE_COMMAND_LIST_DESC, nullptr, 0, 0};
+    ze_command_list_handle_t list = nullptr;
+    zeCommandListCreate(ctx_, dev_, &ldesc, &list);
+    zeCommandListAppendMemoryCopy(list, h_dn_compact.data(), d_exp_down_chunk_, dn_size * sizeof(float), nullptr, 0, nullptr);
+    zeCommandListClose(list);
+    zeCommandQueueExecuteCommandLists(queue_, 1, &list, fence_);
+    zeFenceHostSynchronize(fence_, 2000000000ULL);
+    zeFenceReset(fence_);
+    zeCommandListDestroy(list);
+  }
+  float max_dn_diff = 0.0f;
+  for (size_t i = 0; i < dn_size; ++i) {
+    float diff = std::abs(h_dn_baseline[i] - h_dn_compact[i]);
+    if (diff > max_dn_diff) max_dn_diff = diff;
+  }
+  std::printf("  [Shootout 8] Down max diff: %.2e\n", max_dn_diff); std::fflush(stdout);
+
+  // Print Summary
+  std::printf("\n=================================================================\n");
+  std::printf("--- MoE Micro-GEMM Shootout (B = %d) (Arc 140V Xe2) ------------\n", B);
+  std::printf("=================================================================\n");
+  std::printf("Active Experts: %d / 256 (%.1f%% active)\n", h_num_active, (h_num_active * 100.0) / 256.0);
+  std::printf("Indirect Grid GU: %u workgroups (vs 2048 baseline, -%.1f%%)\n",
+              h_args_gu[0], (1.0 - (double)h_args_gu[0] / 2048.0) * 100.0);
+  std::printf("Indirect Grid DN: %u workgroups (vs 4096 baseline, -%.1f%%)\n",
+              h_args_dn[0], (1.0 - (double)h_args_dn[0] / 4096.0) * 100.0);
+  std::printf("-----------------------------------------------------------------\n");
+  std::printf("Kernel               | Baseline   | Compact    | Speedup | Max Abs Diff\n");
+  std::printf("---------------------+------------+------------+---------+-------------\n");
+  std::printf("Build Expert Bins    | %6.3f ms  | %6.3f ms  | %6.2fx  | bit-exact\n",
+              t_bins_baseline, t_bins_compact, t_bins_baseline / t_bins_compact);
+  std::printf("GateUp Grouped GEMM  | %6.3f ms  | %6.3f ms  | %6.2fx  | %.2e\n",
+              t_gu_baseline, t_gu_compact, t_gu_baseline / t_gu_compact, max_gu_diff);
+  std::printf("Down Grouped GEMM    | %6.3f ms  | %6.3f ms  | %6.2fx  | %.2e\n",
+              t_dn_baseline, t_dn_compact, t_dn_baseline / t_dn_compact, max_dn_diff);
+  std::printf("---------------------+------------+------------+---------+-------------\n");
+  double total_base = t_bins_baseline + t_gu_baseline + t_dn_baseline;
+  double total_comp = t_bins_compact + t_gu_compact + t_dn_compact;
+  std::printf("Combined MoE Triad   | %6.3f ms  | %6.3f ms  | %6.2fx  | (savings: %.2f ms/layer)\n",
+              total_base, total_comp, total_base / total_comp, total_base - total_comp);
+  std::printf("Extrapolated 40-Lyr  | %6.2f ms | %6.2f ms | %6.2fx  | (savings: %.2f ms/chunk)\n",
+              total_base * 40.0, total_comp * 40.0, total_base / total_comp, (total_base - total_comp) * 40.0);
+  std::printf("=================================================================\n\n");
+
+  return (max_gu_diff < 1e-4f && max_dn_diff < 1e-4f);
 }
 
 bool AInferRuntime258V::export_diagnostic_cache(const std::string &cache_file, uint32_t pos) {
@@ -3214,8 +3647,8 @@ bool AInferRuntime258V::init_speculative_verification() {
       CHECK_L0(zeCommandListAppendBarrier(cmd_verify_m2_, nullptr, 0, nullptr));
 
       // GQA Attention
-      ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
       if (kv8_enabled_) {
+        ze_group_count_t gcnt_attn{(uint32_t)(B * NUM_Q_HEADS), 1, 1};
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 0, sizeof(void *), &d_attn_out_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 1, sizeof(void *), &d_q_full_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_i8_, 2, sizeof(void *), &d_gate_full_chunk_));
@@ -3229,6 +3662,13 @@ bool AInferRuntime258V::init_speculative_verification() {
         CHECK_L0(zeKernelSetGroupSize(k_attn_batch_i8_, 256, 1, 1));
         CHECK_L0(zeCommandListAppendLaunchKernel(cmd_verify_m2_, k_attn_batch_i8_, &gcnt_attn, nullptr, 0, nullptr));
       } else {
+        ze_group_count_t gcnt_attn;
+        if (flash_attn_prefill_) {
+          uint32_t num_b_blks = (uint32_t)((B + 7) / 8);
+          gcnt_attn = {(uint32_t)NUM_Q_HEADS, num_b_blks, 1};
+        } else {
+          gcnt_attn = {(uint32_t)(B * NUM_Q_HEADS), 1, 1};
+        }
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_, 0, sizeof(void *), &d_attn_out_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_, 1, sizeof(void *), &d_q_full_chunk_));
         CHECK_L0(zeKernelSetArgumentValue(k_attn_batch_, 2, sizeof(void *), &d_gate_full_chunk_));
@@ -3747,8 +4187,11 @@ void AInferRuntime258V::cleanup() {
   if (k_attn_batch_) zeKernelDestroy(k_attn_batch_);
   if (k_router_batch_) zeKernelDestroy(k_router_batch_);
   if (k_moe_build_expert_bins_) zeKernelDestroy(k_moe_build_expert_bins_);
+  if (k_moe_build_expert_bins_compact_) zeKernelDestroy(k_moe_build_expert_bins_compact_);
   if (k_moe_gateup_grouped_batch_) zeKernelDestroy(k_moe_gateup_grouped_batch_);
+  if (k_moe_gateup_compact_batch_) zeKernelDestroy(k_moe_gateup_compact_batch_);
   if (k_moe_down_grouped_batch_) zeKernelDestroy(k_moe_down_grouped_batch_);
+  if (k_moe_down_compact_batch_) zeKernelDestroy(k_moe_down_compact_batch_);
   if (k_moe_accum_down_batch_) zeKernelDestroy(k_moe_accum_down_batch_);
   if (k_exp_gu_all_batch_) zeKernelDestroy(k_exp_gu_all_batch_);
   if (k_silu_all_batch_) zeKernelDestroy(k_silu_all_batch_);

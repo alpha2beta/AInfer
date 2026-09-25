@@ -1,0 +1,26 @@
+{
+  "task": "I3.7-long-context-catchup",
+  "device": "Intel(R) Arc(TM) Graphics",
+  "model": "models/Tiel-Coder-35B-A3B-Genesis-Hermes/tiel-coder-35b-text-int4g128.binfer",
+  "prompt_tokens": 6720,
+  "decode_tokens": 32,
+  "max_context": 8192,
+  "init_ms": 17154.9,
+  "warmup_prefill_ms": 37317.9,
+  "measured_prefill_ms": 38472,
+  "measured_prefill_tok_per_s": 174.677,
+  "measured_greedy_decode_tok_per_s": 12.2699,
+  "measured_spec_decode_tok_per_s": 9.20929,
+  "spec_acceptance_rate_pct": 0,
+  "spec_parity": false,
+  "claim_comparison": {
+    "prior_ainfer_prefill_tok_per_s": 84.3,
+    "llama_cpp_prefill_tok_per_s": 183.2,
+    "prefill_speedup_vs_prior": 2.07208,
+    "prefill_ratio_vs_llama": 0.953475,
+    "prior_ainfer_decode_tok_per_s": 9.4,
+    "llama_cpp_decode_tok_per_s": 23,
+    "decode_speedup_vs_prior": 1.3053,
+    "decode_ratio_vs_llama": 0.533472
+  }
+}
